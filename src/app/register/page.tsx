@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as faceapi from "face-api.js";
-import { Camera, UserPlus, FileJson, Loader2, MapPin, Phone, Droplets, User, ChevronRight, Check } from "lucide-react";
+import { Camera, UserPlus, FileJson, Loader2, MapPin, Phone, Droplets, User, ChevronRight, Check, Database } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const BLOOD_TYPES = ["A", "B", "AB", "O", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -544,13 +544,19 @@ export default function RegisterPage() {
           </form>
         </div>
 
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <p className="text-sm text-muted-foreground">
             มีบัญชีอยู่แล้ว?{" "}
             <a href="/login" className="font-semibold text-primary hover:text-primary/80 transition-colors">
               กลับไปหน้าเข้าสู่ระบบ
             </a>
           </p>
+          <div className="pt-4 border-t border-border">
+            <a href="/test-db" className="inline-flex items-center justify-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+              <Database className="w-4 h-4 mr-2" />
+              ทดสอบการเชื่อมต่อฐานข้อมูล
+            </a>
+          </div>
         </div>
       </div>
     </div>
