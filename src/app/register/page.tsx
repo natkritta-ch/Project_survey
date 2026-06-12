@@ -137,6 +137,13 @@ export default function RegisterPage() {
     e.preventDefault();
     setSubmitError("");
     setSubmitSuccess("");
+
+    if (!formData.name || !formData.username || !formData.password || !formData.email) {
+      setSubmitError("⚠️ กรุณากรอกข้อมูลส่วนตัวในขั้นตอนที่ 1 ให้ครบถ้วน (ชื่อ, อีเมล, รหัสนักเรียน, รหัสผ่าน)");
+      setStep(1);
+      return;
+    }
+
     if (!faceDescriptor) {
       setSubmitError("⚠️ กรุณาสแกนใบหน้าก่อนทำการลงทะเบียน");
       return;
@@ -190,7 +197,12 @@ export default function RegisterPage() {
                   <div className="flex items-center">
                     <button
                       type="button"
-                      onClick={() => setStep(currentStep)}
+                      onClick={() => {
+                        if (currentStep > 1 && (!formData.name || !formData.username || !formData.password || !formData.email)) {
+                          return; // ป้องกันการกดข้ามหน้าถ้ากรอกหน้า 1 ไม่ครบ
+                        }
+                        setStep(currentStep);
+                      }}
                       className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                         isActive 
                           ? 'bg-primary border-2 border-primary' 
@@ -228,7 +240,7 @@ export default function RegisterPage() {
 
         {/* Form Card */}
         <div className="bg-card border border-border shadow-sm rounded-xl overflow-hidden">
-          <form onSubmit={onSubmit} className="p-6 sm:p-8">
+          <form onSubmit={onSubmit} className="p-6 sm:p-8" noValidate>
             
             {/* ── Step 1: ข้อมูลส่วนตัว ── */}
             <div className={step === 1 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden'}>
@@ -346,7 +358,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setStep(2)}
-                  disabled={!formData.name || !formData.username || !formData.password}
+                  disabled={!formData.name || !formData.username || !formData.password || !formData.email}
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-8"
                 >
                   ถัดไป <ChevronRight className="ml-2 h-4 w-4" />
