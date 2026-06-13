@@ -14,7 +14,7 @@ model attendance {
   type      attendance_type
   status    String
   timestamp DateTime        @default(now())
-  user      user            @relation(fields: [studentId], references: [id], onDelete: Cascade, map: "Attendance_studentId_fkey")
+  student   user            @relation(fields: [studentId], references: [id], onDelete: Cascade, map: "Attendance_studentId_fkey")
   subject   subject?        @relation(fields: [subjectId], references: [id], map: "Attendance_subjectId_fkey")
 
   @@index([studentId], map: "Attendance_studentId_fkey")
@@ -28,7 +28,7 @@ model grade {
   grade     Float
   createdAt DateTime @default(now())
   updatedAt DateTime
-  user      user     @relation(fields: [studentId], references: [id], onDelete: Cascade, map: "Grade_studentId_fkey")
+  student   user     @relation(fields: [studentId], references: [id], onDelete: Cascade, map: "Grade_studentId_fkey")
   subject   subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade, map: "Grade_subjectId_fkey")
 
   @@unique([studentId, subjectId], map: "Grade_studentId_subjectId_key")
@@ -62,13 +62,13 @@ model subject {
   attendance   attendance[]
   grade        grade[]
   schedule     schedule[]
-  user         user?        @relation(fields: [teacherId], references: [id], map: "Subject_teacherId_fkey")
+  teacher      user?        @relation(fields: [teacherId], references: [id], map: "Subject_teacherId_fkey")
 
   @@unique([code, academicYear, term], map: "Subject_code_academicYear_term_key")
   @@index([teacherId], map: "Subject_teacherId_fkey")
 }
 
-model termconfig {
+model termConfig {
   id           String   @id @default(cuid())
   academicYear String
   term         String
@@ -77,6 +77,7 @@ model termconfig {
   isCurrent    Boolean  @default(false)
 
   @@unique([academicYear, term], map: "TermConfig_academicYear_term_key")
+  @@map("termconfig")
 }
 
 model user {
@@ -102,11 +103,11 @@ model user {
   deletedAt          DateTime?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @default(now())
-  attendance         attendance[]
-  grade              grade[]
-  subject            subject[]
-  user               user?        @relation("userTouser", fields: [studentId], references: [id], map: "User_studentId_fkey")
-  other_user         user[]       @relation("userTouser")
+  attendances        attendance[]
+  grades             grade[]
+  subjects           subject[]
+  student            user?        @relation("userTouser", fields: [studentId], references: [id], map: "User_studentId_fkey")
+  students           user[]       @relation("userTouser")
 
   @@index([studentId], map: "User_studentId_fkey")
 }
