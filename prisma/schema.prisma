@@ -7,114 +7,118 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  HEAD
-  TEACHER
-  STUDENT
-  PARENT
+model attendance {
+  id        String          @id
+  studentId String
+  subjectId String?
+  type      attendance_type
+  status    String
+  timestamp DateTime        @default(now())
+  user      user            @relation(fields: [studentId], references: [id], onDelete: Cascade, map: "Attendance_studentId_fkey")
+  subject   subject?        @relation(fields: [subjectId], references: [id], map: "Attendance_subjectId_fkey")
+
+  @@index([studentId], map: "Attendance_studentId_fkey")
+  @@index([subjectId], map: "Attendance_subjectId_fkey")
 }
 
-enum AttendanceType {
-  class
-  assembly
+model grade {
+  id        String   @id
+  studentId String
+  subjectId String
+  grade     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  user      user     @relation(fields: [studentId], references: [id], onDelete: Cascade, map: "Grade_studentId_fkey")
+  subject   subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade, map: "Grade_subjectId_fkey")
+
+  @@unique([studentId, subjectId], map: "Grade_studentId_subjectId_key")
+  @@index([subjectId], map: "Grade_subjectId_fkey")
 }
 
-model User {
-  id             String    @id @default(uuid())
-  name           String
-  username       String    @unique
-  password       String
-  twoFactorSecret String?  // สำหรับเก็บ Secret Key ของ Google Authenticator
-  isTwoFactorEnabled Boolean @default(false)
-  role           Role
-  // เก็บ Vector หรือ Base64 สำหรับแสกนหน้า
-  faceDescriptor String?   @db.Text
-  level          String?   // ชั้นปีของนักเรียน เช่น ปวช.1, ปวช.2, ปวช.3, ปวส.1, ปวส.2
-  canEditProfile Boolean   @default(false) // หัวหน้าแผนกต้องเปิดสิทธิ์ให้ก่อนถึงจะแก้ไขข้อมูลส่วนตัวได้
-  canSubmitGrades Boolean   @default(false) // อาจารย์/หัวหน้าแผนกต้องเปิดสิทธิ์ก่อนนักเรียนถึงจะกรอกเกรดได้
-  nickname        String?   // ชื่อเล่น
-  phone           String?   // เบอร์โทรศัพท์
-  address         String?   @db.Text // ที่อยู่
-  bloodType       String?   // กรุ๊ปเลือด
-  gender          String?   // เพศ (ชาย, หญิง, ไม่ระบุ)
-  email           String?   @unique // อีเมลสำหรับการกู้คืนรหัสผ่าน
-  profilePicture  String?   @db.MediumText // รูปภาพโปรไฟล์ (Base64)
-  
-  studentId      String?
-  student        User?     @relation("ParentToStudent", fields: [studentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  parents        User[]    @relation("ParentToStudent")
+model schedule {
+  id        String    @id
+  subjectId String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  deletedAt DateTime?
+  subject   subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade, map: "Schedule_subjectId_fkey")
 
-  subjects       Subject[] @relation("TeacherToSubject")
-  attendances    Attendance[]
-  grades         Grade[]
-  deletedAt      DateTime? // สำหรับระบบถังขยะ
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @default(now()) @updatedAt
+  @@index([subjectId], map: "Schedule_subjectId_fkey")
 }
 
-model Subject {
-  id           String       @id @default(uuid())
+model subject {
+  id           String       @id
   name         String
   code         String
-  level        String       @default("-") // เช่น ปวช.1, ปวช.2, ปวช.3, ปวส.1, ปวส.2
-  group        String       @default("ก.1,2") // กลุ่มการเรียนรู้ เช่น ก.1, ก.2, ก.1,2
-  room         String?      // ห้องเรียน
+  level        String       @default("-")
+  group        String       @default("ก.1,2")
+  room         String?
   academicYear String       @default("2569")
   term         String       @default("1")
-  credit       Float        @default(3.0) // หน่วยกิต
-  
-  teacherId    String?      
-  teacher      User?        @relation("TeacherToSubject", fields: [teacherId], references: [id], onDelete: SetNull)
+  credit       Float        @default(3)
+  teacherId    String?
+  deletedAt    DateTime?
+  attendance   attendance[]
+  grade        grade[]
+  schedule     schedule[]
+  user         user?        @relation(fields: [teacherId], references: [id], map: "Subject_teacherId_fkey")
 
-  schedules    Schedule[]
-  attendances  Attendance[]
-  grades       Grade[]
-  deletedAt    DateTime?    // สำหรับระบบถังขยะ
-
-  @@unique([code, academicYear, term])
+  @@unique([code, academicYear, term], map: "Subject_code_academicYear_term_key")
+  @@index([teacherId], map: "Subject_teacherId_fkey")
 }
 
-model Schedule {
-  id        String   @id @default(uuid())
-  subjectId String
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  dayOfWeek Int      // 1 = จันทร์, 7 = อาทิตย์
-  startTime String   // "08:00"
-  endTime   String   // "10:00"
-  deletedAt DateTime? // สำหรับระบบถังขยะ
-}
-
-model Attendance {
-  id        String         @id @default(uuid())
-  studentId String
-  student   User           @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  subjectId String?        // ว่างได้ในกรณีเป็นการเข้าแถวรวม (assembly)
-  subject   Subject?       @relation(fields: [subjectId], references: [id])
-  type      AttendanceType // การเข้าเรียนแบบ 'class' หรือ 'assembly'
-  status    String         // เช่น PRESENT, ABSENT, LATE, EXCUSED
-  timestamp DateTime       @default(now())
-}
-
-model Grade {
-  id        String   @id @default(uuid())
-  studentId String
-  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  subjectId String
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  grade     Float    // Numeric grade, e.g. 4.0, 3.5, 3.0, etc.
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([studentId, subjectId])
-}
-
-model TermConfig {
-  id           String   @id @default(uuid())
+model termconfig {
+  id           String   @id
   academicYear String
   term         String
   startDate    DateTime
   endDate      DateTime
   isCurrent    Boolean  @default(false)
 
-  @@unique([academicYear, term])
+  @@unique([academicYear, term], map: "TermConfig_academicYear_term_key")
+}
+
+model user {
+  id                 String       @id
+  name               String
+  username           String       @unique(map: "User_username_key")
+  password           String
+  twoFactorSecret    String?
+  isTwoFactorEnabled Boolean      @default(false)
+  role               user_role
+  faceDescriptor     String?      @db.Text
+  level              String?
+  canEditProfile     Boolean      @default(false)
+  canSubmitGrades    Boolean      @default(false)
+  nickname           String?
+  phone              String?
+  address            String?      @db.Text
+  bloodType          String?
+  gender             String?
+  email              String?      @unique(map: "User_email_key")
+  profilePicture     String?      @db.MediumText
+  studentId          String?
+  deletedAt          DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now())
+  attendance         attendance[]
+  grade              grade[]
+  subject            subject[]
+  user               user?        @relation("userTouser", fields: [studentId], references: [id], map: "User_studentId_fkey")
+  other_user         user[]       @relation("userTouser")
+
+  @@index([studentId], map: "User_studentId_fkey")
+}
+
+enum attendance_type {
+  class
+  assembly
+}
+
+enum user_role {
+  HEAD
+  TEACHER
+  STUDENT
+  PARENT
 }
