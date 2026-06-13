@@ -71,6 +71,7 @@ export async function POST(request: Request) {
       },
       update: { grade: numericGrade },
       create: {
+        id: crypto.randomUUID(),
         studentId: actualStudentId,
         subjectId: subjectId,
         grade: numericGrade,
