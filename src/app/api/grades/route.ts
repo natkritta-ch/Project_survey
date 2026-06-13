@@ -75,6 +75,7 @@ export async function POST(request: Request) {
         student: { connect: { id: actualStudentId } },
         subject: { connect: { id: subjectId } },
         grade: numericGrade,
+        updatedAt: new Date(),
       }
     });
 
