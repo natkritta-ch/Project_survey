@@ -33,7 +33,7 @@ async function main() {
   for (const s of subjectsData) {
     const existing = await prisma.subject.findFirst({ where: { code: s.code, academicYear, term } });
     if (!existing) {
-      createdSubjects.push(await prisma.subject.create({ data: s }));
+      createdSubjects.push(await prisma.subject.create({ data: { ...s, id: crypto.randomUUID() } }));
       console.log(`Created subject: ${s.code}`);
     } else {
       createdSubjects.push(existing);
@@ -70,6 +70,7 @@ async function main() {
 
         await prisma.schedule.create({
             data: {
+                id: crypto.randomUUID(),
                 subjectId: subj.id,
                 dayOfWeek: day,
                 startTime: startStr,

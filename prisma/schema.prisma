@@ -8,7 +8,7 @@ datasource db {
 }
 
 model attendance {
-  id        String          @id
+  id        String          @id @default(cuid())
   studentId String
   subjectId String?
   type      attendance_type
@@ -22,7 +22,7 @@ model attendance {
 }
 
 model grade {
-  id        String   @id
+  id        String   @id @default(cuid())
   studentId String
   subjectId String
   grade     Float
@@ -36,7 +36,7 @@ model grade {
 }
 
 model schedule {
-  id        String    @id
+  id        String    @id @default(cuid())
   subjectId String
   dayOfWeek Int
   startTime String
@@ -48,7 +48,7 @@ model schedule {
 }
 
 model subject {
-  id           String       @id
+  id           String       @id @default(cuid())
   name         String
   code         String
   level        String       @default("-")
@@ -69,7 +69,7 @@ model subject {
 }
 
 model termconfig {
-  id           String   @id
+  id           String   @id @default(cuid())
   academicYear String
   term         String
   startDate    DateTime
@@ -80,7 +80,7 @@ model termconfig {
 }
 
 model user {
-  id                 String       @id
+  id                 String       @id @default(cuid())
   name               String
   username           String       @unique(map: "User_username_key")
   password           String
