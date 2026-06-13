@@ -8,6 +8,7 @@ export default function TestDbPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
   const [details, setDetails] = useState("");
+  const [connectionInfo, setConnectionInfo] = useState<{host: string, user: string, database: string} | null>(null);
 
   const checkConnection = async () => {
     setStatus("loading");
@@ -21,6 +22,7 @@ export default function TestDbPage() {
       if (data.success) {
         setStatus("success");
         setMessage(data.message);
+        if (data.connection) setConnectionInfo(data.connection);
       } else {
         setStatus("error");
         setMessage(data.message);
@@ -62,9 +64,28 @@ export default function TestDbPage() {
           )}
 
           {status === "success" && (
-            <div className="w-full aspect-video bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 rounded-lg flex flex-col items-center justify-center gap-3">
-              <CheckCircle2 className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
-              <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{message}</p>
+            <div className="w-full flex flex-col gap-4">
+              <div className="w-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-800 rounded-lg p-6 flex flex-col items-center justify-center gap-3">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">{message}</p>
+              </div>
+              {connectionInfo && (
+                <div className="w-full bg-muted/50 border border-border rounded-lg p-4 text-sm space-y-2">
+                  <p className="font-semibold text-foreground border-b border-border pb-2 mb-2">รายละเอียดการเชื่อมต่อ</p>
+                  <div className="grid grid-cols-3 gap-2 text-muted-foreground">
+                    <span className="font-medium text-foreground">Host:</span>
+                    <span className="col-span-2">{connectionInfo.host}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-muted-foreground">
+                    <span className="font-medium text-foreground">Database:</span>
+                    <span className="col-span-2">{connectionInfo.database}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-muted-foreground">
+                    <span className="font-medium text-foreground">User:</span>
+                    <span className="col-span-2">{connectionInfo.user}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
