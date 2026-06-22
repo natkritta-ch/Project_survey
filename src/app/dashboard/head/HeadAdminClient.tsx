@@ -109,7 +109,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       }
       resetSubjectForm();
     } catch {
-      alert("เกิดข้อผิดพลาดในการบันทึกวิชา (อาจมีรหัสวิชาและกลุ่มเรียนซ้ำในเทอมเดียวกัน)");
+      alert("เกิดข้อผิดพลาดในการบันทึกวิชา (อาจมีรหัสวิชา, กลุ่มเรียน และชั้นปีซ้ำในเทอมเดียวกัน)");
     } finally {
       setIsLoading(false);
       setIsEditSubjectModalOpen(false);
