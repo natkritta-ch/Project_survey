@@ -1408,13 +1408,17 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">เทอม</label>
                   <select value={subjTerm} onChange={e => setSubjTerm(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
                     <option value="1">1</option>
                     <option value="2">2</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">หน่วยกิต</label>
+                  <input required type="number" step="0.5" min="0" value={subjCredit} onChange={e => setSubjCredit(parseFloat(e.target.value))} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border" />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">กลุ่มเรียน</label>
