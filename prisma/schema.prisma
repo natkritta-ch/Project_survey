@@ -65,7 +65,7 @@ model subject {
   schedule     schedule[]
   teacher      user?        @relation(fields: [teacherId], references: [id], map: "Subject_teacherId_fkey")
 
-  @@unique([code, academicYear, term], map: "Subject_code_academicYear_term_key")
+  @@unique([code, academicYear, term, group])
   @@index([teacherId], map: "Subject_teacherId_fkey")
 }
 
