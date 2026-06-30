@@ -132,20 +132,26 @@ export default function TeacherScannerClient({
     stopCamera();
     
     // หลังจากปิดกล้อง ให้สอบถามและบันทึก "ขาดเรียน" สำหรับคนที่ยังไม่ถูกบันทึก 
-    let unloggedStudents = students.filter(s => !logs.find(l => l.id === s.id));
+    let sessionUnloggedStudents = students.filter(s => !logs.find(l => l.id === s.id));
     if (scanType === "assembly" && assemblyLevel !== "ทั้งหมด") {
-      unloggedStudents = unloggedStudents.filter(s => s.level === assemblyLevel);
+      sessionUnloggedStudents = sessionUnloggedStudents.filter(s => s.level === assemblyLevel);
+    } else if (scanType === "class" && selectedSubject) {
+      const sObj = subjects.find(s => s.id === selectedSubject);
+      // กรองเฉพาะเด็กที่มีระดับชั้นตรงกับวิชาเท่านั้น ป้องกันการข้ามไปเช็คขาดให้เด็กชั้นอื่น
+      if (sObj && sObj.level) {
+        sessionUnloggedStudents = sessionUnloggedStudents.filter(s => s.level === sObj.level);
+      }
     }
     
-    if (unloggedStudents.length > 0) {
-      const confirmAbsent = window.confirm(`คุณต้องการบันทึกสถานะ "ขาดเรียน" ให้นักเรียนที่เหลือจำนวน ${unloggedStudents.length} คน ใช่หรือไม่?`);
+    if (sessionUnloggedStudents.length > 0) {
+      const confirmAbsent = window.confirm(`คุณต้องการบันทึกสถานะ "ขาดเรียน" ให้นักเรียนที่เหลือจำนวน ${sessionUnloggedStudents.length} คน ใช่หรือไม่?`);
       if (confirmAbsent) {
         try {
           await fetch('/api/attendance/absent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              studentIds: unloggedStudents.map(s => s.id),
+              studentIds: sessionUnloggedStudents.map(s => s.id),
               subjectId: scanType === "class" ? selectedSubject : null,
               type: scanType
             })
@@ -288,6 +294,11 @@ export default function TeacherScannerClient({
   let unloggedStudents = students.filter(s => !logs.find(l => l.id === s.id));
   if (scanType === "assembly" && assemblyLevel !== "ทั้งหมด") {
     unloggedStudents = unloggedStudents.filter(s => s.level === assemblyLevel);
+  } else if (scanType === "class" && selectedSubject) {
+    const sObj = subjects.find(s => s.id === selectedSubject);
+    if (sObj && sObj.level) {
+      unloggedStudents = unloggedStudents.filter(s => s.level === sObj.level);
+    }
   }
 
   return (
