@@ -285,7 +285,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const isAllStudentsGradesUnlocked = activeStudents.length > 0 && activeStudents.every(u => u.canSubmitGrades);
 
   const handlePromoteStudents = async () => {
-    if (confirm("คุณแน่ใจหรือไม่ที่จะเลื่อนชั้นปีนักเรียนทั้งวิทยาลัย?\n\n- ปวช.1 -> ปวช.2, ปวช.2 -> ปวช.3, ปวส.1 -> ปวส.2\n- ปวช.3 และ ปวส.2 จะถูกเลื่อนเป็น จบการศึกษา")) {
+    if (confirm("คุณแน่ใจหรือไม่ที่จะเลื่อนชั้นปีนักเรียนทั้งวิทยาลัย?\n\n- ปวช.1 -> ปวช.2, ปวช.2 -> ปวช.3, ปวส.1 -> ปวส.2\n- ปวช.3 และ ปวส.2 เมื่อเลื่อนชั้นแล้ว ข้อมูลจะถูกลบออกจากระบบทันที")) {
       setIsLoading(true);
       try {
         await promoteStudents();
@@ -297,18 +297,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     }
   };
 
-  const handleClearOldGraduates = async () => {
-    if (confirm("คุณแน่ใจหรือไม่ที่จะลบข้อมูลนักเรียนที่ 'จบการศึกษา' ไปแล้วเกิน 2 ปี ถาวร?\n(การกระทำนี้ไม่สามารถกู้คืนได้ และจะช่วยเพิ่มพื้นที่ว่างให้ฐานข้อมูล)")) {
-      setIsLoading(true);
-      try {
-        await clearOldGraduates();
-        alert("ล้างข้อมูลผู้ที่จบการศึกษาเกิน 2 ปี เรียบร้อยแล้ว");
-      } catch (e) {
-        alert("เกิดข้อผิดพลาดในการล้างข้อมูล");
-      }
-      setIsLoading(false);
-    }
-  };
   const handleViewAttendance = async (u: any) => {
     setIsLoading(true);
     try {
@@ -472,7 +460,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               </div>
             </div>
             
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-auto max-h-[70vh] border-t border-gray-200 dark:border-gray-700">
               {selectedSubjects.length > 0 && (
                 <div className="mb-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg flex items-center justify-between border border-red-100 dark:border-red-800">
                   <span className="text-red-700 dark:text-red-300 font-medium text-sm">
@@ -485,7 +473,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </div>
               )}
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                   <tr>
                     <th className="px-6 py-3 text-left w-12">
                       <input 
@@ -899,11 +887,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     </div>
                     <button disabled={isLoading} onClick={handlePromoteStudents} className="bg-amber-500 text-white px-3 py-2 rounded-md hover:bg-amber-600 disabled:opacity-50 text-sm font-semibold flex items-center shadow-sm">
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" /></svg>
-                      เลื่อนชั้นปีนักเรียนทั้งหมด
-                    </button>
-                    <button disabled={isLoading} onClick={handleClearOldGraduates} className="bg-red-500 text-white px-3 py-2 rounded-md hover:bg-red-600 disabled:opacity-50 text-sm font-semibold flex items-center shadow-sm">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      ล้างข้อมูลคนจบการศึกษา &gt; 2 ปี
+                      เลื่อนชั้นปีนักเรียนทั้งหมด (คนที่จบจะถูกลบทันที)
                     </button>
                   </div>
                 )}
@@ -1078,9 +1062,9 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 ))}
               </div>
             ) : (
-              <div className="overflow-x-auto mt-4">
+              <div className="overflow-x-auto overflow-y-auto max-h-[70vh] mt-4 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-6 py-3 text-left w-12">
                         <input 
@@ -1228,9 +1212,9 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   </div>
                 )}
               </div>
-              <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="overflow-x-auto overflow-y-auto max-h-[70vh] bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">รหัสวิชา</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ชื่อวิชา</th>
@@ -1269,9 +1253,9 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   </div>
                 )}
               </div>
-              <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="overflow-x-auto overflow-y-auto max-h-[70vh] bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">วิชา (รหัส)</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">วัน / เวลา</th>
@@ -1308,9 +1292,9 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   </div>
                 )}
               </div>
-              <div className="overflow-x-auto bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="overflow-x-auto overflow-y-auto max-h-[70vh] bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Username / ชื่อ</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">สิทธิ์ / ชั้นปี</th>

@@ -192,12 +192,20 @@ export async function promoteStudents() {
     else if (student.level === "ปวส.2(ม.6)") nextLevel = "จบการศึกษา";
     
     if (nextLevel !== student.level) {
-      transactions.push(
-        prisma.user.update({
-          where: { id: student.id },
-          data: { level: nextLevel }
-        })
-      );
+      if (nextLevel === "จบการศึกษา") {
+        transactions.push(
+          prisma.user.delete({
+            where: { id: student.id }
+          })
+        );
+      } else {
+        transactions.push(
+          prisma.user.update({
+            where: { id: student.id },
+            data: { level: nextLevel }
+          })
+        );
+      }
     }
   }
   

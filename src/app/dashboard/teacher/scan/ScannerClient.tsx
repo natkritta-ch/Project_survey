@@ -48,7 +48,8 @@ export default function TeacherScannerClient({
             const descriptor = new Float32Array(descArray);
             return new faceapi.LabeledFaceDescriptors(s.id, [descriptor]);
           });
-          setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.55));
+          // ปรับความแม่นยำ (Distance Threshold) จาก 0.55 เป็น 0.48 เพื่อให้ระบบเข้มงวดขึ้น (หน้าต้องเหมือนจริงถึงจะผ่าน)
+          setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.48));
         }
 
         setModelsLoaded(true);
@@ -195,15 +196,25 @@ export default function TeacherScannerClient({
             const studentName = student?.name || "ไม่ทราบชื่อ";
             
             let allowedToLog = true;
-            if (scanType === "assembly" && assemblyLevel !== "ทั้งหมด") {
+            let rejectReason = "";
+
+            // ป้องกันการแสกนหน้าคนที่อยู่ไกลหรือเป็นฉากหลัง (หน้าเล็กเกินไปความแม่นยำจะต่ำ)
+            const minFaceSize = 90; // พิกเซล
+            const faceBox = resizedDetections[i].detection.box;
+
+            if (faceBox.width < minFaceSize || faceBox.height < minFaceSize) {
+              allowedToLog = false;
+              rejectReason = "ขยับหน้าเข้ามาใกล้ๆ";
+            } else if (scanType === "assembly" && assemblyLevel !== "ทั้งหมด") {
               if (student?.level !== assemblyLevel) {
                 allowedToLog = false;
+                rejectReason = "คนละชั้นปี";
               }
             }
 
             if (!allowedToLog) {
-              boxLabel = `${studentName} (คนละชั้นปี)`;
-              boxColor = "orange";
+              boxLabel = rejectReason === "ขยับหน้าเข้ามาใกล้ๆ" ? rejectReason : `${studentName} (${rejectReason})`;
+              boxColor = rejectReason === "ขยับหน้าเข้ามาใกล้ๆ" ? "gray" : "orange";
             } else {
               const similarity = Math.max(0, 100 - (result.distance * 100)); // แปลง Distance ให้เป็น % ความเหมือน
               boxLabel = `${studentName} (${Math.round(similarity)}%)`;
