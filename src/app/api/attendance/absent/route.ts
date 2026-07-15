@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
     const alreadyPresentWhere: any = {
       studentId: { in: studentIds },
-      status: "PRESENT",
+      status: { in: ["PRESENT", "LATE"] },
       timestamp: { gte: todayStart, lte: todayEnd },
     };
 

@@ -86,6 +86,14 @@ export async function POST(request: Request) {
     });
 
     if (recent) {
+      if (recent.status === "ABSENT") {
+        // หากครูเคยเช็คขาดไปแล้ว ให้สแกนหน้าทับเป็นมาเรียน/มาสายได้เลย
+        const updated = await prisma.attendance.update({
+          where: { id: recent.id },
+          data: { status: status || "PRESENT", timestamp: new Date() }
+        });
+        return NextResponse.json({ success: true, attendance: updated, updatedFromAbsent: true });
+      }
       return NextResponse.json({ success: true, message: "Checked in recently", duplicate: true });
     }
 

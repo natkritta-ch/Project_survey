@@ -20,7 +20,7 @@ export default async function HeadDashboard() {
     orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] 
   });
   const rawUsers = await prisma.user.findMany({ 
-    include: { student: true }, 
+    include: { student: true, attendances: true }, 
     orderBy: { username: 'asc' } 
   });
 
