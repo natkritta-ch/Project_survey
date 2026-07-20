@@ -24,7 +24,7 @@ export default function ClientInputAutoSubmit({
       title={title}
       onChange={(e) => {
         if (e.target.form) {
-          e.target.form.submit();
+          e.target.form.requestSubmit();
         }
       }}
     />

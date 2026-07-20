@@ -88,8 +88,8 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
         const presentCount = st.attendances.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length; 
         const percent = totalAssemblyDays > 0 ? (presentCount / totalAssemblyDays) * 100 : 0;
         
-        // เกณฑ์: ผ่านคือ >= 80%
-        const isPass = percent >= 80;
+        // เกณฑ์: ผ่านคือ >= 60%
+        const isPass = percent >= 60;
 
         return {
           id: st.id,
@@ -197,7 +197,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
   // Stats for cards
   const totalStudents = summaryData.length;
   const criticalStudents = activeSubjectId === "assembly" 
-    ? summaryData.filter(s => s.percent < 80).length 
+    ? summaryData.filter(s => s.percent < 60).length 
     : summaryData.filter(s => s.absents >= 4).length;
   const warningStudents = activeSubjectId !== "assembly" ? summaryData.filter(s => s.absents === 3).length : 0;
 
@@ -205,7 +205,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
   let finalSummaryData = summaryData;
   if (showOnlyFailed) {
     if (activeSubjectId === "assembly") {
-      finalSummaryData = summaryData.filter(s => s.percent < 80);
+      finalSummaryData = summaryData.filter(s => s.percent < 60);
     } else {
       finalSummaryData = summaryData.filter(s => s.absents >= 4);
     }
@@ -228,10 +228,10 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
           
           {/* View Switcher Tabs */}
           <div className="flex bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 rounded-lg p-1">
-            <Link href={`?view=summary&subjectId=${activeSubjectId}&level=${activeLevel}`} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center transition ${isSummaryView(viewMode) ? 'bg-indigo-50 text-indigo-700 shadow-sm dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}>
+            <Link href={`/dashboard/teacher/report?view=summary&subjectId=${activeSubjectId}&level=${activeLevel}`} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center transition ${isSummaryView(viewMode) ? 'bg-indigo-50 text-indigo-700 shadow-sm dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}>
               <BarChart3 className="w-4 h-4 mr-2" /> สรุปประเมินผล
             </Link>
-            <Link href={`?view=logs&subjectId=${activeSubjectId}&level=${activeLevel}`} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center transition ${!isSummaryView(viewMode) ? 'bg-indigo-50 text-indigo-700 shadow-sm dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}>
+            <Link href={`/dashboard/teacher/report?view=logs&subjectId=${activeSubjectId}&level=${activeLevel}`} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center transition ${!isSummaryView(viewMode) ? 'bg-indigo-50 text-indigo-700 shadow-sm dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}>
               <ListChecks className="w-4 h-4 mr-2" /> ดู/แก้ไขรายวัน
             </Link>
           </div>
@@ -359,7 +359,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
             <div className="p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center flex-wrap gap-4">
               <h3 className="font-semibold text-slate-800 dark:text-slate-200">
                 {activeSubjectId === "assembly" 
-                  ? "ตารางผลประเมินการเข้าแถว (เกณฑ์ผ่าน 80%)" 
+                  ? "ตารางผลประเมินการเข้าแถว (เกณฑ์ผ่าน 60%)" 
                   : `ตารางสรุปผลการขาดเรียน วิชา [${subjectDetail?.code || '-'}] ${subjectDetail?.name || ''} (ระดับชั้น: ${subjectDetail?.level || '-'}) (เกณฑ์ ขร. คือขาด 4 ครั้ง)`}
               </h3>
               
@@ -415,7 +415,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
                           <>
                             <td className="px-6 py-4 whitespace-nowrap text-center font-medium">{st.detailStr}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${st.percent >= 80 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${st.percent >= 60 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
                                 {st.percent}%
                               </span>
                             </td>

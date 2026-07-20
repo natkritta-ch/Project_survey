@@ -28,7 +28,7 @@ export default function StudentStatusOverview({ attendances, subjects }: { atten
     const absents = finalAssemblyLogs.filter((a: any) => ["ABSENT"].includes(a.status)).length;
     const leaves = finalAssemblyLogs.filter((a: any) => ["LEAVE_PERSONAL", "LEAVE_SICK"].includes(a.status)).length;
     const percent = totalDays > 0 ? (presents / totalDays) * 100 : 0;
-    const isPass = totalDays === 0 || percent >= 80;
+    const isPass = totalDays === 0 || percent >= 60;
 
     const assemblyStats = { totalDays, presents, absents, leaves, percent: Math.round(percent), isPass };
 
@@ -53,7 +53,7 @@ export default function StudentStatusOverview({ attendances, subjects }: { atten
         {/* Assembly Status Panel */}
         <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
           <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-b border-slate-200 dark:border-slate-700">
-            <h4 className="font-bold text-slate-700 dark:text-slate-200">กิจกรรมเข้าแถวหน้าเสาธง (เกณฑ์ผ่าน 80%)</h4>
+            <h4 className="font-bold text-slate-700 dark:text-slate-200">กิจกรรมเข้าแถวหน้าเสาธง (เกณฑ์ผ่าน 60%)</h4>
           </div>
           <div className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div>
