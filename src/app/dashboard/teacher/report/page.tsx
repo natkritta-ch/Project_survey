@@ -14,20 +14,22 @@ import ClientCheckboxAutoSubmit from "./ClientCheckboxAutoSubmit";
 
 export const dynamic = 'force-dynamic';
 
-export default async function TeacherReportPage({ searchParams }: { searchParams: { view?: string, subjectId?: string, level?: string, date?: string, status?: string, failed?: string, search?: string, assemblyStart?: string, assemblyEnd?: string } }) {
+export default async function TeacherReportPage({ searchParams }: { searchParams: Promise<{ view?: string, subjectId?: string, level?: string, date?: string, status?: string, failed?: string, search?: string, assemblyStart?: string, assemblyEnd?: string }> }) {
   const session = await getServerSession(authOptions);
   if ((session?.user as any)?.role !== "TEACHER") {
     redirect("/login");
   }
 
   const teacherId = (session?.user as any)?.id;
-  const viewMode = searchParams.view || "summary"; // 'summary' หรือ 'logs'
-  const activeSubjectId = searchParams.subjectId || "assembly";
-  const activeLevel = searchParams.level || "all";
-  const activeDate = searchParams.date || "";
-  const activeStatus = searchParams.status || "all";
-  const showOnlyFailed = searchParams.failed === "true";
-  const activeSearch = searchParams.search || "";
+  
+  const params = await searchParams;
+  const viewMode = params.view || "summary"; // 'summary' หรือ 'logs'
+  const activeSubjectId = params.subjectId || "assembly";
+  const activeLevel = params.level || "all";
+  const activeDate = params.date || "";
+  const activeStatus = params.status || "all";
+  const showOnlyFailed = params.failed === "true";
+  const activeSearch = params.search || "";
 
   // ดึงวิชาที่อาจารย์คนนี้สอน (จะว่างเปล่าก็ไม่เป็นไร เป็นส่วนหนึ่งของสิทธิ์การมองเห็น)
   const mySubjects = await prisma.subject.findMany({ where: { teacherId, deletedAt: null }, orderBy: { name: 'asc' } });
@@ -47,11 +49,11 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
   if (isSummaryView(viewMode)) {
     if (activeSubjectId === "assembly") {
       let assemblyDateFilter: any = {};
-      if (searchParams.assemblyStart) {
-        assemblyDateFilter.gte = new Date(searchParams.assemblyStart);
+      if (params.assemblyStart) {
+        assemblyDateFilter.gte = new Date(params.assemblyStart);
       }
-      if (searchParams.assemblyEnd) {
-        const endDate = new Date(searchParams.assemblyEnd);
+      if (params.assemblyEnd) {
+        const endDate = new Date(params.assemblyEnd);
         endDate.setHours(23, 59, 59, 999);
         assemblyDateFilter.lte = endDate;
       }
@@ -276,9 +278,9 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
             <div className="flex flex-col">
               <label className="text-xs font-bold text-slate-500 tracking-wider uppercase mb-1 block">ช่วงวันที่ตัดรอบ (Assembly)</label>
               <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                <ClientInputAutoSubmit type="date" name="assemblyStart" defaultValue={searchParams.assemblyStart || ""} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-[13px] outline-none w-[130px] min-w-0" />
+                <ClientInputAutoSubmit type="date" name="assemblyStart" defaultValue={params.assemblyStart || ""} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-[13px] outline-none w-[130px] min-w-0" />
                 <span className="text-xs text-slate-400 font-bold">ถึง</span>
-                <ClientInputAutoSubmit type="date" name="assemblyEnd" defaultValue={searchParams.assemblyEnd || ""} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-[13px] outline-none w-[130px] min-w-0" />
+                <ClientInputAutoSubmit type="date" name="assemblyEnd" defaultValue={params.assemblyEnd || ""} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-[13px] outline-none w-[130px] min-w-0" />
               </div>
             </div>
           )}
