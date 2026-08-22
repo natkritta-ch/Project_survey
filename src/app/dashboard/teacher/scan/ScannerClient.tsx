@@ -22,7 +22,7 @@ export default function TeacherScannerClient({
   const [faceMatcher, setFaceMatcher] = useState<faceapi.FaceMatcher | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(initialSubjectId || "");
-  const [logs, setLogs] = useState<{ id: string; name: string; time: string; manual?: boolean; status?: "saved" | "duplicate" }[]>([]);
+  const [logs, setLogs] = useState<{ logId: string; id: string; name: string; time: string; manual?: boolean; status?: "saved" | "duplicate" }[]>([]);
   const [scanType, setScanType] = useState<"class"|"assembly">(initialType || "class");
   const [manualStudentId, setManualStudentId] = useState("");
   const [assemblyLevel, setAssemblyLevel] = useState("ทั้งหมด");
@@ -185,7 +185,8 @@ export default function TeacherScannerClient({
 
         const results = detections.map(d => faceMatcher.findBestMatch(d.descriptor));
 
-        results.forEach(async (result, i) => {
+        for (let i = 0; i < results.length; i++) {
+          const result = results[i];
           const studentId = result.label;
           let boxLabel = "ไม่รู้จัก";
           let boxColor = "red";
@@ -228,8 +229,11 @@ export default function TeacherScannerClient({
                 if (recent) recent.time = now;
                 else logsRef.current.push({ id: studentId, time: now });
                 
+                // Fix #4: ใช้ logId unique แทน time string เพื่อป้องกัน race condition
+                const logId = `${studentId}-${now}`;
+
                 // Optimistically add to log first, then update status after API
-                setLogs(prev => [{ id: studentId, name: studentName, time: new Date().toLocaleTimeString('th-TH'), status: "saved" }, ...prev]);
+                setLogs(prev => [{ logId, id: studentId, name: studentName, time: new Date().toLocaleTimeString('th-TH'), status: "saved" }, ...prev]);
 
                 try {
                   const res = await fetch('/api/attendance', {
@@ -243,8 +247,8 @@ export default function TeacherScannerClient({
                   });
                   const data = await res.json();
                   if (data.duplicate) {
-                    // Update the log entry status to "duplicate"
-                    setLogs(prev => prev.map(l => l.id === studentId && l.time === new Date().toLocaleTimeString('th-TH') ? { ...l, status: "duplicate" } : l));
+                    // Fix #4: match ด้วย logId แทน time string — ไม่มี race condition อีกต่อไป
+                    setLogs(prev => prev.map(l => l.logId === logId ? { ...l, status: "duplicate" } : l));
                   }
                 } catch (e) {
                   console.error("Failed to API record");
@@ -268,7 +272,7 @@ export default function TeacherScannerClient({
 
           const drawBox = new faceapi.draw.DrawBox(finalBox, { label: boxLabel, boxColor: boxColor });
           drawBox.draw(canvasRef.current);
-        });
+        }
       }
     }, 400); // ✨ ลดเวลาอัปเดตจาก 1500 (1.5 วินาที) เหลือแค่ 400 (0.4 วินาที) ทำให้กรอบเลื่อนตามหน้าได้ลื่นและเร็วขึ้นเยอะมาก 
   };
@@ -282,7 +286,7 @@ export default function TeacherScannerClient({
     
     const now = Date.now();
     logsRef.current.push({ id: manualStudentId, time: now });
-    setLogs(prev => [{ id: manualStudentId, name: student.name, time: new Date().toLocaleTimeString('th-TH'), manual: true }, ...prev]);
+    setLogs(prev => [{ logId: `${manualStudentId}-${now}`, id: manualStudentId, name: student.name, time: new Date().toLocaleTimeString('th-TH'), manual: true }, ...prev]);
     
     try {
       await fetch('/api/attendance', {

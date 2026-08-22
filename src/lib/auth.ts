@@ -2,11 +2,23 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import prisma from "./prisma";
 import bcrypt from "bcryptjs";
+// Fix #3: ย้าย speakeasy มา import ด้านบนแทน require() dynamic ใน function
+import * as speakeasy from "speakeasy";
 
 // Simple In-Memory Rate Limiter (ป้องกัน Brute Force)
+// ⚠️  Fix #2: หมายเหตุ — Map นี้อยู่ใน memory ของ process เดียว
+//    ในสภาพแวดล้อม production ที่มีหลาย worker ให้ใช้ Redis แทน
 const loginAttempts = new Map<string, { count: number, resetAt: number }>();
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_MS = 60 * 1000; // ล็อค 1 นาที
+
+// Fix #2: Periodic cleanup ล้าง entries ที่หมดอายุแล้วออกจาก Map ทุก 10 นาที ป้องกัน memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of loginAttempts.entries()) {
+    if (now >= val.resetAt) loginAttempts.delete(key);
+  }
+}, 10 * 60 * 1000);
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -77,7 +89,6 @@ export const authOptions: NextAuthOptions = {
             throw new Error("2FA_REQUIRED");
           }
           
-          const speakeasy = require('speakeasy');
           const isValid = speakeasy.totp.verify({
             secret: userWith2FA.twoFactorSecret,
             encoding: 'base32',
@@ -105,10 +116,15 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
+        // บันทึกเวลาล่าสุดที่ตรวจ DB (ตอน sign-in ใหม่)
+        token.lastChecked = Date.now();
       }
 
       // Check if user is soft deleted to invalidate active sessions (Fix for Issue #1)
-      if (token.id) {
+      // ตรวจ DB เฉพาะตอน sign-in ใหม่ หรือทุก 5 นาที — ไม่ตรวจทุก request
+      const RECHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 นาที
+      const lastChecked = token.lastChecked as number | undefined;
+      if (token.id && (!lastChecked || Date.now() - lastChecked > RECHECK_INTERVAL_MS)) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
           select: { deletedAt: true }
@@ -116,6 +132,7 @@ export const authOptions: NextAuthOptions = {
         if (!dbUser || dbUser.deletedAt) {
           return {}; // returning empty token invalidates session
         }
+        token.lastChecked = Date.now();
       }
 
       return token;

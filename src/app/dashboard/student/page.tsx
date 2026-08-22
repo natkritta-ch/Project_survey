@@ -39,9 +39,20 @@ export default async function StudentDashboard() {
     }
   });
 
-  if (myInfo && !myInfo.isTwoFactorEnabled) {
+  // Fix #5: ถ้า user ถูกลบใน DB แต่ session ยังอยู่ → redirect ออกทันที ป้องกัน crash
+  if (!myInfo) {
+    redirect("/login");
+  }
+
+  if (!myInfo) {
+    // Fix #5: ถ้าไม่พบ user ใน DB (อาจถูกลบไปแล้ว) ให้ redirect ออก
+    redirect("/login");
+  }
+
+  if (!myInfo.isTwoFactorEnabled) {
     redirect("/dashboard/2fa?forced=true");
   }
+
 
   // ดึงประวัติเข้าเรียนของนักเรียนคนนี้
   const attendances = await prisma.attendance.findMany({

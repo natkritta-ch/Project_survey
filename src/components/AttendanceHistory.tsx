@@ -22,14 +22,11 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
   }
 
   if (filterDate) {
-    const targetDate = new Date(filterDate);
+    // Fix #7: เปรียบเทียบ date string โดยแปลง timestamp เป็น Thai timezone ก่อน
+    // new Date("2025-01-15") จะ parse เป็น UTC midnight ซึ่งต่างจาก local time +7 ชั่วโมง
     filtered = filtered.filter(r => {
-      const rDate = new Date(r.timestamp);
-      return (
-        rDate.getDate() === targetDate.getDate() &&
-        rDate.getMonth() === targetDate.getMonth() &&
-        rDate.getFullYear() === targetDate.getFullYear()
-      );
+      const thaiDateStr = new Date(r.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); // คืน YYYY-MM-DD
+      return thaiDateStr === filterDate;
     });
   }
 

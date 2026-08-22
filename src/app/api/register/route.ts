@@ -48,7 +48,8 @@ export async function POST(request: Request) {
     
     return NextResponse.json(
       { success: false, message: errorMessage },
-      { status: 500 }
+      // Fix #10: ใช้ 409 Conflict สำหรับ unique constraint แทน 500 Internal Error
+      { status: error.code === "P2002" ? 409 : 500 }
     );
   }
 }

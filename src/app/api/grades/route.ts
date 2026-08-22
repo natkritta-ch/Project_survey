@@ -53,7 +53,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: `ไม่มีสิทธิ์ดำเนินการนี้ (role: ${userRole || 'undefined'})` }, { status: 403 });
     }
 
-    if (!subjectId || grade === undefined || isNaN(parseFloat(grade))) {
+    // ตรวจสอบเฉพาะค่า grade (subjectId ตรวจแล้วที่ line 22)
+    // Fix #9: ลบ !subjectId ออก เพราะตรวจสอบแล้วที่ด้านบน (line 22)
+    if (grade === undefined || isNaN(parseFloat(grade))) {
       return NextResponse.json({ success: false, message: "ข้อมูลไม่ถูกต้อง" }, { status: 400 });
     }
 

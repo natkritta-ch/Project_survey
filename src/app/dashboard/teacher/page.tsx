@@ -8,7 +8,9 @@ import LogoutButton from "../../../components/LogoutButton";
 
 export default async function TeacherDashboard() {
   const session = await getServerSession(authOptions);
-  if ((session?.user as any)?.role !== "TEACHER") {
+  // Fix #6: รองรับทั้ง TEACHER และ HEAD เพราะ API attendance รองรับ HEAD แล้ว
+  const userRole = (session?.user as any)?.role;
+  if (userRole !== "TEACHER" && userRole !== "HEAD") {
     redirect("/login");
   }
 
