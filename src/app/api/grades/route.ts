@@ -60,9 +60,11 @@ export async function POST(request: Request) {
     }
 
     const numericGrade = parseFloat(grade);
-    if (numericGrade < 0 || numericGrade > 4) {
-      return NextResponse.json({ success: false, message: "เกรดต้องอยู่ระหว่าง 0 - 4" }, { status: 400 });
+    const validGrades = [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
+    if (!validGrades.includes(numericGrade)) {
+      return NextResponse.json({ success: false, message: "เกรดต้องเป็น 0, 0.5, 1.0, 1.5, ... ถึง 4.0 เท่านั้น" }, { status: 400 });
     }
+
 
     const record = await prisma.grade.upsert({
       where: {

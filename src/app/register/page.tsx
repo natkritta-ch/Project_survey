@@ -40,7 +40,7 @@ export default function RegisterPage() {
     const loadModels = async () => {
       try {
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+          faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
           faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
           faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
         ]);
@@ -81,7 +81,7 @@ export default function RegisterPage() {
     setInterval(async () => {
       if (video.paused || video.ended || !modelsLoaded) return;
       try {
-        const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions());
+        const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }));
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -107,10 +107,18 @@ export default function RegisterPage() {
     setScanError("");
     try {
       const detection = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
       if (detection) {
+        // Enforce face size constraint (e.g. width >= 160)
+        const box = detection.detection.box;
+        if (box.width < 160 || box.height < 160) {
+          setScanError("❌ กรุณาขยับหน้าเข้าใกล้กล้องให้มากขึ้น (เพื่อให้เห็นใบหน้าชัดเจนที่สุด)");
+          setIsScanning(false);
+          return;
+        }
+
         setFaceDescriptor(JSON.stringify(Array.from(detection.descriptor)));
         // Capture a snapshot of the face
         const canvas = document.createElement("canvas");

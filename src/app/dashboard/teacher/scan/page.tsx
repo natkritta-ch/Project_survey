@@ -7,9 +7,12 @@ import TeacherScannerClient from "./ScannerClient";
 
 export default async function TeacherScanPage({ searchParams }: { searchParams: Promise<{ type?: string, subjectId?: string }> }) {
   const session = await getServerSession(authOptions);
-  if ((session?.user as any)?.role !== "TEACHER") {
+  // Fix: รองรับทั้ง TEACHER และ HEAD
+  const userRole = (session?.user as any)?.role;
+  if (userRole !== "TEACHER" && userRole !== "HEAD") {
     redirect("/login");
   }
+
 
   const params = await searchParams;
   const initialType = params.type as "class" | "assembly" | undefined;

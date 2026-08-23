@@ -22,10 +22,10 @@ export default function TeacherScannerClient({
   const [faceMatcher, setFaceMatcher] = useState<faceapi.FaceMatcher | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(initialSubjectId || "");
-  const [logs, setLogs] = useState<{ logId: string; id: string; name: string; time: string; manual?: boolean; status?: "saved" | "duplicate" }[]>([]);
+  const [logs, setLogs] = useState<{ logId: string; id: string; name: string; time: string; manual?: boolean; status?: "saved" | "duplicate"; attendanceId?: string }[]>([]);
   const [scanType, setScanType] = useState<"class"|"assembly">(initialType || "class");
   const [manualStudentId, setManualStudentId] = useState("");
-  const [assemblyLevel, setAssemblyLevel] = useState("ทั้งหมด");
+  const [assemblyLevel, setAssemblyLevel] = useState("");
   const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
 
   const levelsOptions = ["ปวช.1", "ปวช.2", "ปวช.3", "ปวส.1", "ปวส.2", "ปวส.1(ม.6)", "ปวส.2(ม.6)", "ไม่ระบุ"];
@@ -33,39 +33,60 @@ export default function TeacherScannerClient({
   // Refs สำหรับการจัดเก็บข้อมูลที่ไม่เสี่ยงต่อรอบ Re-render 
   const logsRef = useRef<{ id: string; time: number }[]>([]);
 
+  // 1. โหลดโมเดลแค่ครั้งเดียว
   useEffect(() => {
-    const loadModelsAndData = async () => {
+    const loadModels = async () => {
       try {
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri('/models'), // เปลี่ยนกลับไปใช้ Tiny เพื่อความเร็ว
+          faceapi.nets.tinyFaceDetector.loadFromUri('/models'), // สแกนจริงใช้ Tiny เพื่อความเร็ว
           faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
           faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
         ]);
-
-        if (students.length > 0) {
-          const labeledDescriptors = students.map((s) => {
-            const descArray = JSON.parse(s.faceDescriptor);
-            const descriptor = new Float32Array(descArray);
-            return new faceapi.LabeledFaceDescriptors(s.id, [descriptor]);
-          });
-          // ปรับความแม่นยำ (Distance Threshold) จาก 0.55 เป็น 0.48 เพื่อให้ระบบเข้มงวดขึ้น (หน้าต้องเหมือนจริงถึงจะผ่าน)
-          setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.48));
-        }
-
         setModelsLoaded(true);
       } catch (e) {
         console.error("Error loading Face API models:", e);
       }
     };
-    loadModelsAndData();
+    loadModels();
     
-    // Cleanup on unmount
     return () => stopCamera();
-  }, [students]);
+  }, []);
+
+  // 2. อัปเดต FaceMatcher เมื่อเปลี่ยนตัวกรอง (สำคัญมาก: ช่วยลด False Positive)
+  useEffect(() => {
+    if (!modelsLoaded || students.length === 0) return;
+
+    let filteredStudents = students;
+    
+    // โหลดเฉพาะหน้านักเรียนในชั้นปีนั้นๆ เข้าไปใน AI
+    if (scanType === "class" && selectedSubject) {
+      const sObj = subjects.find(s => s.id === selectedSubject);
+      if (sObj && sObj.level) {
+        filteredStudents = students.filter(s => s.level === sObj.level);
+      }
+    } else if (scanType === "assembly" && assemblyLevel) {
+      filteredStudents = students.filter(s => s.level === assemblyLevel);
+    }
+
+    if (filteredStudents.length > 0) {
+      const labeledDescriptors = filteredStudents.map((s) => {
+        const descArray = JSON.parse(s.faceDescriptor);
+        const descriptor = new Float32Array(descArray);
+        return new faceapi.LabeledFaceDescriptors(s.id, [descriptor]);
+      });
+      // เพิ่มความเข้มงวดเป็น 0.45 
+      setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.45));
+    } else {
+      setFaceMatcher(null);
+    }
+  }, [students, modelsLoaded, scanType, selectedSubject, assemblyLevel, subjects]);
 
   const startCamera = async () => {
     if (scanType === "class" && !selectedSubject) {
-      return alert("กรุณาเลือกวิชาก่อนเริ่มเช็คชื่อ หรือเลือกโหมดเข้าแถว");
+      return alert("กรุณาเลือกวิชาก่อนเริ่มเช็คชื่อ");
+    }
+    if (scanType === "assembly" && !assemblyLevel) {
+      return alert("กรุณาเลือกชั้นปีที่ต้องการเช็คแถว");
     }
     // เคลียร์ประวัติการเช็คชื่อเมื่อเปิดกล้องเริ่มรอบใหม่
     setLogs([]);
@@ -134,7 +155,7 @@ export default function TeacherScannerClient({
     
     // หลังจากปิดกล้อง ให้สอบถามและบันทึก "ขาดเรียน" สำหรับคนที่ยังไม่ถูกบันทึก 
     let sessionUnloggedStudents = students.filter(s => !logs.find(l => l.id === s.id));
-    if (scanType === "assembly" && assemblyLevel !== "ทั้งหมด") {
+    if (scanType === "assembly" && assemblyLevel) {
       sessionUnloggedStudents = sessionUnloggedStudents.filter(s => s.level === assemblyLevel);
     } else if (scanType === "class" && selectedSubject) {
       const sObj = subjects.find(s => s.id === selectedSubject);
@@ -163,6 +184,38 @@ export default function TeacherScannerClient({
           alert("เกิดข้อผิดพลาดในการบันทึกสถานะขาดเรียน");
         }
       }
+    }
+  };
+
+  const handleCancelSession = async () => {
+    stopCamera();
+    
+    if (logs.length === 0) {
+      alert("ไม่มีประวัติการเช็คชื่อในรอบนี้ที่ต้องยกเลิก");
+      return;
+    }
+
+    const confirmCancel = window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบประวัติการเช็คชื่อที่เพิ่งสแกนติดไปทั้งหมด ${logs.length} คนในรอบนี้?`);
+    if (confirmCancel) {
+      const attendanceIds = logs.filter(l => l.attendanceId).map(l => l.attendanceId);
+      
+      if (attendanceIds.length > 0) {
+        try {
+          await fetch('/api/attendance/cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ attendanceIds })
+          });
+        } catch (e) {
+          console.error("Failed to cancel session", e);
+          alert("เกิดข้อผิดพลาดในการยกเลิกประวัติบางส่วน");
+        }
+      }
+      
+      // Clear logs state
+      setLogs([]);
+      logsRef.current = [];
+      alert("ยกเลิกการเช็คชื่อรอบนี้และลบประวัติเรียบร้อยแล้ว");
     }
   };
 
@@ -206,7 +259,7 @@ export default function TeacherScannerClient({
             if (faceBox.width < minFaceSize || faceBox.height < minFaceSize) {
               allowedToLog = false;
               rejectReason = "ขยับหน้าเข้ามาใกล้ๆ";
-            } else if (scanType === "assembly" && assemblyLevel !== "ทั้งหมด") {
+            } else if (scanType === "assembly" && assemblyLevel) {
               if (student?.level !== assemblyLevel) {
                 allowedToLog = false;
                 rejectReason = "คนละชั้นปี";
@@ -247,8 +300,10 @@ export default function TeacherScannerClient({
                   });
                   const data = await res.json();
                   if (data.duplicate) {
-                    // Fix #4: match ด้วย logId แทน time string — ไม่มี race condition อีกต่อไป
+                    // Fix #4: match ด้วย logId แทน time string ป้องกัน race condition อีกรอบ
                     setLogs(prev => prev.map(l => l.logId === logId ? { ...l, status: "duplicate" } : l));
+                  } else if (data.attendance?.id) {
+                    setLogs(prev => prev.map(l => l.logId === logId ? { ...l, attendanceId: data.attendance.id } : l));
                   }
                 } catch (e) {
                   console.error("Failed to API record");
@@ -286,10 +341,11 @@ export default function TeacherScannerClient({
     
     const now = Date.now();
     logsRef.current.push({ id: manualStudentId, time: now });
-    setLogs(prev => [{ logId: `${manualStudentId}-${now}`, id: manualStudentId, name: student.name, time: new Date().toLocaleTimeString('th-TH'), manual: true }, ...prev]);
+    const manualLogId = `${manualStudentId}-${now}`;
+    setLogs(prev => [{ logId: manualLogId, id: manualStudentId, name: student.name, time: new Date().toLocaleTimeString('th-TH'), manual: true }, ...prev]);
     
     try {
-      await fetch('/api/attendance', {
+      const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -298,6 +354,10 @@ export default function TeacherScannerClient({
           type: scanType
         })
       });
+      const data = await res.json();
+      if (data.attendance?.id) {
+        setLogs(prev => prev.map(l => l.logId === manualLogId ? { ...l, attendanceId: data.attendance.id } : l));
+      }
       setManualStudentId("");
     } catch (e) {
       console.error(e);
@@ -307,7 +367,7 @@ export default function TeacherScannerClient({
 
   // กรองเมนูรายชื่อนักเรียนเฉพาะคนที่ยังไม่ได้เช็คชื่อ (ไม่ว่าจะจากกล้องหรือมือ)
   let unloggedStudents = students.filter(s => !logs.find(l => l.id === s.id));
-  if (scanType === "assembly" && assemblyLevel !== "ทั้งหมด") {
+  if (scanType === "assembly" && assemblyLevel) {
     unloggedStudents = unloggedStudents.filter(s => s.level === assemblyLevel);
   } else if (scanType === "class" && selectedSubject) {
     const sObj = subjects.find(s => s.id === selectedSubject);
@@ -356,7 +416,7 @@ export default function TeacherScannerClient({
               onChange={e => setAssemblyLevel(e.target.value)} 
               className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border disabled:bg-gray-100 dark:disabled:bg-gray-800"
             >
-              <option value="ทั้งหมด">-- ทั้งหมด --</option>
+              <option value="">-- กรุณาเลือกชั้นปี --</option>
               {levelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           </div>
@@ -392,13 +452,21 @@ export default function TeacherScannerClient({
         )}
 
         {isScanning ? (
-          <button
-            onClick={handleEndSession}
-            className="w-full py-3 px-4 rounded-xl text-white font-medium flex items-center justify-center bg-red-600 hover:bg-red-700 transition"
-          >
-            <StopCircle className="mr-2" />
-            ปิดกล้อง / จบการเช็คชื่อรอบนี้
-          </button>
+          <div className="flex gap-2 w-full">
+            <button
+              onClick={handleEndSession}
+              className="flex-1 py-3 px-4 rounded-xl text-white font-medium flex items-center justify-center bg-red-600 hover:bg-red-700 transition"
+            >
+              <StopCircle className="mr-2 w-5 h-5" />
+              ปิดกล้อง / จบการเช็คชื่อ
+            </button>
+            <button
+              onClick={handleCancelSession}
+              className="flex-1 py-3 px-4 rounded-xl text-gray-700 font-medium flex items-center justify-center bg-gray-200 hover:bg-gray-300 transition"
+            >
+              ยกเลิกและลบรอบนี้
+            </button>
+          </div>
         ) : (
           <button
             onClick={startCamera}

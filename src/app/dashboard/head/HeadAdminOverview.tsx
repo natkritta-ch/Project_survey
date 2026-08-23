@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Save } from "lucide-react";
 import * as XLSX from "xlsx";
-import { createOrUpdateTermConfig } from "./actions";
+import { createOrUpdateTermConfig, resetAllFaces } from "./actions";
 
 export default function HeadAdminOverview({ subjects, users, levelsOptions, termConfigs = [] }: { subjects: any[], users: any[], levelsOptions: string[], termConfigs?: any[] }) {
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
@@ -426,6 +426,42 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      {/* Danger Zone: Reset Faces */}
+      <div className="mt-12 p-6 border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 rounded-2xl">
+        <h3 className="text-lg font-bold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
+          <ShieldAlert className="w-5 h-5" />
+          เขตอันตราย (Danger Zone)
+        </h3>
+        <p className="text-sm text-red-600/80 dark:text-red-400/80 mb-6 max-w-3xl">
+          การดำเนินการในส่วนนี้จะส่งผลกระทบต่อข้อมูลสำคัญของระบบ ไม่สามารถย้อนกลับได้ โปรดใช้งานด้วยความระมัดระวัง
+        </p>
+        
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white dark:bg-slate-900 rounded-xl border border-red-100 dark:border-red-900/30">
+          <div>
+            <h4 className="font-semibold text-slate-800 dark:text-slate-200">รีเซ็ตใบหน้านักเรียนทั้งหมด</h4>
+            <p className="text-sm text-slate-500 mt-1">ลบรูปถ่ายและล้างค่าการจดจำใบหน้าของนักเรียนทุกคนออกจากระบบ เพื่อบังคับให้นักเรียนถ่ายรูปใหม่</p>
+          </div>
+          <button 
+            onClick={async () => {
+              if (window.confirm("คำเตือน: คุณกำลังจะ 'ลบข้อมูลใบหน้า' ของนักเรียนทุกคนในระบบ\n\nการกระทำนี้จะทำให้นักเรียนทุกคนสแกนหน้าไม่ผ่าน จนกว่าพวกเขาจะเข้าสู่ระบบไปกด 'ถ่ายรูปใหม่' ในหน้าโปรไฟล์\n\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?")) {
+                const doubleCheck = window.prompt("พิมพ์คำว่า 'ยืนยัน' เพื่อดำเนินการลบ:");
+                if (doubleCheck === 'ยืนยัน') {
+                  try {
+                    await resetAllFaces();
+                    alert("รีเซ็ตใบหน้านักเรียนทุกคนสำเร็จแล้ว!");
+                  } catch(e) {
+                    alert("เกิดข้อผิดพลาดในการลบข้อมูล");
+                  }
+                }
+              }
+            }}
+            className="px-4 py-2 bg-red-100 hover:bg-red-600 text-red-700 hover:text-white rounded-lg font-medium transition whitespace-nowrap"
+          >
+            ล้างข้อมูลใบหน้า
+          </button>
         </div>
       </div>
 

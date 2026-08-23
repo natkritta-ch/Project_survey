@@ -19,7 +19,7 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
     const loadModels = async () => {
       try {
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
+          faceapi.nets.ssdMobilenetv1.loadFromUri('/models'),
           faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
           faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
         ]);
@@ -62,10 +62,18 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
     setIsScanning(true);
     try {
       const detection = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
       if (detection) {
+        // Enforce face size constraint
+        const box = detection.detection.box;
+        if (box.width < 160 || box.height < 160) {
+          setMessage("กรุณาขยับหน้าเข้าใกล้กล้องให้มากกว่านี้ (เพื่อให้เห็นหน้าชัดเจนที่สุด)");
+          setIsScanning(false);
+          return;
+        }
+
         setNewFaceDescriptor(JSON.stringify(Array.from(detection.descriptor)));
         // Capture snapshot
         const canvas = document.createElement("canvas");

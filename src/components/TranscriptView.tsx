@@ -16,7 +16,7 @@ export default function TranscriptView({ grades, showPrintButton = false }: { gr
       const yr = g.subject?.academicYear || "-";
       const tm = g.subject?.term || "-";
       const key = `${yr}-${tm}`;
-      const cr = g.subject?.credit ? parseFloat(g.subject.credit) : 3.0; // Default 3.0 if missing
+      const cr = g.subject?.credit ? parseFloat(g.subject.credit) : 0.0; // Fix: เปลี่ยนจาก 3.0 เป็น 0.0 เพื่อไม่ให้ทำ GPA เสียถ้าลืมใส่หน่วยกิต
 
       let point = typeof g.grade === 'number' ? g.grade : parseFloat(g.grade);
       if (isNaN(point)) return;

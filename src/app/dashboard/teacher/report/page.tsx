@@ -473,7 +473,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
                   logs.map((log: any) => (
                     <tr key={log.id} className="log-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
                       <td className="px-6 py-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                        {new Date(log.timestamp).toLocaleString("th-TH")}
+                        {new Date(log.timestamp).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-medium text-slate-900 dark:text-slate-100">{log.student?.name}</div>
