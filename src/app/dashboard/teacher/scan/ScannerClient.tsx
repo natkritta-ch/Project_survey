@@ -74,8 +74,8 @@ export default function TeacherScannerClient({
         const descriptor = new Float32Array(descArray);
         return new faceapi.LabeledFaceDescriptors(s.id, [descriptor]);
       });
-      // เพิ่มความเข้มงวดเป็น 0.45 
-      setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.45));
+      // ปรับให้เข้มงวดขึ้นเป็น 0.40 (ต้องเหมือน 60% ขึ้นไปถึงจะผ่าน)
+      setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.40));
     } else {
       setFaceMatcher(null);
     }
