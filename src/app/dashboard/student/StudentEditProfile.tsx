@@ -6,6 +6,7 @@ import { Camera, Loader2, Save, ShieldCheck, CheckCircle2 } from "lucide-react";
 
 export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [streamActive, setStreamActive] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -25,11 +26,56 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
         ]);
         setModelsLoaded(true);
       } catch (e) {
-        console.error(e);
+        console.error("Failed to load models:", e);
       }
     };
     loadModels();
   }, [canEdit]);
+
+  const handleVideoPlay = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (video.videoWidth === 0) {
+      setTimeout(handleVideoPlay, 100);
+      return;
+    }
+
+    const displaySize = { width: video.videoWidth, height: video.videoHeight };
+    faceapi.matchDimensions(canvas, displaySize);
+
+    const interval = setInterval(async () => {
+      if (video.paused || video.ended || !modelsLoaded) return;
+      try {
+        const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }));
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (detection) {
+            const resizedDetection = faceapi.resizeResults(detection, displaySize);
+            const box = resizedDetection.box;
+            
+            const isConfident = detection.score >= 0.85;
+            const isLargeEnough = box.width >= 160 && box.height >= 160;
+
+            if (isConfident && isLargeEnough) {
+              ctx.strokeStyle = "#22c55e"; // green-500
+              ctx.lineWidth = 4;
+            } else {
+              ctx.strokeStyle = "#ef4444"; // red-500
+              ctx.lineWidth = 2;
+            }
+            ctx.strokeRect(box.x, box.y, box.width, box.height);
+          }
+        }
+      } catch (e) {
+        // Ignore tracking errors
+      }
+    }, 150);
+    return () => clearInterval(interval);
+  };
 
   const startCamera = async () => {
     try {
@@ -151,7 +197,26 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
         <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">แสกนใบหน้าใหม่เพื่ออัปเดตข้อมูล <span className="text-slate-400 font-normal text-xs ml-1">(ถ่ายรูปใหม่)</span></p>
         
         <div className={`relative rounded-lg overflow-hidden w-full aspect-video bg-black mb-3 ${streamActive ? 'block' : 'hidden'}`}>
-          <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            muted 
+            playsInline 
+            onPlay={handleVideoPlay}
+            className="w-full h-full object-cover transform scale-x-[-1]" 
+          />
+          <canvas 
+            ref={canvasRef} 
+            className="absolute top-0 left-0 w-full h-full object-cover transform scale-x-[-1] pointer-events-none" 
+          />
+          
+          {/* UI Guide overlay */}
+          <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center">
+             <div className="w-3/5 sm:w-48 aspect-[3/4] border-2 border-white/40 border-dashed rounded-[60px] sm:rounded-[100px]"></div>
+             <div className="absolute bottom-4 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full text-white text-xs text-center border border-white/10">
+               ให้ใบหน้าอยู่ในกรอบจนขึ้น <span className="text-green-400 font-semibold">กรอบสีเขียว</span>
+             </div>
+          </div>
         </div>
 
         {!streamActive && !newFaceDescriptor && (
