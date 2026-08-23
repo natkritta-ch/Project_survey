@@ -86,7 +86,13 @@ export default async function StudentDashboard() {
     return isSameLevel && isCurrentTerm;
   });
 
-  // 3. (แก้ปัญหาที่ 2) ดึงรายชื่อวิชาทั้งหมดที่เคยเช็คชื่อไว้ มาใส่ใน Dropdown ตัวกรอง แม้จะหายไปจากตารางเรียนแล้วก็ตาม
+  const myGrades = await prisma.grade.findMany({
+    where: { studentId: userId },
+    include: { subject: true },
+    orderBy: [{ subject: { academicYear: 'desc' } }, { subject: { term: 'desc' } }]
+  });
+
+  // 3. (แก้ปัญหาที่ 2) ดึงรายชื่อวิชาทั้งหมดที่เคยเช็คชื่อไว้ หรือมีเกรด มาใส่ใน Dropdown
   const uniqueSubjectsMap = new Map();
   mySchedules.forEach(sc => {
     if (sc.subject) uniqueSubjectsMap.set(sc.subject.id, sc.subject);
@@ -96,14 +102,12 @@ export default async function StudentDashboard() {
       uniqueSubjectsMap.set(a.subject.id, a.subject);
     }
   });
-  const mySubjects = Array.from(uniqueSubjectsMap.values());
-
-  // Bug #4 fix: include subject เพื่อแสดงข้อมูล term/year ได้ถูกต้อง
-  const myGrades = await prisma.grade.findMany({
-    where: { studentId: userId },
-    include: { subject: true },
-    orderBy: [{ subject: { academicYear: 'desc' } }, { subject: { term: 'desc' } }]
+  myGrades.forEach(g => {
+    if (g.subject && !uniqueSubjectsMap.has(g.subject.id)) {
+      uniqueSubjectsMap.set(g.subject.id, g.subject);
+    }
   });
+  const mySubjects = Array.from(uniqueSubjectsMap.values());
 
   const daysMap: Record<number, string> = {
     1: "วันจันทร์", 2: "วันอังคาร", 3: "วันพุธ", 4: "วันพฤหัสบดี", 5: "วันศุกร์", 6: "วันเสาร์", 7: "วันอาทิตย์"
