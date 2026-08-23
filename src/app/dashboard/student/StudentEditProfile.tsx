@@ -107,10 +107,21 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
     if (!videoRef.current || !modelsLoaded) return;
     setIsScanning(true);
     try {
+      // 1. Freeze the frame INSTANTLY on click
+      const freezeCanvas = document.createElement("canvas");
+      freezeCanvas.width = videoRef.current.videoWidth;
+      freezeCanvas.height = videoRef.current.videoHeight;
+      const freezeCtx = freezeCanvas.getContext("2d");
+      if (freezeCtx) {
+        freezeCtx.drawImage(videoRef.current, 0, 0, freezeCanvas.width, freezeCanvas.height);
+      }
+
+      // 2. Process the frozen frame
       const detection = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }))
+        .detectSingleFace(freezeCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
+        
       if (detection) {
         // Enforce face size constraint
         const box = detection.detection.box;
@@ -121,15 +132,16 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
         }
 
         setNewFaceDescriptor(JSON.stringify(Array.from(detection.descriptor)));
-        // Capture snapshot
-        const canvas = document.createElement("canvas");
-        canvas.width = videoRef.current.videoWidth;
-        canvas.height = videoRef.current.videoHeight;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.scale(-1, 1); // Flip horizontally
-          ctx.drawImage(videoRef.current, -canvas.width, 0, canvas.width, canvas.height);
-          setNewProfilePicture(canvas.toDataURL("image/jpeg", 0.6));
+        
+        // 3. Save the exact frozen frame
+        const finalCanvas = document.createElement("canvas");
+        finalCanvas.width = freezeCanvas.width;
+        finalCanvas.height = freezeCanvas.height;
+        const finalCtx = finalCanvas.getContext("2d");
+        if (finalCtx) {
+          finalCtx.scale(-1, 1); // Flip horizontally
+          finalCtx.drawImage(freezeCanvas, -finalCanvas.width, 0, finalCanvas.width, finalCanvas.height);
+          setNewProfilePicture(finalCanvas.toDataURL("image/jpeg", 0.6));
         }
 
         setMessage("อัปเดตใบหน้าใหม่สำเร็จ!");

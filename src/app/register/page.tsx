@@ -116,10 +116,21 @@ export default function RegisterPage() {
     setIsScanning(true);
     setScanError("");
     try {
+      // 1. Freeze the frame INSTANTLY on click so the user doesn't have to hold still
+      const freezeCanvas = document.createElement("canvas");
+      freezeCanvas.width = videoRef.current.videoWidth;
+      freezeCanvas.height = videoRef.current.videoHeight;
+      const freezeCtx = freezeCanvas.getContext("2d");
+      if (freezeCtx) {
+        freezeCtx.drawImage(videoRef.current, 0, 0, freezeCanvas.width, freezeCanvas.height);
+      }
+
+      // 2. Run heavy AI detection on the frozen frame
       const detection = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }))
+        .detectSingleFace(freezeCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
+        
       if (detection) {
         // Enforce face size constraint (e.g. width >= 160)
         const box = detection.detection.box;
@@ -130,15 +141,16 @@ export default function RegisterPage() {
         }
 
         setFaceDescriptor(JSON.stringify(Array.from(detection.descriptor)));
-        // Capture a snapshot of the face
-        const canvas = document.createElement("canvas");
-        canvas.width = videoRef.current.videoWidth;
-        canvas.height = videoRef.current.videoHeight;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.scale(-1, 1); // Flip horizontally because video is mirrored
-          ctx.drawImage(videoRef.current, -canvas.width, 0, canvas.width, canvas.height);
-          const base64Image = canvas.toDataURL("image/jpeg", 0.6);
+        
+        // 3. Save the exact frozen frame that was processed
+        const finalCanvas = document.createElement("canvas");
+        finalCanvas.width = freezeCanvas.width;
+        finalCanvas.height = freezeCanvas.height;
+        const finalCtx = finalCanvas.getContext("2d");
+        if (finalCtx) {
+          finalCtx.scale(-1, 1); // Flip horizontally because video is mirrored
+          finalCtx.drawImage(freezeCanvas, -finalCanvas.width, 0, finalCanvas.width, finalCanvas.height);
+          const base64Image = finalCanvas.toDataURL("image/jpeg", 0.6);
           setFormData(prev => ({ ...prev, profilePicture: base64Image }));
         }
       } else {
