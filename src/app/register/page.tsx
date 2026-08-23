@@ -81,7 +81,8 @@ export default function RegisterPage() {
     setInterval(async () => {
       if (video.paused || video.ended || !modelsLoaded) return;
       try {
-        const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }));
+        // ใช้ความมั่นใจ 0.4 เพื่อให้ตรวจจับหน้าติดง่ายขึ้นตอนโชว์กรอบ (แต่ตอนบันทึกจริงจะใช้ 0.85)
+        const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }));
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -89,9 +90,18 @@ export default function RegisterPage() {
             const resizedDetection = faceapi.resizeResults(detection, displaySize);
             const box = resizedDetection.box;
             
-            // Draw a green bounding box using primary color
-            ctx.strokeStyle = "hsl(var(--primary))";
-            ctx.lineWidth = 3;
+            const isConfident = detection.score >= 0.85;
+            const isLargeEnough = box.width >= 160 && box.height >= 160;
+
+            if (isConfident && isLargeEnough) {
+              // Draw a green bounding box
+              ctx.strokeStyle = "#22c55e"; // green-500
+              ctx.lineWidth = 4;
+            } else {
+              // Draw a red bounding box for warning
+              ctx.strokeStyle = "#ef4444"; // red-500
+              ctx.lineWidth = 2;
+            }
             ctx.strokeRect(box.x, box.y, box.width, box.height);
           }
         }
