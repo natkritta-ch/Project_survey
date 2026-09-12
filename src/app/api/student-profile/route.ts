@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "../../../lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
+import { revalidatePath } from "next/cache";
 
 export async function PUT(request: Request) {
   try {
@@ -32,6 +33,11 @@ export async function PUT(request: Request) {
       where: { id: studentId },
       data: updateData,
     });
+
+    // Revalidate paths so that the updated face descriptor is fetched correctly
+    revalidatePath("/dashboard/teacher/scan");
+    revalidatePath("/dashboard/head");
+    revalidatePath("/dashboard/student");
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

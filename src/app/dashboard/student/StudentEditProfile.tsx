@@ -3,8 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import * as faceapi from "face-api.js";
 import { Camera, Loader2, Save, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
@@ -171,9 +173,10 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
       });
       const data = await res.json();
       if (data.success) {
-        setMessage("บันทึกข้อมูลสำเร็จ! กรุณารีเฟรชหน้าเพื่อดูผลลัพธ์");
+        setMessage("บันทึกข้อมูลสำเร็จ!");
         setNewFaceDescriptor(null);
         setNewProfilePicture(null);
+        router.refresh();
       } else {
         setMessage("เกิดข้อผิดพลาด: " + data.message);
       }
