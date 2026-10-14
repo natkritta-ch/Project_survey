@@ -339,8 +339,9 @@ export async function promoteStudents() {
     if (nextLevel !== student.level) {
       if (nextLevel === "จบการศึกษา") {
         transactions.push(
-          prisma.user.delete({
-            where: { id: student.id }
+          prisma.user.update({
+            where: { id: student.id },
+            data: { level: nextLevel, updatedAt: new Date() }
           })
         );
       } else {
@@ -363,14 +364,14 @@ export async function promoteStudents() {
 
 export async function clearOldGraduates() {
   await requireHeadAuth();
-  const twoYearsAgo = new Date();
-  twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+  const threeYearsAgo = new Date();
+  threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
 
   await prisma.user.deleteMany({
     where: {
       role: "STUDENT",
       level: "จบการศึกษา",
-      updatedAt: { lt: twoYearsAgo }
+      updatedAt: { lt: threeYearsAgo }
     }
   });
   revalidatePath("/dashboard/head");

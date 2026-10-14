@@ -58,7 +58,7 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
     XLSX.writeFile(wb, filename);
   };
 
-  const students = useMemo(() => users.filter(u => !u.deletedAt && u.role === "STUDENT" && (filterLevel === "ทั้งหมด" || u.level === filterLevel)), [users, filterLevel]);
+  const students = useMemo(() => users.filter(u => !u.deletedAt && u.role === "STUDENT" && (filterLevel === "ทั้งหมด" ? (u.level !== "จบการศึกษา" && u.level !== "พ้นสภาพ") : u.level === filterLevel)), [users, filterLevel]);
   const activeTeachers = useMemo(() => users.filter(u => !u.deletedAt && u.role === "TEACHER").length, [users]);
   const activeSubjects = useMemo(() => subjects.filter(s => !s.deletedAt && (filterLevel === "ทั้งหมด" || s.level === filterLevel)).length, [subjects, filterLevel]);
 

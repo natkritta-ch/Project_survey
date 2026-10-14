@@ -300,13 +300,26 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const isAllStudentsGradesUnlocked = activeStudents.length > 0 && activeStudents.every(u => u.canSubmitGrades);
 
   const handlePromoteStudents = async () => {
-    if (confirm("คุณแน่ใจหรือไม่ที่จะเลื่อนชั้นปีนักเรียนทั้งวิทยาลัย?\n\n- ปวช.1 -> ปวช.2, ปวช.2 -> ปวช.3, ปวส.1 -> ปวส.2\n- ปวช.3 และ ปวส.2 เมื่อเลื่อนชั้นแล้ว ข้อมูลจะถูกลบออกจากระบบทันที")) {
+    if (confirm("คุณแน่ใจหรือไม่ที่จะเลื่อนชั้นปีนักเรียนทั้งวิทยาลัย?\n\n- ปวช.1 -> ปวช.2, ปวช.2 -> ปวช.3\n- ปวส.1 -> ปวส.2, ปวส.1(ม.6) -> ปวส.2(ม.6)\n- ปวช.3, ปวส.2 และ ปวส.2(ม.6) จะเปลี่ยนสถานะเป็น 'จบการศึกษา' (ระบบจะเก็บข้อมูลไว้อย่างน้อย 3 ปี)")) {
       setIsLoading(true);
       try {
         await promoteStudents();
         alert("เลื่อนชั้นปีนักเรียนเสร็จสมบูรณ์");
       } catch (e) {
         alert("เกิดข้อผิดพลาดในการเลื่อนชั้นปี");
+      }
+      setIsLoading(false);
+    }
+  };
+
+  const handleClearOldGraduates = async () => {
+    if (confirm("คุณแน่ใจหรือไม่ที่จะลบข้อมูลนักเรียนที่ 'จบการศึกษา' ไปแล้วเกิน 3 ปี ถาวร?\n(การกระทำนี้ไม่สามารถกู้คืนได้ และจะช่วยเพิ่มพื้นที่ว่างให้ฐานข้อมูล)")) {
+      setIsLoading(true);
+      try {
+        await clearOldGraduates();
+        alert("ล้างข้อมูลผู้ที่จบการศึกษาเกิน 3 ปี เรียบร้อยแล้ว");
+      } catch (e) {
+        alert("เกิดข้อผิดพลาดในการล้างข้อมูล");
       }
       setIsLoading(false);
     }
@@ -1121,7 +1134,11 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     </div>
                     <button disabled={isLoading} onClick={handlePromoteStudents} className="bg-amber-500 text-white px-3 py-2 rounded-md hover:bg-amber-600 disabled:opacity-50 text-sm font-semibold flex items-center shadow-sm">
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" /></svg>
-                      เลื่อนชั้นปีนักเรียนทั้งหมด (คนที่จบจะถูกลบทันที)
+                      เลื่อนชั้นปีนักเรียนทั้งหมด
+                    </button>
+                    <button disabled={isLoading} onClick={handleClearOldGraduates} className="bg-red-500 text-white px-3 py-2 rounded-md hover:bg-red-600 disabled:opacity-50 text-sm font-semibold flex items-center shadow-sm">
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      ล้างข้อมูลคนจบการศึกษา &gt; 3 ปี
                     </button>
                   </div>
                 )}
