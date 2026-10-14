@@ -21,6 +21,40 @@ export async function POST(request: Request) {
       profilePicture,
     } = body;
 
+    // ตรวจสอบว่ามีผู้ใช้นี้ในระบบอยู่แล้วหรือไม่
+    const existingUser = await prisma.user.findFirst({
+      where: { username, role: "STUDENT", deletedAt: null }
+    });
+
+    if (existingUser) {
+      if (existingUser.faceDescriptor) {
+        return NextResponse.json(
+          { success: false, message: "รหัสนักเรียนนี้ได้ทำการลงทะเบียนและสแกนใบหน้าแล้ว หากต้องการอัปเดตใบหน้าใหม่ กรุณาเข้าสู่ระบบแล้วไปที่เมนูแก้ไขโปรไฟล์" },
+          { status: 409 }
+        );
+      }
+
+      // อัปเดตข้อมูลนักเรียนเดิมที่ยังไม่มีใบหน้า
+      const updatedUser = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: name || existingUser.name,
+          nickname: nickname || existingUser.nickname,
+          password: await bcrypt.hash(password, 10),
+          faceDescriptor,
+          level: level || existingUser.level,
+          phone: phone || existingUser.phone,
+          email: email || existingUser.email,
+          address: address || existingUser.address,
+          bloodType: bloodType || existingUser.bloodType,
+          gender: gender || existingUser.gender,
+          nationalId: nationalId || existingUser.nationalId,
+          profilePicture: profilePicture || existingUser.profilePicture,
+        }
+      });
+      return NextResponse.json({ success: true, user: { id: updatedUser.id, username: updatedUser.username } });
+    }
+
     const user = await prisma.user.create({
       data: {
         name,

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
-import { Camera, RefreshCcw, CheckCircle2, StopCircle, UserPlus, FlipHorizontal, Clock, AlertTriangle, CalendarPlus, X, Sparkles } from "lucide-react";
+import { Camera, RefreshCcw, CheckCircle2, StopCircle, UserPlus, FlipHorizontal, Clock, AlertTriangle, CalendarPlus, X, Sparkles, Search, BookOpen, ChevronDown } from "lucide-react";
 
 export default function TeacherScannerClient({ 
   students, 
@@ -22,6 +22,8 @@ export default function TeacherScannerClient({
   const [faceMatcher, setFaceMatcher] = useState<faceapi.FaceMatcher | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState(initialSubjectId || "");
+  const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
+  const [subjectSearch, setSubjectSearch] = useState("");
   const [logs, setLogs] = useState<{ logId: string; id: string; name: string; time: string; manual?: boolean; status?: "saved" | "duplicate"; attendanceId?: string }[]>([]);
   const [scanType, setScanType] = useState<"class"|"assembly">(initialType || "class");
   const [manualStudentId, setManualStudentId] = useState("");
@@ -34,6 +36,8 @@ export default function TeacherScannerClient({
   const [subjectsList, setSubjectsList] = useState<any[]>(subjects);
   const [isMakeupModalOpen, setIsMakeupModalOpen] = useState(false);
   const [makeupSubjectId, setMakeupSubjectId] = useState(initialSubjectId || "");
+  const [isMakeupSubjectDropdownOpen, setIsMakeupSubjectDropdownOpen] = useState(false);
+  const [makeupSubjectSearch, setMakeupSubjectSearch] = useState("");
   const [makeupDate, setMakeupDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [makeupStartTime, setMakeupStartTime] = useState("");
   const [makeupEndTime, setMakeupEndTime] = useState("");
@@ -546,15 +550,98 @@ export default function TeacherScannerClient({
                   })()}
                 </div>
               ) : (
-                <select 
-                  disabled={isScanning}
-                  value={selectedSubject} 
-                  onChange={e => setSelectedSubject(e.target.value)} 
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border disabled:bg-gray-100 dark:disabled:bg-gray-800"
-                >
-                  <option value="">-- กรุณาเลือกวิชา --</option>
-                  {subjectsList.map(s => <option key={s.id} value={s.id}>[{s.code}] {s.name} (ชั้นปี: ${s.level || "ไม่ระบุ"})</option>)}
-                </select>
+                <div className="relative">
+                  {isSubjectDropdownOpen && (
+                    <div className="fixed inset-0 z-40" onClick={() => setIsSubjectDropdownOpen(false)}></div>
+                  )}
+
+                  <div className="relative z-40">
+                    <div
+                      onClick={() => !isScanning && setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
+                      className={`flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
+                        isScanning ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''
+                      } ${
+                        isSubjectDropdownOpen 
+                          ? 'border-indigo-500 ring-1 ring-indigo-500' 
+                          : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
+                        <span className={selectedSubject ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'}>
+                          {selectedSubject
+                            ? (() => {
+                                const s = subjectsList.find(x => x.id === selectedSubject);
+                                return s ? `[${s.code}] ${s.name} (ชั้นปี: ${s.level || "ไม่ระบุ"})` : "-- กรุณาเลือกวิชา --";
+                              })()
+                            : "-- กรุณาเลือกวิชา --"}
+                        </span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {isSubjectDropdownOpen && !isScanning && (
+                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={subjectSearch}
+                              onChange={e => setSubjectSearch(e.target.value)}
+                              placeholder="พิมพ์ค้นหารหัส หรือชื่อวิชา..."
+                              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                              autoFocus
+                            />
+                            <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2" />
+                          </div>
+                        </div>
+
+                        <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
+                          {subjectsList
+                            .filter(s => {
+                              if (!subjectSearch) return true;
+                              const q = subjectSearch.toLowerCase();
+                              return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.level && s.level.toLowerCase().includes(q));
+                            })
+                            .map(s => (
+                              <div
+                                key={s.id}
+                                onClick={() => {
+                                  setSelectedSubject(s.id);
+                                  setIsSubjectDropdownOpen(false);
+                                  setSubjectSearch("");
+                                }}
+                                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
+                                  selectedSubject === s.id 
+                                    ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' 
+                                    : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'
+                                }`}
+                              >
+                                <div>
+                                  <span className="font-semibold text-gray-900 dark:text-white mr-2">[{s.code}]</span>
+                                  <span>{s.name}</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-1.5 py-0.5 rounded shrink-0">
+                                  {s.level || "-"}
+                                </span>
+                              </div>
+                            ))
+                          }
+
+                          {subjectsList.filter(s => {
+                            if (!subjectSearch) return true;
+                            const q = subjectSearch.toLowerCase();
+                            return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.level && s.level.toLowerCase().includes(q));
+                          }).length === 0 && (
+                            <div className="px-4 py-3 text-sm text-gray-400 italic text-center">
+                              ไม่พบวิชาที่ค้นหา
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -887,19 +974,96 @@ export default function TeacherScannerClient({
             </div>
 
             <form onSubmit={handleCreateMakeup} className="space-y-4">
-              <div>
+              <div className="relative">
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">วิชาที่ต้องการสอนชดเชย</label>
-                <select
-                  value={makeupSubjectId}
-                  onChange={e => setMakeupSubjectId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-sm py-2.5 px-3 focus:ring-2 focus:ring-amber-500 outline-none"
-                  required
-                >
-                  <option value="">-- เลือกวิชา --</option>
-                  {subjectsList.map(s => (
-                    <option key={s.id} value={s.id}>[{s.code}] {s.name} ({s.level || "ไม่ระบุ"})</option>
-                  ))}
-                </select>
+                {isMakeupSubjectDropdownOpen && (
+                  <div className="fixed inset-0 z-40" onClick={() => setIsMakeupSubjectDropdownOpen(false)}></div>
+                )}
+
+                <div className="relative z-40">
+                  <div
+                    onClick={() => setIsMakeupSubjectDropdownOpen(!isMakeupSubjectDropdownOpen)}
+                    className={`flex items-center justify-between w-full rounded-xl border text-sm py-2.5 px-3 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
+                      isMakeupSubjectDropdownOpen 
+                        ? 'border-amber-500 ring-2 ring-amber-500/20' 
+                        : 'border-gray-300 dark:border-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span className={makeupSubjectId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-400'}>
+                        {makeupSubjectId
+                          ? (() => {
+                              const s = subjectsList.find(x => x.id === makeupSubjectId);
+                              return s ? `[${s.code}] ${s.name} (${s.level || "ไม่ระบุ"})` : "-- เลือกวิชา --";
+                            })()
+                          : "-- เลือกวิชา --"}
+                      </span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isMakeupSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isMakeupSubjectDropdownOpen && (
+                    <div className="absolute w-full mt-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                      <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={makeupSubjectSearch}
+                            onChange={e => setMakeupSubjectSearch(e.target.value)}
+                            placeholder="พิมพ์ค้นหารหัส หรือชื่อวิชา..."
+                            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
+                        </div>
+                      </div>
+
+                      <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
+                        {subjectsList
+                          .filter(s => {
+                            if (!makeupSubjectSearch) return true;
+                            const q = makeupSubjectSearch.toLowerCase();
+                            return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.level && s.level.toLowerCase().includes(q));
+                          })
+                          .map(s => (
+                            <div
+                              key={s.id}
+                              onClick={() => {
+                                setMakeupSubjectId(s.id);
+                                setIsMakeupSubjectDropdownOpen(false);
+                                setMakeupSubjectSearch("");
+                              }}
+                              className={`p-2.5 text-xs cursor-pointer transition-colors flex items-center justify-between hover:bg-amber-50 dark:hover:bg-amber-950/40 ${
+                                makeupSubjectId === s.id 
+                                  ? 'bg-amber-50 text-amber-900 font-semibold border-l-2 border-amber-500 dark:bg-amber-950/60 dark:text-amber-200' 
+                                  : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div>
+                                <span className="font-semibold text-gray-900 dark:text-white mr-1.5">[{s.code}]</span>
+                                <span>{s.name}</span>
+                              </div>
+                              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded shrink-0">
+                                {s.level || "-"}
+                              </span>
+                            </div>
+                          ))
+                        }
+
+                        {subjectsList.filter(s => {
+                          if (!makeupSubjectSearch) return true;
+                          const q = makeupSubjectSearch.toLowerCase();
+                          return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.level && s.level.toLowerCase().includes(q));
+                        }).length === 0 && (
+                          <div className="p-3 text-center text-xs text-gray-400 italic">
+                            ไม่พบวิชาที่ค้นหา
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

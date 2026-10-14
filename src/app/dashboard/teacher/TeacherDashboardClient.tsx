@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles } from "lucide-react";
+import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 export default function TeacherDashboardClient({ 
@@ -24,6 +24,8 @@ export default function TeacherDashboardClient({
   const [makeupClasses, setMakeupClasses] = useState<any[]>(initialMakeupClasses || []);
   const [isMakeupModalOpen, setIsMakeupModalOpen] = useState(false);
   const [makeupSubjectId, setMakeupSubjectId] = useState(subjects[0]?.id || "");
+  const [isMakeupSubjectDropdownOpen, setIsMakeupSubjectDropdownOpen] = useState(false);
+  const [makeupSubjectSearch, setMakeupSubjectSearch] = useState("");
   const [makeupDate, setMakeupDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [makeupStartTime, setMakeupStartTime] = useState("");
   const [makeupEndTime, setMakeupEndTime] = useState("");
@@ -625,19 +627,96 @@ export default function TeacherDashboardClient({
             </div>
 
             <form onSubmit={handleCreateMakeup} className="space-y-4">
-              <div>
+              <div className="relative">
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">วิชาที่ต้องการสอนชดเชย</label>
-                <select
-                  value={makeupSubjectId}
-                  onChange={e => setMakeupSubjectId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-sm py-2.5 px-3 focus:ring-2 focus:ring-amber-500 outline-none"
-                  required
-                >
-                  <option value="">-- เลือกวิชา --</option>
-                  {subjects.map((s: any) => (
-                    <option key={s.id} value={s.id}>[{s.code}] {s.name} ({s.level || "ไม่ระบุ"})</option>
-                  ))}
-                </select>
+                {isMakeupSubjectDropdownOpen && (
+                  <div className="fixed inset-0 z-40" onClick={() => setIsMakeupSubjectDropdownOpen(false)}></div>
+                )}
+
+                <div className="relative z-40">
+                  <div
+                    onClick={() => setIsMakeupSubjectDropdownOpen(!isMakeupSubjectDropdownOpen)}
+                    className={`flex items-center justify-between w-full rounded-xl border text-sm py-2.5 px-3 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
+                      isMakeupSubjectDropdownOpen 
+                        ? 'border-amber-500 ring-2 ring-amber-500/20' 
+                        : 'border-gray-300 dark:border-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
+                      <span className={makeupSubjectId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-400'}>
+                        {makeupSubjectId
+                          ? (() => {
+                              const s = subjects.find((x: any) => x.id === makeupSubjectId);
+                              return s ? `[${s.code}] ${s.name} (${s.level || "ไม่ระบุ"})` : "-- เลือกวิชา --";
+                            })()
+                          : "-- เลือกวิชา --"}
+                      </span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isMakeupSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isMakeupSubjectDropdownOpen && (
+                    <div className="absolute w-full mt-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                      <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={makeupSubjectSearch}
+                            onChange={e => setMakeupSubjectSearch(e.target.value)}
+                            placeholder="พิมพ์ค้นหารหัส หรือชื่อวิชา..."
+                            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
+                        </div>
+                      </div>
+
+                      <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
+                        {subjects
+                          .filter((s: any) => {
+                            if (!makeupSubjectSearch) return true;
+                            const q = makeupSubjectSearch.toLowerCase();
+                            return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.level && s.level.toLowerCase().includes(q));
+                          })
+                          .map((s: any) => (
+                            <div
+                              key={s.id}
+                              onClick={() => {
+                                setMakeupSubjectId(s.id);
+                                setIsMakeupSubjectDropdownOpen(false);
+                                setMakeupSubjectSearch("");
+                              }}
+                              className={`p-2.5 text-xs cursor-pointer transition-colors flex items-center justify-between hover:bg-amber-50 dark:hover:bg-amber-950/40 ${
+                                makeupSubjectId === s.id 
+                                  ? 'bg-amber-50 text-amber-900 font-semibold border-l-2 border-amber-500 dark:bg-amber-950/60 dark:text-amber-200' 
+                                  : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div>
+                                <span className="font-semibold text-gray-900 dark:text-white mr-1.5">[{s.code}]</span>
+                                <span>{s.name}</span>
+                              </div>
+                              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 rounded shrink-0">
+                                {s.level || "-"}
+                              </span>
+                            </div>
+                          ))
+                        }
+
+                        {subjects.filter((s: any) => {
+                          if (!makeupSubjectSearch) return true;
+                          const q = makeupSubjectSearch.toLowerCase();
+                          return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.level && s.level.toLowerCase().includes(q));
+                        }).length === 0 && (
+                          <div className="p-3 text-center text-xs text-gray-400 italic">
+                            ไม่พบวิชาที่ค้นหา
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>

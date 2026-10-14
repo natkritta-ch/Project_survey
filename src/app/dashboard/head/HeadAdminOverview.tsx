@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Save } from "lucide-react";
+import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Save, Search, ChevronDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createOrUpdateTermConfig, resetAllFaces } from "./actions";
 
@@ -9,6 +9,8 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
   const [searchKr, setSearchKr] = useState("");
   const [filterSubjectKr, setFilterSubjectKr] = useState("ทั้งหมด");
+  const [isSubjectKrDropdownOpen, setIsSubjectKrDropdownOpen] = useState(false);
+  const [subjectKrSearch, setSubjectKrSearch] = useState("");
   const [filterLevelKr, setFilterLevelKr] = useState("ทั้งหมด");
   const [searchMz, setSearchMz] = useState("");
   const [filterLevelMz, setFilterLevelMz] = useState("ทั้งหมด");
@@ -292,16 +294,69 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
             />
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <span className="font-semibold text-slate-500 whitespace-nowrap hidden sm:inline-block">วิชา:</span>
-              <select 
-                value={filterSubjectKr} 
-                onChange={e => setFilterSubjectKr(e.target.value)} 
-                className="px-3 py-1.5 border border-rose-200 dark:border-slate-600 rounded-lg w-full sm:w-auto outline-none focus:border-rose-400 dark:bg-slate-900 dark:text-white max-w-[150px] truncate"
-              >
-                <option value="ทั้งหมด">-- ทุกวิชา --</option>
-                {Array.from(new Set(subjectStats.khorRorStudentsList.map(st => st.subjectName))).map(sub => (
-                  <option key={sub as string} value={sub as string}>{sub as string}</option>
-                ))}
-              </select>
+              <div className="relative">
+                {isSubjectKrDropdownOpen && (
+                  <div className="fixed inset-0 z-40" onClick={() => setIsSubjectKrDropdownOpen(false)}></div>
+                )}
+                <div className="relative z-40">
+                  <div
+                    onClick={() => setIsSubjectKrDropdownOpen(!isSubjectKrDropdownOpen)}
+                    className={`flex items-center justify-between gap-1.5 px-3 py-1.5 border border-rose-200 dark:border-slate-600 rounded-lg text-sm cursor-pointer bg-white dark:bg-slate-900 transition-colors max-w-[200px] ${
+                      isSubjectKrDropdownOpen ? 'border-rose-400 ring-2 ring-rose-400/20' : 'hover:border-rose-300'
+                    }`}
+                  >
+                    <span className="truncate text-slate-700 dark:text-slate-200 font-medium">
+                      {filterSubjectKr === "ทั้งหมด" ? "-- ทุกวิชา --" : filterSubjectKr}
+                    </span>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isSubjectKrDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isSubjectKrDropdownOpen && (
+                    <div className="absolute right-0 sm:left-0 top-full mt-1 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                      <div className="p-2 sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 z-10 shadow-sm">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={subjectKrSearch}
+                            onChange={e => setSubjectKrSearch(e.target.value)}
+                            placeholder="ค้นหาชื่อวิชา..."
+                            className="w-full pl-7 pr-2.5 py-1 text-xs border border-slate-200 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:border-rose-400"
+                            autoFocus
+                          />
+                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1.5" />
+                        </div>
+                      </div>
+
+                      <div className="py-1 divide-y divide-slate-50 dark:divide-slate-700/50">
+                        {(!subjectKrSearch || "ทั้งหมด".includes(subjectKrSearch.toLowerCase())) && (
+                          <div
+                            onClick={() => { setFilterSubjectKr("ทั้งหมด"); setIsSubjectKrDropdownOpen(false); setSubjectKrSearch(""); }}
+                            className={`px-3 py-2 text-xs cursor-pointer transition-colors hover:bg-rose-50 dark:hover:bg-slate-700/50 ${
+                              filterSubjectKr === "ทั้งหมด" ? 'bg-rose-50 text-rose-900 font-bold dark:bg-slate-700 dark:text-rose-300' : 'text-slate-700 dark:text-slate-300'
+                            }`}
+                          >
+                            -- ทุกวิชา --
+                          </div>
+                        )}
+                        {Array.from(new Set(subjectStats.khorRorStudentsList.map(st => st.subjectName)))
+                          .filter(sub => !subjectKrSearch || (sub as string).toLowerCase().includes(subjectKrSearch.toLowerCase()))
+                          .map(sub => (
+                            <div
+                              key={sub as string}
+                              onClick={() => { setFilterSubjectKr(sub as string); setIsSubjectKrDropdownOpen(false); setSubjectKrSearch(""); }}
+                              className={`px-3 py-2 text-xs cursor-pointer transition-colors truncate hover:bg-rose-50 dark:hover:bg-slate-700/50 ${
+                                filterSubjectKr === sub ? 'bg-rose-50 text-rose-900 font-bold dark:bg-slate-700 dark:text-rose-300' : 'text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              {sub as string}
+                            </div>
+                          ))
+                        }
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
               <select 
                 value={filterLevelKr} 
                 onChange={e => setFilterLevelKr(e.target.value)} 

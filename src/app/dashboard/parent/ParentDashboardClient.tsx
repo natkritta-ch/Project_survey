@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Clock, GraduationCap, Menu, X, Users, Home, ChevronDown } from "lucide-react";
+import { User, Clock, GraduationCap, Menu, X, Users, Home, ChevronDown, Search, Loader2, Sparkles } from "lucide-react";
 
 export default function ParentDashboardClient({
   session,
@@ -26,6 +26,45 @@ export default function ParentDashboardClient({
   const [addStudentUsername, setAddStudentUsername] = useState("");
   const [addStudentNationalId, setAddStudentNationalId] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+
+  // Searchable Select สำหรับเลือกนักเรียนที่จะเพิ่ม
+  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentSuggestions, setStudentSuggestions] = useState<any[]>([]);
+  const [isSearchingStudent, setIsSearchingStudent] = useState(false);
+  const [selectedStudentInfo, setSelectedStudentInfo] = useState<any | null>(null);
+  const searchTimeoutRef = useRef<any>(null);
+
+  const handleStudentSearchChange = (query: string) => {
+    setStudentSearch(query);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!query || query.trim().length < 1) {
+      setStudentSuggestions([]);
+      return;
+    }
+
+    setIsSearchingStudent(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/register/search-student?q=${encodeURIComponent(query.trim())}`);
+        const data = await res.json();
+        if (data.success) {
+          setStudentSuggestions(data.students || []);
+        }
+      } catch (err) {
+        console.error("Failed to search students:", err);
+      } finally {
+        setIsSearchingStudent(false);
+      }
+    }, 250);
+  };
+
+  const handleSelectStudent = (st: any) => {
+    setAddStudentUsername(st.username);
+    setSelectedStudentInfo(st);
+    setIsStudentDropdownOpen(false);
+    setStudentSearch("");
+  };
 
   const handleAddChild = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -197,15 +236,91 @@ export default function ParentDashboardClient({
               <User className="w-5 h-5 text-primary" /> เพิ่มบัญชีบุตรหลานที่ต้องการติดตาม
             </h3>
             <form onSubmit={handleAddChild} className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
-                <input
-                  required
-                  type="text"
-                  placeholder="รหัสนักเรียน (Username)"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-                  value={addStudentUsername}
-                  onChange={(e) => setAddStudentUsername(e.target.value)}
-                />
+              {/* Searchable Select Combobox สำหรับค้นหาและเลือกนักเรียน */}
+              <div className="flex-1 relative">
+                {isStudentDropdownOpen && (
+                  <div className="fixed inset-0 z-40" onClick={() => setIsStudentDropdownOpen(false)}></div>
+                )}
+
+                <div className="relative z-40">
+                  <div
+                    onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
+                    className={`flex items-center justify-between w-full px-4 py-2 bg-background border rounded-xl text-sm cursor-pointer transition-colors ${
+                      isStudentDropdownOpen 
+                        ? 'border-primary ring-2 ring-primary/20' 
+                        : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <Users className="w-4 h-4 text-primary shrink-0" />
+                      <span className={addStudentUsername ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                        {selectedStudentInfo 
+                          ? `${selectedStudentInfo.name} (${selectedStudentInfo.username}) - ชั้น ${selectedStudentInfo.level || "ไม่ระบุ"}`
+                          : (addStudentUsername || "-- ค้นหาและเลือกนักเรียน --")
+                        }
+                      </span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} />
+                  </div>
+
+                  {isStudentDropdownOpen && (
+                    <div className="absolute left-0 top-full mt-1.5 w-full sm:w-96 bg-card border border-border rounded-xl shadow-2xl max-h-60 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                      <div className="p-2.5 sticky top-0 bg-card border-b border-border z-10 shadow-sm">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={studentSearch}
+                            onChange={e => handleStudentSearchChange(e.target.value)}
+                            placeholder="พิมพ์ชื่อ หรือ รหัสนักเรียน..."
+                            className="w-full pl-8 pr-3 py-1.5 border border-border rounded-lg text-sm bg-background text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                            autoFocus
+                          />
+                          <Search className="w-4 h-4 text-muted-foreground absolute left-2.5 top-2" />
+                          {isSearchingStudent && (
+                            <Loader2 className="w-4 h-4 animate-spin text-primary absolute right-2.5 top-2" />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="py-1 divide-y divide-border">
+                        {studentSuggestions.map(st => (
+                          <div
+                            key={st.id}
+                            onClick={() => handleSelectStudent(st)}
+                            className={`p-3 cursor-pointer transition-colors flex items-center justify-between hover:bg-primary/10 ${
+                              addStudentUsername === st.username ? 'bg-primary/10 font-semibold text-primary' : 'text-foreground'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm">{st.name}</span>
+                                <span className="text-xs text-muted-foreground font-mono">({st.username})</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                ชั้น {st.level || "ไม่ระบุ"}
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                              {st.level || "-"}
+                            </span>
+                          </div>
+                        ))}
+
+                        {studentSearch && !isSearchingStudent && studentSuggestions.length === 0 && (
+                          <div className="p-4 text-center text-xs text-muted-foreground italic">
+                            ไม่พบนักเรียนที่ค้นหา
+                          </div>
+                        )}
+
+                        {!studentSearch && studentSuggestions.length === 0 && (
+                          <div className="p-3 text-center text-xs text-muted-foreground">
+                            พิมพ์ชื่อหรือรหัสนักเรียนในช่องค้นหาด้านบน
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex-1">
                 <input

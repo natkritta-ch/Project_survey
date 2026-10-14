@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as faceapi from "face-api.js";
-import { Camera, UserPlus, FileJson, Loader2, MapPin, Phone, Droplets, User, ChevronRight, Check, Database } from "lucide-react";
+import { Camera, UserPlus, FileJson, Loader2, MapPin, Phone, Droplets, User, ChevronRight, Check, Database, Search, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 const BLOOD_TYPES = ["A", "B", "AB", "O", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -21,6 +21,14 @@ export default function RegisterPage() {
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
 
+  // Student Live Search Suggestions
+  const [studentSuggestions, setStudentSuggestions] = useState<any[]>([]);
+  const [isSearchingStudent, setIsSearchingStudent] = useState(false);
+  const [isSuggestOpen, setIsSuggestOpen] = useState(false);
+  const [suggestTarget, setSuggestTarget] = useState<"name" | "username" | null>(null);
+  const [linkedStudentNotice, setLinkedStudentNotice] = useState<string | null>(null);
+  const searchTimeoutRef = useRef<any>(null);
+
   const [formData, setFormData] = useState({
     name: "",
     nickname: "",
@@ -34,6 +42,56 @@ export default function RegisterPage() {
     bloodType: "A",
     profilePicture: "",
   });
+
+  // Debounced search for existing student in database
+  const searchStudents = (query: string, target: "name" | "username") => {
+    setSuggestTarget(target);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!query || query.trim().length < 1) {
+      setStudentSuggestions([]);
+      setIsSuggestOpen(false);
+      return;
+    }
+
+    setIsSuggestOpen(true);
+    setIsSearchingStudent(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/register/search-student?q=${encodeURIComponent(query.trim())}`);
+        const data = await res.json();
+        if (data.success) {
+          setStudentSuggestions(data.students || []);
+        }
+      } catch (err) {
+        console.error("Failed to search students:", err);
+      } finally {
+        setIsSearchingStudent(false);
+      }
+    }, 250);
+  };
+
+  const handleSelectStudent = (st: any) => {
+    setFormData(prev => ({
+      ...prev,
+      name: st.name || prev.name,
+      username: st.username || prev.username,
+      level: st.level || prev.level,
+      nickname: st.nickname || prev.nickname,
+      phone: st.phone || prev.phone,
+      email: st.email || prev.email,
+      address: st.address || prev.address,
+      gender: st.gender || prev.gender,
+      bloodType: st.bloodType || prev.bloodType,
+      ...(st.nationalId ? { nationalId: st.nationalId } : {})
+    }));
+    setIsSuggestOpen(false);
+    setStudentSuggestions([]);
+    if (st.hasFace) {
+      setLinkedStudentNotice(`⚠️ รหัสนักเรียน ${st.username} (${st.name}) ได้เคยลงทะเบียนใบหน้าแล้ว หากทำต่อจะเป็นการส่งข้อมูลเพื่อตรวจสอบ`);
+    } else {
+      setLinkedStudentNotice(`✨ ดึงข้อมูลของ "${st.name}" (${st.username}) ชั้น ${st.level || "ไม่ระบุ"} สำเร็จ กรุณากำหนดรหัสผ่านและดำเนินการสแกนใบหน้า`);
+    }
+  };
 
   // Load face models
   useEffect(() => {
@@ -279,15 +337,94 @@ export default function RegisterPage() {
                 <h2 className="text-lg font-semibold text-foreground">ข้อมูลส่วนตัวเบื้องต้น</h2>
               </div>
 
+              {/* แจ้งเตือนเมื่อมีการดึงข้อมูลนักเรียนจากระบบมาเติมให้อัตโนมัติ */}
+              {linkedStudentNotice && (
+                <div className="mb-6 p-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-sm text-indigo-900 dark:text-indigo-200 flex items-start gap-3 animate-in fade-in">
+                  <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-semibold">{linkedStudentNotice}</p>
+                    <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">ข้อมูลส่วนตัวเดิมถูกเติมลงในฟอร์มแล้ว คุณสามารถแก้ไขเพิ่มเติมหรือตรวจสอบก่อนไปขั้นตอนถัดไป</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setLinkedStudentNotice(null)}
+                    className="text-xs text-indigo-500 hover:text-indigo-700 font-bold ml-2"
+                  >
+                    ปิด
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2">
-                  <label className={labelClass}>ชื่อ-นามสกุล <span className="text-destructive">*</span></label>
-                  <input
-                    type="text" required className={inputClass}
-                    placeholder="เช่น สมชาย ใจดี"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
+                {/* ช่องชื่อ-นามสกุล พร้อม Searchable Suggestion Dropdown */}
+                <div className="md:col-span-2 relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={labelClass}>
+                      ชื่อ-นามสกุล <span className="text-destructive">*</span>
+                    </label>
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Search className="w-3 h-3 text-primary" /> พิมพ์ค้นหาชื่อที่มีในระบบได้
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text" required className={inputClass}
+                      placeholder="เช่น สมชาย ใจดี (หรือเริ่มพิมพ์เพื่อค้นหา)"
+                      value={formData.name}
+                      onChange={(e) => {
+                        setFormData({ ...formData, name: e.target.value });
+                        searchStudents(e.target.value, "name");
+                      }}
+                      onFocus={() => {
+                        if (formData.name) searchStudents(formData.name, "name");
+                      }}
+                    />
+                    {isSearchingStudent && suggestTarget === "name" && (
+                      <div className="absolute right-3 top-3">
+                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Suggestion Dropdown ใต้ช่องชื่อ */}
+                  {isSuggestOpen && suggestTarget === "name" && studentSuggestions.length > 0 && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsSuggestOpen(false)}></div>
+                      <div className="absolute left-0 top-full mt-1.5 w-full bg-card border border-primary/30 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                        <div className="p-2.5 bg-primary/5 border-b border-border flex items-center justify-between">
+                          <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" /> พบข้อมูลนักเรียนในระบบ (คลิกเพื่อดึงข้อมูล)
+                          </span>
+                          <span className="text-[10px] font-semibold text-muted-foreground bg-background px-2 py-0.5 rounded-full border border-border">
+                            พบ {studentSuggestions.length} คน
+                          </span>
+                        </div>
+                        <div className="divide-y divide-border">
+                          {studentSuggestions.map(st => (
+                            <div
+                              key={st.id}
+                              onClick={() => handleSelectStudent(st)}
+                              className="p-3 cursor-pointer transition-colors hover:bg-primary/10 flex items-center justify-between gap-3"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-sm text-foreground">{st.name}</span>
+                                  <span className="text-xs text-muted-foreground font-mono">({st.username})</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
+                                  <span>ชั้น {st.level || "ไม่ระบุ"}</span>
+                                  {st.nickname && <span>• ชื่อเล่น: {st.nickname}</span>}
+                                </div>
+                              </div>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${st.hasFace ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'}`}>
+                                {st.hasFace ? "สแกนหน้าแล้ว" : "🟢 พร้อมบันทึกหน้า"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:col-span-2">
@@ -362,14 +499,74 @@ export default function RegisterPage() {
                   />
                 </div>
 
-                <div>
-                  <label className={labelClass}>รหัสนักเรียน / Username <span className="text-destructive">*</span></label>
-                  <input
-                    type="text" required className={inputClass}
-                    placeholder="รหัสนักเรียน"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  />
+                {/* ช่องรหัสนักเรียน / Username พร้อม Searchable Suggestion Dropdown */}
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={labelClass}>
+                      รหัสนักเรียน / Username <span className="text-destructive">*</span>
+                    </label>
+                    <span className="text-[11px] text-muted-foreground flex items-center gap-1">
+                      <Search className="w-3 h-3 text-primary" /> ค้นหารหัสเดิม
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text" required className={inputClass}
+                      placeholder="รหัสนักเรียน (e.g. 66001)"
+                      value={formData.username}
+                      onChange={(e) => {
+                        setFormData({ ...formData, username: e.target.value });
+                        searchStudents(e.target.value, "username");
+                      }}
+                      onFocus={() => {
+                        if (formData.username) searchStudents(formData.username, "username");
+                      }}
+                    />
+                    {isSearchingStudent && suggestTarget === "username" && (
+                      <div className="absolute right-3 top-3">
+                        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Suggestion Dropdown ใต้ช่องรหัสนักเรียน */}
+                  {isSuggestOpen && suggestTarget === "username" && studentSuggestions.length > 0 && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsSuggestOpen(false)}></div>
+                      <div className="absolute left-0 top-full mt-1.5 w-full bg-card border border-primary/30 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                        <div className="p-2.5 bg-primary/5 border-b border-border flex items-center justify-between">
+                          <span className="text-xs font-bold text-primary flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" /> รหัสนักเรียนเดิมในระบบ (คลิกเพื่อเลือก)
+                          </span>
+                          <span className="text-[10px] font-semibold text-muted-foreground bg-background px-2 py-0.5 rounded-full border border-border">
+                            พบ {studentSuggestions.length} คน
+                          </span>
+                        </div>
+                        <div className="divide-y divide-border">
+                          {studentSuggestions.map(st => (
+                            <div
+                              key={st.id}
+                              onClick={() => handleSelectStudent(st)}
+                              className="p-3 cursor-pointer transition-colors hover:bg-primary/10 flex items-center justify-between gap-3"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-sm text-foreground font-mono">{st.username}</span>
+                                  <span className="text-xs text-foreground font-semibold">- {st.name}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  ชั้น {st.level || "ไม่ระบุ"}
+                                </div>
+                              </div>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full shrink-0 ${st.hasFace ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'}`}>
+                                {st.hasFace ? "สแกนหน้าแล้ว" : "🟢 พร้อมบันทึกหน้า"}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div>

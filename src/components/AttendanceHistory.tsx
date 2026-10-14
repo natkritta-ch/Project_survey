@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { Search, BookOpen, ChevronDown } from "lucide-react";
 
 export default function AttendanceHistory({ attendances, subjects, schedules }: { attendances: any[], subjects: any[], schedules?: any[] }) {
   const [filterSubject, setFilterSubject] = useState("all");
+  const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
+  const [subjectSearch, setSubjectSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterDate, setFilterDate] = useState("");
 
@@ -64,53 +67,153 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
     <div>
       {/* Filters */}
       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-gray-50 dark:bg-gray-800/80 p-5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-        <div>
+        <div className="relative">
           <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">วิชา / กิจกรรม</label>
-          <select
-            value={filterSubject}
-            onChange={e => setFilterSubject(e.target.value)}
-            className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2.5 border dark:bg-gray-900 dark:text-white dark:border-gray-600 transition"
-          >
-            <option value="all">ดูทั้งหมด ({attendances.length} รายการ)</option>
-            <option value="assembly">★ เข้าแถว / กิจกรรมรวม ({attendances.filter(r => !r.subject).length} รายการ)</option>
-            
-            {[1, 2, 3, 4, 5, 6, 7].map(day => {
-              const daySubjects = groupedOptions[day];
-              if (daySubjects && daySubjects.length > 0) {
-                return (
-                  <optgroup key={`day-${day}`} label={`วัน${daysMap[day]}`} className="font-bold text-indigo-700 bg-indigo-50 dark:bg-indigo-900 dark:text-indigo-300">
-                    {daySubjects.map((s: any) => {
-                       const count = attendances.filter(r => r.subject?.id === s.id).length;
-                       return <option key={s.id} value={s.id} className="text-gray-900 bg-white font-normal dark:bg-gray-800 dark:text-gray-200">[{s.code}] {s.name} ({count})</option>;
-                    })}
-                  </optgroup>
-                );
-              }
-              return null;
-            })}
+          {isSubjectDropdownOpen && (
+            <div className="fixed inset-0 z-40" onClick={() => setIsSubjectDropdownOpen(false)}></div>
+          )}
 
-            {(() => {
-              if (unscheduledOptions.length === 0) return null;
-              
-              const oldGrouped: Record<string, any[]> = {};
-              unscheduledOptions.forEach((s: any) => {
-                const termStr = (s.term && s.academicYear) ? `เทอม ${s.term}/${s.academicYear}` : "";
-                const label = `🗂️ ประวัติ ${s.level || "ไม่ระบุ"} ${termStr}`.trim();
-                if (!oldGrouped[label]) oldGrouped[label] = [];
-                oldGrouped[label].push(s);
-              });
+          <div className="relative z-40">
+            <div
+              onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
+              className={`flex items-center justify-between w-full rounded-lg border shadow-sm sm:text-sm px-3 py-2.5 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
+                isSubjectDropdownOpen 
+                  ? 'border-indigo-500 ring-2 ring-indigo-500/20' 
+                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate text-gray-900 dark:text-white font-medium">
+                <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span className="truncate">
+                  {filterSubject === "all" && `ดูทั้งหมด (${attendances.length} รายการ)`}
+                  {filterSubject === "assembly" && `★ เข้าแถว / กิจกรรมรวม (${attendances.filter(r => !r.subject).length})`}
+                  {filterSubject !== "all" && filterSubject !== "assembly" && (() => {
+                    const s = subjects.find(x => x.id === filterSubject);
+                    const count = attendances.filter(r => r.subject?.id === filterSubject).length;
+                    return s ? `[${s.code}] ${s.name} (${count})` : "วิชาที่เลือก";
+                  })()}
+                </span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+            </div>
 
-              // Sort labels alphabetically so "ปวช.1" comes before "ปวช.2"
-              return Object.keys(oldGrouped).sort().map(label => (
-                <optgroup key={label} label={label} className="font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800">
-                  {oldGrouped[label].map((s: any) => {
-                     const count = attendances.filter(r => r.subject?.id === s.id).length;
-                     return <option key={s.id} value={s.id} className="text-slate-900 bg-white font-normal dark:bg-slate-900 dark:text-slate-200">[{s.code}] {s.name} ({count})</option>;
+            {isSubjectDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-full sm:w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                <div className="p-2.5 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={subjectSearch}
+                      onChange={e => setSubjectSearch(e.target.value)}
+                      placeholder="ค้นหารหัส หรือชื่อวิชา..."
+                      className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                      autoFocus
+                    />
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
+                  </div>
+                </div>
+
+                <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
+                  {/* ตัวเลือกทั่วไป */}
+                  {(!subjectSearch || "ดูทั้งหมด".includes(subjectSearch.toLowerCase())) && (
+                    <div
+                      onClick={() => { setFilterSubject("all"); setIsSubjectDropdownOpen(false); setSubjectSearch(""); }}
+                      className={`p-2.5 text-xs cursor-pointer transition-colors flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-950/40 ${
+                        filterSubject === "all" ? 'bg-indigo-50 text-indigo-900 font-bold dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <span>ดูทั้งหมด</span>
+                      <span className="text-[11px] font-bold text-gray-500">{attendances.length} รายการ</span>
+                    </div>
+                  )}
+
+                  {(!subjectSearch || "เข้าแถว".includes(subjectSearch.toLowerCase()) || "กิจกรรม".includes(subjectSearch.toLowerCase())) && (
+                    <div
+                      onClick={() => { setFilterSubject("assembly"); setIsSubjectDropdownOpen(false); setSubjectSearch(""); }}
+                      className={`p-2.5 text-xs cursor-pointer transition-colors flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-950/40 ${
+                        filterSubject === "assembly" ? 'bg-indigo-50 text-indigo-900 font-bold dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <span className="font-semibold text-amber-600 dark:text-amber-400">★ เข้าแถว / กิจกรรมรวม</span>
+                      <span className="text-[11px] font-bold text-gray-500">{attendances.filter(r => !r.subject).length}</span>
+                    </div>
+                  )}
+
+                  {/* แสดงวิชาตามวัน */}
+                  {[1, 2, 3, 4, 5, 6, 7].map(day => {
+                    const daySubjects = (groupedOptions[day] || []).filter(s => {
+                      if (!subjectSearch) return true;
+                      const q = subjectSearch.toLowerCase();
+                      return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || daysMap[day].toLowerCase().includes(q);
+                    });
+                    if (daySubjects.length === 0) return null;
+
+                    return (
+                      <div key={`day-group-${day}`}>
+                        <div className="px-3 py-1 text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50/70 dark:bg-indigo-950/40">
+                          วัน{daysMap[day]}
+                        </div>
+                        {daySubjects.map((s: any) => {
+                          const count = attendances.filter(r => r.subject?.id === s.id).length;
+                          return (
+                            <div
+                              key={s.id}
+                              onClick={() => { setFilterSubject(s.id); setIsSubjectDropdownOpen(false); setSubjectSearch(""); }}
+                              className={`p-2.5 text-xs cursor-pointer transition-colors flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-950/40 ${
+                                filterSubject === s.id ? 'bg-indigo-50 text-indigo-900 font-bold border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div className="truncate pr-2">
+                                <span className="font-semibold text-gray-900 dark:text-white mr-1.5">[{s.code}]</span>
+                                <span>{s.name}</span>
+                              </div>
+                              <span className="text-[10px] font-bold bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded shrink-0">{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
                   })}
-                </optgroup>
-              ));
-            })()}
-          </select>
+
+                  {/* แสดงวิชาอื่นๆ / ประวัติ */}
+                  {(() => {
+                    const filteredUnscheduled = unscheduledOptions.filter(s => {
+                      if (!subjectSearch) return true;
+                      const q = subjectSearch.toLowerCase();
+                      return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || (s.level && s.level.toLowerCase().includes(q));
+                    });
+                    if (filteredUnscheduled.length === 0) return null;
+
+                    return (
+                      <div>
+                        <div className="px-3 py-1 text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400 bg-gray-100/70 dark:bg-gray-800">
+                          วิชาอื่นๆ / ประวัติ
+                        </div>
+                        {filteredUnscheduled.map((s: any) => {
+                          const count = attendances.filter(r => r.subject?.id === s.id).length;
+                          return (
+                            <div
+                              key={s.id}
+                              onClick={() => { setFilterSubject(s.id); setIsSubjectDropdownOpen(false); setSubjectSearch(""); }}
+                              className={`p-2.5 text-xs cursor-pointer transition-colors flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-950/40 ${
+                                filterSubject === s.id ? 'bg-indigo-50 text-indigo-900 font-bold border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div className="truncate pr-2">
+                                <span className="font-semibold text-gray-900 dark:text-white mr-1.5">[{s.code}]</span>
+                                <span>{s.name}</span>
+                              </div>
+                              <span className="text-[10px] font-bold bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded shrink-0">{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div>

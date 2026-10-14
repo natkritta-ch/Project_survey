@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { UserPlus, Loader2, Users } from "lucide-react";
+import { useState, useRef } from "react";
+import { UserPlus, Loader2, Users, Search, ChevronDown, CheckCircle2, Sparkles } from "lucide-react";
 
 export default function ParentRegisterPage() {
   const [formData, setFormData] = useState({
@@ -12,8 +12,48 @@ export default function ParentRegisterPage() {
     address: "",
     studentUsername: "", // รหัสนักเรียนของลูก
     email: "",
+    studentNationalId: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+
+  // Student Searchable Select
+  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [studentSuggestions, setStudentSuggestions] = useState<any[]>([]);
+  const [isSearchingStudent, setIsSearchingStudent] = useState(false);
+  const [selectedStudentInfo, setSelectedStudentInfo] = useState<any | null>(null);
+  const searchTimeoutRef = useRef<any>(null);
+
+  const handleStudentSearchChange = (query: string) => {
+    setStudentSearch(query);
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!query || query.trim().length < 1) {
+      setStudentSuggestions([]);
+      return;
+    }
+
+    setIsSearchingStudent(true);
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/register/search-student?q=${encodeURIComponent(query.trim())}`);
+        const data = await res.json();
+        if (data.success) {
+          setStudentSuggestions(data.students || []);
+        }
+      } catch (err) {
+        console.error("Failed to search students:", err);
+      } finally {
+        setIsSearchingStudent(false);
+      }
+    }, 250);
+  };
+
+  const handleSelectStudent = (st: any) => {
+    setFormData(prev => ({ ...prev, studentUsername: st.username }));
+    setSelectedStudentInfo(st);
+    setIsStudentDropdownOpen(false);
+    setStudentSearch("");
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +71,8 @@ export default function ParentRegisterPage() {
       const data = await response.json();
       if (data.success) {
         alert("สมัครบัญชีผู้ปกครองสำเร็จ และผูกข้อมูลกับนักเรียนเรียบร้อยแล้ว!");
-        setFormData({ name: "", username: "", password: "", phone: "", address: "", studentUsername: "", email: "" });
+        setFormData({ name: "", username: "", password: "", phone: "", address: "", studentUsername: "", email: "", studentNationalId: "" });
+        setSelectedStudentInfo(null);
       } else {
         alert("สมัครสมาชิกล้มเหลว: " + data.message);
       }
@@ -124,18 +165,91 @@ export default function ParentRegisterPage() {
                 เพื่อความปลอดภัย กรุณากรอกรหัสนักเรียนและ <b>เลขบัตรประชาชน 4 ตัวท้าย</b> ของนักเรียนให้ถูกต้องตรงกับที่ลงทะเบียนไว้ ระบบจะส่งคำขอไปให้นักเรียนอนุมัติ
               </p>
               <div className="space-y-3">
+                {/* Searchable Select สำหรับเลือกนักเรียน */}
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Users className="h-5 w-5 text-gray-400" />
+                  {isStudentDropdownOpen && (
+                    <div className="fixed inset-0 z-40" onClick={() => setIsStudentDropdownOpen(false)}></div>
+                  )}
+
+                  <div className="relative z-40">
+                    <div
+                      onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
+                      className={`flex items-center justify-between w-full rounded-lg border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${
+                        isStudentDropdownOpen 
+                          ? 'border-indigo-500 ring-2 ring-indigo-500/20' 
+                          : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Users className="h-5 w-5 text-indigo-500 shrink-0" />
+                        <span className={formData.studentUsername ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-400'}>
+                          {selectedStudentInfo 
+                            ? `${selectedStudentInfo.name} (${selectedStudentInfo.username}) - ชั้น ${selectedStudentInfo.level || "ไม่ระบุ"}`
+                            : (formData.studentUsername || "-- พิมพ์ค้นหาและเลือกนักเรียน --")
+                          }
+                        </span>
+                      </div>
+                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {isStudentDropdownOpen && (
+                      <div className="absolute w-full mt-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                        <div className="p-2.5 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={studentSearch}
+                              onChange={e => handleStudentSearchChange(e.target.value)}
+                              placeholder="พิมพ์ชื่อ หรือ รหัสนักเรียน..."
+                              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                              autoFocus
+                            />
+                            <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2" />
+                            {isSearchingStudent && (
+                              <Loader2 className="w-4 h-4 animate-spin text-indigo-500 absolute right-2.5 top-2" />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="py-1 divide-y divide-gray-50 dark:divide-gray-750">
+                          {studentSuggestions.map(st => (
+                            <div
+                              key={st.id}
+                              onClick={() => handleSelectStudent(st)}
+                              className={`p-3 cursor-pointer transition-colors flex items-center justify-between hover:bg-indigo-50 dark:hover:bg-indigo-950/40 ${
+                                formData.studentUsername === st.username ? 'bg-indigo-50/80 dark:bg-indigo-950/60 font-semibold text-indigo-900 dark:text-indigo-200' : 'text-gray-700 dark:text-gray-300'
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-sm text-gray-900 dark:text-white">{st.name}</span>
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">({st.username})</span>
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                  ชั้น {st.level || "ไม่ระบุ"} {st.nickname && `• ชื่อเล่น: ${st.nickname}`}
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/50 px-2 py-0.5 rounded-full">
+                                {st.level || "-"}
+                              </span>
+                            </div>
+                          ))}
+
+                          {studentSearch && !isSearchingStudent && studentSuggestions.length === 0 && (
+                            <div className="p-4 text-center text-xs text-gray-400 italic">
+                              ไม่พบนักเรียนที่ตรงกับคำค้นหา
+                            </div>
+                          )}
+
+                          {!studentSearch && studentSuggestions.length === 0 && (
+                            <div className="p-3 text-center text-xs text-gray-400">
+                              พิมพ์ชื่อหรือรหัสนักเรียนในช่องค้นหาด้านบน
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <input
-                    type="text"
-                    required
-                    className="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm bg-blue-50 dark:bg-blue-900/20"
-                    placeholder="รหัสนักเรียน (ตัวอย่าง: 66001)"
-                    value={formData.studentUsername}
-                    onChange={(e) => setFormData({...formData, studentUsername: e.target.value})}
-                  />
                 </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
