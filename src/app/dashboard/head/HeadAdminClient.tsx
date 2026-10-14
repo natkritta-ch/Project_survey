@@ -25,6 +25,9 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [isRoomDropdownOpen, setIsRoomDropdownOpen] = useState(false);
   const [roomSearchQuery, setRoomSearchQuery] = useState("");
   const [subjTeacherId, setSubjTeacherId] = useState("");
+  const [isTeacherDropdownOpen, setIsTeacherDropdownOpen] = useState(false);
+  const [teacherSearchQuery, setTeacherSearchQuery] = useState("");
+  const [isSubjectSuggestOpen, setIsSubjectSuggestOpen] = useState(false);
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
   const levelsOptions = ["ปวช.1", "ปวช.2", "ปวช.3", "ปวส.1", "ปวส.2", "ปวส.1(ม.6)", "ปวส.2(ม.6)", "ไม่ระบุ"];
   const groupOptions = ["ก.1", "ก.2", "ก.1,2"];
@@ -57,13 +60,15 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [userPassword, setUserPassword] = useState("");
   const [userRole, setUserRole] = useState("TEACHER");
   const [userLevel, setUserLevel] = useState("ปวช.1");
-  const [userStudentId, setUserStudentId] = useState("");
   const [userNickname, setUserNickname] = useState("");
   const [userGender, setUserGender] = useState("");
   const [userBloodType, setUserBloodType] = useState("");
   const [userPhone, setUserPhone] = useState("");
   const [userAddress, setUserAddress] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [userStudentId, setUserStudentId] = useState("");
+  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [filterUserRole, setFilterUserRole] = useState("ทั้งหมด");
   const [filterUserLevel, setFilterUserLevel] = useState("ทั้งหมด");
   const [searchUser, setSearchUser] = useState("");
@@ -138,10 +143,11 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setSubjId(""); setSubjCode(""); setSubjName(""); setSubjLevel("ปวช.1"); setSubjTeacherId("");
     setSubjAcademicYear(String(currentBEYear)); setSubjTerm("1"); setSubjCredit(3.0); setSubjGroup("ก.1,2"); setSubjRoom("");
     setIsRoomDropdownOpen(false); setRoomSearchQuery("");
+    setIsTeacherDropdownOpen(false); setTeacherSearchQuery("");
+    setIsSubjectSuggestOpen(false);
     setIsEditSubjectModalOpen(false);
   };
 
-  // ================= SCHEDULE HANDLERS =================
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!schedSubjId) return alert("กรุณาเลือกวิชา");
@@ -153,8 +159,13 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         await createSchedule({ subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
       }
       resetScheduleForm();
-    } catch {
-      alert("เกิดข้อผิดพลาดในการบันทึกตารางเรียน");
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("TIME_COLLISION")) {
+        alert("⚠️ เวลาชนกัน!\n\n" + msg.replace("TIME_COLLISION: ", ""));
+      } else {
+        alert("เกิดข้อผิดพลาดในการบันทึกตารางเรียน");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -221,13 +232,15 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setUserPassword(""); 
     setUserRole(u.role); 
     setUserLevel(u.level || "ปวช.1"); 
-    setUserStudentId(u.studentId || "");
     setUserNickname(u.nickname || "");
     setUserGender(u.gender || "");
     setUserBloodType(u.bloodType || "");
     setUserPhone(u.phone || "");
     setUserAddress(u.address || "");
     setUserEmail(u.email || "");
+    setUserStudentId(u.studentId || "");
+    setIsStudentDropdownOpen(false);
+    setStudentSearchQuery("");
     setIsEditUserModalOpen(true);
   };
 
@@ -238,13 +251,15 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setUserPassword(""); 
     setUserRole("TEACHER"); 
     setUserLevel("ปวช.1"); 
-    setUserStudentId("");
     setUserNickname("");
     setUserGender("");
     setUserBloodType("");
     setUserPhone("");
     setUserAddress("");
     setUserEmail("");
+    setUserStudentId("");
+    setIsStudentDropdownOpen(false);
+    setStudentSearchQuery("");
     setIsEditUserModalOpen(false);
   };
 
@@ -337,13 +352,112 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               <>
               <h3 className="text-lg font-bold dark:text-white">เพิ่มรายวิชาใหม่</h3>
               <form onSubmit={handleSaveSubject} className="flex gap-4 items-end flex-wrap p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">รหัสวิชา</label>
-                <input required type="text" value={subjCode} onChange={e => setSubjCode(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border" placeholder="e.g. CS101" />
+              {/* ช่องรหัสวิชา พร้อม Live Suggestion */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  รหัสวิชา
+                </label>
+                <input 
+                  required 
+                  type="text" 
+                  value={subjCode} 
+                  onChange={e => {
+                    setSubjCode(e.target.value);
+                    setIsSubjectSuggestOpen(true);
+                  }} 
+                  onFocus={() => setIsSubjectSuggestOpen(true)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
+                  placeholder="e.g. CS101" 
+                />
+
+                {/* Dropdown Suggestions */}
+                {isSubjectSuggestOpen && (subjCode.trim().length > 0 || subjName.trim().length > 0) && (() => {
+                  const queryCode = subjCode.trim().toLowerCase();
+                  const queryName = subjName.trim().toLowerCase();
+                  const matches = activeSubjects.filter(s => 
+                    (queryCode && s.code.toLowerCase().includes(queryCode)) ||
+                    (queryName && s.name.toLowerCase().includes(queryName))
+                  );
+                  if (matches.length === 0) return null;
+
+                  return (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsSubjectSuggestOpen(false)}></div>
+                      <div className="absolute left-0 top-full mt-1.5 w-80 sm:w-96 bg-white dark:bg-gray-800 border border-indigo-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                        <div className="p-2.5 bg-indigo-50 dark:bg-indigo-900/40 border-b border-indigo-100 dark:border-indigo-800/50 flex items-center justify-between">
+                          <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                            <span className="text-sm">🔍</span> วิชาเดิมในระบบ (คลิกเพื่อแก้ไข)
+                          </span>
+                          <span className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-800 px-2 py-0.5 rounded-full">
+                            พบ {matches.length} วิชา
+                          </span>
+                        </div>
+                        <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                          {matches.map(s => {
+                            const isExactCode = subjCode && s.code.toLowerCase() === queryCode;
+                            return (
+                              <div
+                                key={s.id}
+                                onClick={() => {
+                                  handleEditSubject(s);
+                                  setIsSubjectSuggestOpen(false);
+                                }}
+                                className={`p-3 cursor-pointer transition-colors hover:bg-indigo-50/80 dark:hover:bg-indigo-950/40 ${isExactCode ? 'bg-amber-50/70 dark:bg-amber-950/30' : ''}`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-bold text-sm text-gray-900 dark:text-white">
+                                    {s.code}
+                                  </span>
+                                  {isExactCode && (
+                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 dark:bg-amber-900/60 dark:text-amber-300 px-1.5 py-0.5 rounded">
+                                      ⚠️ รหัสตรงกัน
+                                    </span>
+                                  )}
+                                  <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold ml-auto">
+                                    {s.level || "-"}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-gray-300 truncate mt-0.5 font-medium">
+                                  {s.name}
+                                </div>
+                                <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-1 flex items-center gap-2">
+                                  <span>กลุ่ม {s.group || "-"}</span>
+                                  <span>•</span>
+                                  <span>เทอม {s.term || "-"}/{s.academicYear || "-"}</span>
+                                  {s.teacher && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="truncate">อ. {s.teacher.name}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ชื่อวิชา</label>
-                <input required type="text" value={subjName} onChange={e => setSubjName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border" placeholder="e.g. Computer Science" />
+
+              {/* ช่องชื่อวิชา */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  ชื่อวิชา
+                </label>
+                <input 
+                  required 
+                  type="text" 
+                  value={subjName} 
+                  onChange={e => {
+                    setSubjName(e.target.value);
+                    setIsSubjectSuggestOpen(true);
+                  }} 
+                  onFocus={() => setIsSubjectSuggestOpen(true)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
+                  placeholder="e.g. Computer Science" 
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ชั้นปี</label>
@@ -374,12 +488,63 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   {groupOptions.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
-              <div>
+              <div className="relative min-w-[200px]">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">อาจารย์ประจำวิชา (เลือกหรือไม่ก็ได้)</label>
-                <select value={subjTeacherId} onChange={e => setSubjTeacherId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
-                  <option value="">-- ไม่ระบุ --</option>
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
+                {isTeacherDropdownOpen && (
+                  <div className="fixed inset-0 z-40" onClick={() => setIsTeacherDropdownOpen(false)}></div>
+                )}
+                <div className="relative z-40">
+                  <div
+                    onClick={() => setIsTeacherDropdownOpen(!isTeacherDropdownOpen)}
+                    className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isTeacherDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
+                  >
+                    <span className={`${subjTeacherId ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}`}>
+                      {subjTeacherId
+                        ? (teachers.find(t => t.id === subjTeacherId)?.name || "-- ไม่ระบุ --")
+                        : "-- ไม่ระบุ --"}
+                    </span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isTeacherDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+
+                  {isTeacherDropdownOpen && (
+                    <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
+                      <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
+                        <input
+                          type="text"
+                          value={teacherSearchQuery}
+                          onChange={e => setTeacherSearchQuery(e.target.value)}
+                          placeholder="ค้นหาชื่ออาจารย์..."
+                          className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="py-1">
+                        <div
+                          onClick={() => { setSubjTeacherId(""); setIsTeacherDropdownOpen(false); setTeacherSearchQuery(""); }}
+                          className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                        >
+                          -- ไม่ระบุ --
+                        </div>
+                        {teachers
+                          .filter(t => !teacherSearchQuery || t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase()))
+                          .map(t => (
+                            <div
+                              key={t.id}
+                              onClick={() => { setSubjTeacherId(t.id); setIsTeacherDropdownOpen(false); setTeacherSearchQuery(""); }}
+                              className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${subjTeacherId === t.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
+                            >
+                              <span className="font-semibold">{t.name}</span>
+                              <span className="ml-2 text-xs text-gray-400">{t.role === "HEAD" ? "หัวหน้าแผนก" : "อาจารย์"}</span>
+                            </div>
+                          ))
+                        }
+                        {teachers.filter(t => !teacherSearchQuery || t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase())).length === 0 && (
+                          <div className="px-4 py-3 text-sm text-gray-400 italic">ไม่พบอาจารย์ที่ค้นหา</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="relative min-w-[200px]">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ห้องเรียน</label>
@@ -842,14 +1007,83 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </div>
               )}
               {userRole === "PARENT" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">เป็นผู้ปกครองของ (ลูก)</label>
-                  <select value={userStudentId} onChange={e => setUserStudentId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
-                    <option value="">-- ไม่ระบุ --</option>
-                    {users.filter(u => u.role === "STUDENT").map(u => (
-                      <option key={u.id} value={u.id}>{u.name} (รหัส: {u.username})</option>
-                    ))}
-                  </select>
+                <div className="relative min-w-[240px]">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    ผูกกับนักเรียน (บุตรหลาน)
+                  </label>
+                  {isStudentDropdownOpen && (
+                    <div className="fixed inset-0 z-40" onClick={() => setIsStudentDropdownOpen(false)}></div>
+                  )}
+                  <div className="relative z-40">
+                    <div
+                      onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
+                      className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isStudentDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
+                    >
+                      <span className={`${userStudentId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'} truncate`}>
+                        {userStudentId
+                          ? (() => {
+                              const st = users.find(u => u.id === userStudentId);
+                              return st ? `${st.name} (${st.username})` : "-- ไม่ระบุ --";
+                            })()
+                          : "-- ค้นหาและเลือกนักเรียน --"}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+
+                    {isStudentDropdownOpen && (
+                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
+                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
+                          <input
+                            type="text"
+                            value={studentSearchQuery}
+                            onChange={e => setStudentSearchQuery(e.target.value)}
+                            placeholder="พิมพ์ชื่อ หรือ รหัสนักเรียน..."
+                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="py-1">
+                          <div
+                            onClick={() => {
+                              setUserStudentId("");
+                              setIsStudentDropdownOpen(false);
+                              setStudentSearchQuery("");
+                            }}
+                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                          >
+                            -- ไม่ระบุ --
+                          </div>
+                          {users
+                            .filter(u => u.role === "STUDENT" && !u.deletedAt)
+                            .filter(u => {
+                              if (!studentSearchQuery) return true;
+                              const q = studentSearchQuery.toLowerCase();
+                              return u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || (u.level && u.level.toLowerCase().includes(q));
+                            })
+                            .map(u => (
+                              <div
+                                key={u.id}
+                                onClick={() => {
+                                  setUserStudentId(u.id);
+                                  setIsStudentDropdownOpen(false);
+                                  setStudentSearchQuery("");
+                                }}
+                                className={`px-4 py-2 text-sm cursor-pointer transition-colors flex items-center justify-between ${userStudentId === u.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
+                              >
+                                <div>
+                                  <span className="font-semibold">{u.name}</span>
+                                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">({u.username})</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-1.5 py-0.5 rounded">
+                                  {u.level || "-"}
+                                </span>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               <button disabled={isLoading} type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50">
@@ -1412,12 +1646,60 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">อาจารย์ประจำวิชา</label>
-                  <select value={subjTeacherId} onChange={e => setSubjTeacherId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
-                    <option value="">-- ไม่ระบุ --</option>
-                    {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  {isTeacherDropdownOpen && (
+                    <div className="fixed inset-0 z-40" onClick={() => setIsTeacherDropdownOpen(false)}></div>
+                  )}
+                  <div className="relative z-40">
+                    <div
+                      onClick={() => setIsTeacherDropdownOpen(!isTeacherDropdownOpen)}
+                      className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isTeacherDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
+                    >
+                      <span className={`${subjTeacherId ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'} truncate`}>
+                        {subjTeacherId
+                          ? (teachers.find(t => t.id === subjTeacherId)?.name || "-- ไม่ระบุ --")
+                          : "-- ไม่ระบุ --"}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isTeacherDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+
+                    {isTeacherDropdownOpen && (
+                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-48 overflow-y-auto z-50">
+                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10">
+                          <input
+                            type="text"
+                            value={teacherSearchQuery}
+                            onChange={e => setTeacherSearchQuery(e.target.value)}
+                            placeholder="ค้นหาชื่ออาจารย์..."
+                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="py-1">
+                          <div
+                            onClick={() => { setSubjTeacherId(""); setIsTeacherDropdownOpen(false); setTeacherSearchQuery(""); }}
+                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                          >
+                            -- ไม่ระบุ --
+                          </div>
+                          {teachers
+                            .filter(t => !teacherSearchQuery || t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase()))
+                            .map(t => (
+                              <div
+                                key={t.id}
+                                onClick={() => { setSubjTeacherId(t.id); setIsTeacherDropdownOpen(false); setTeacherSearchQuery(""); }}
+                                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${subjTeacherId === t.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
+                              >
+                                <span className="font-semibold">{t.name}</span>
+                                <span className="ml-2 text-xs text-gray-400">{t.role === "HEAD" ? "หัวหน้าแผนก" : "อาจารย์"}</span>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="relative min-w-[200px]">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ห้องเรียน</label>
@@ -1572,14 +1854,83 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </div>
               )}
               {userRole === "PARENT" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">เป็นผู้ปกครองของ (ลูก)</label>
-                  <select value={userStudentId} onChange={e => setUserStudentId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
-                    <option value="">-- ไม่ระบุ --</option>
-                    {users.filter(u => u.role === "STUDENT").map(u => (
-                      <option key={u.id} value={u.id}>{u.name} (รหัส: {u.username})</option>
-                    ))}
-                  </select>
+                <div className="relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    ผูกกับนักเรียน (บุตรหลาน)
+                  </label>
+                  {isStudentDropdownOpen && (
+                    <div className="fixed inset-0 z-40" onClick={() => setIsStudentDropdownOpen(false)}></div>
+                  )}
+                  <div className="relative z-40">
+                    <div
+                      onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
+                      className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isStudentDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
+                    >
+                      <span className={`${userStudentId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'} truncate`}>
+                        {userStudentId
+                          ? (() => {
+                              const st = users.find(u => u.id === userStudentId);
+                              return st ? `${st.name} (${st.username})` : "-- ไม่ระบุ --";
+                            })()
+                          : "-- ค้นหาและเลือกนักเรียน --"}
+                      </span>
+                      <svg className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    </div>
+
+                    {isStudentDropdownOpen && (
+                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-52 overflow-y-auto z-50">
+                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
+                          <input
+                            type="text"
+                            value={studentSearchQuery}
+                            onChange={e => setStudentSearchQuery(e.target.value)}
+                            placeholder="พิมพ์ชื่อ หรือ รหัสนักเรียน..."
+                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+                            autoFocus
+                          />
+                        </div>
+                        <div className="py-1">
+                          <div
+                            onClick={() => {
+                              setUserStudentId("");
+                              setIsStudentDropdownOpen(false);
+                              setStudentSearchQuery("");
+                            }}
+                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                          >
+                            -- ไม่ระบุ --
+                          </div>
+                          {users
+                            .filter(u => u.role === "STUDENT" && !u.deletedAt)
+                            .filter(u => {
+                              if (!studentSearchQuery) return true;
+                              const q = studentSearchQuery.toLowerCase();
+                              return u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || (u.level && u.level.toLowerCase().includes(q));
+                            })
+                            .map(u => (
+                              <div
+                                key={u.id}
+                                onClick={() => {
+                                  setUserStudentId(u.id);
+                                  setIsStudentDropdownOpen(false);
+                                  setStudentSearchQuery("");
+                                }}
+                                className={`px-4 py-2 text-sm cursor-pointer transition-colors flex items-center justify-between ${userStudentId === u.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
+                              >
+                                <div>
+                                  <span className="font-semibold">{u.name}</span>
+                                  <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">({u.username})</span>
+                                </div>
+                                <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-1.5 py-0.5 rounded">
+                                  {u.level || "-"}
+                                </span>
+                              </div>
+                            ))
+                          }
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
               

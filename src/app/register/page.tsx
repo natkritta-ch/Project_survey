@@ -329,6 +329,18 @@ export default function RegisterPage() {
                 </div>
 
                 <div>
+                  <label className={labelClass}>เลขบัตรประชาชน <span className="text-destructive">*</span></label>
+                  <input
+                    type="text" required className={inputClass}
+                    placeholder="เลขบัตรประชาชน 13 หลัก"
+                    maxLength={13}
+                    pattern="\d{13}"
+                    value={(formData as any).nationalId || ""}
+                    onChange={(e) => setFormData({ ...formData, nationalId: e.target.value } as any)}
+                  />
+                </div>
+
+                <div>
                   <label className={labelClass}>
                     <Phone className="inline w-3 h-3 mr-1" />เบอร์โทรศัพท์
                   </label>

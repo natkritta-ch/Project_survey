@@ -17,6 +17,7 @@ export async function POST(request: Request) {
       address,
       bloodType,
       gender,
+      nationalId,
       profilePicture,
     } = body;
 
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
         address: address || null,
         bloodType: bloodType || null,
         gender: gender || null,
+        nationalId: nationalId || null,
         profilePicture: profilePicture || null,
       },
     });

@@ -5,9 +5,9 @@ import bcrypt from "bcryptjs";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, username, password, studentUsername, phone, address, email } = body;
+    const { name, username, password, studentUsername, studentNationalId, phone, address, email } = body;
 
-    // 1. ตรวจสอบว่ามีรหัสนักเรียนนี้ในระบบหรือไม่
+    // 1. ตรวจสอบว่ามีรหัสนักเรียนนี้หรือไม่ (เพิ่ม Security ด่านแรก)
     const student = await prisma.user.findFirst({
       where: {
         username: studentUsername,
@@ -22,23 +22,48 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. ถ้าเจอ ให้สร้างบัญชีผู้ปกครองและผูก id 
+    // ตรวจสอบเลขบัตรประชาชน 4 ตัวท้าย (ถ้ามี)
+    if (student.nationalId && studentNationalId) {
+      const last4 = student.nationalId.slice(-4);
+      if (last4 !== studentNationalId) {
+        return NextResponse.json(
+          { success: false, message: "ข้อมูลยืนยันตัวตน (เลขบัตรประชาชน 4 ตัวท้าย) ไม่ถูกต้อง" },
+          { status: 400 }
+        );
+      }
+    } else if (!student.nationalId) {
+      return NextResponse.json(
+        { success: false, message: "นักเรียนยังไม่ได้อัปเดตข้อมูลเลขบัตรประชาชนในระบบ กรุณาให้นักเรียนอัปเดตโปรไฟล์ก่อน" },
+        { status: 400 }
+      );
+    }
+
+    // 2. สร้างบัญชีผู้ปกครองใหม่ (ไม่ต้องใส่ studentId แล้ว)
     const parent = await prisma.user.create({
       data: {
         name,
         username,
         password: await bcrypt.hash(password, 10),
         role: "PARENT",
-        studentId: student.id, // ผูกบัญชีนักเรียน
         phone: phone || null,
         address: address || null,
         email: email || null,
       },
     });
 
+    // 3. สร้าง ParentStudentLink พร้อมสถานะ PENDING รอให้นักเรียนอนุมัติ
+    await prisma.parentStudentLink.create({
+      data: {
+        parentId: parent.id,
+        studentId: student.id,
+        status: "PENDING",
+      }
+    });
+
     return NextResponse.json({ 
       success: true, 
-      user: { id: parent.id, username: parent.username, studentId: parent.studentId } 
+      user: { id: parent.id, username: parent.username },
+      message: "สมัครสมาชิกสำเร็จ โปรดรอนักเรียนอนุมัติการเข้าถึงข้อมูล"
     });
   } catch (error: any) {
     console.error("Register parent error:", error);

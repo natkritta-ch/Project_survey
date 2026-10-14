@@ -58,6 +58,125 @@ export async function POST(request: Request) {
 
     // กำหนดช่วงเวลาตรวจซ้ำตามประเภท
     const isAssembly = !subjectId || type === "assembly";
+    let computedStatus = status || "PRESENT";
+
+    // 💡 ระบบตรวจสอบช่วงเวลาเรียนและคำนวณสถานะ (Schedule & Make-up Class with 30-min buffer)
+    if (!isAssembly && subjectId) {
+      const parseTimeToMinutes = (timeStr: string) => {
+        const [h, m] = timeStr.split(":").map(Number);
+        return h * 60 + m;
+      };
+
+      const now = new Date();
+      const thaiDateStr = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Bangkok',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(now); // "YYYY-MM-DD"
+
+      const thaiTimeStr = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Bangkok',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(now); // "HH:mm"
+      
+      const currentMinutes = parseTimeToMinutes(thaiTimeStr);
+
+      const thaiDayStr = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Bangkok',
+        weekday: 'short'
+      }).format(now);
+      const dayMap: Record<string, number> = {
+        'Mon': 1, 'Tue': 2, 'Wed': 3, 'Thu': 4, 'Fri': 5, 'Sat': 6, 'Sun': 7
+      };
+      const currentDayOfWeek = dayMap[thaiDayStr] || 1;
+
+      // 1. ดึงตารางเรียนปกติของวิชานี้ในวันนี้
+      const regularSchedules = await prisma.schedule.findMany({
+        where: { subjectId, dayOfWeek: currentDayOfWeek, deletedAt: null }
+      });
+
+      // 2. ดึงคลาสสอนชดเชยของวิชานี้ในวันนี้
+      let makeupClassesToday: any[] = [];
+      try {
+        const todayStart = new Date(`${thaiDateStr}T00:00:00.000Z`);
+        const todayEnd = new Date(`${thaiDateStr}T23:59:59.999Z`);
+        makeupClassesToday = await (prisma as any).makeupClass.findMany({
+          where: {
+            subjectId,
+            date: { gte: todayStart, lte: todayEnd }
+          }
+        });
+      } catch (err) {
+        makeupClassesToday = [];
+      }
+
+      // รวม session ทั้งหมดที่จัดขึ้นวันนี้
+      const allSessionsToday = [
+        ...regularSchedules.map(sc => ({
+          type: 'regular',
+          startTime: sc.startTime,
+          endTime: sc.endTime
+        })),
+        ...makeupClassesToday.map(mc => ({
+          type: 'makeup',
+          startTime: mc.startTime,
+          endTime: mc.endTime
+        }))
+      ];
+
+      // ดึงเกณฑ์เวลาสาย (lateThresholdMin)
+      const subjInfo = await prisma.subject.findUnique({
+        where: { id: subjectId },
+        select: { lateThresholdMin: true }
+      });
+      const lateThreshold = subjInfo?.lateThresholdMin ?? 15;
+
+      // ตรวจสอบว่าเวลาปัจจุบันอยู่ในช่วง [startTime - 30 นาที, endTime + 30 นาที] หรือไม่
+      const BUFFER_MINUTES = 30;
+      let matchedSession: { startTime: string; endTime: string; type: string } | null = null;
+
+      for (const session of allSessionsToday) {
+        const startMin = parseTimeToMinutes(session.startTime);
+        const endMin = parseTimeToMinutes(session.endTime);
+        const windowStart = startMin - BUFFER_MINUTES;
+        const windowEnd = endMin + BUFFER_MINUTES;
+
+        if (currentMinutes >= windowStart && currentMinutes <= windowEnd) {
+          matchedSession = session;
+          break;
+        }
+      }
+
+      // ถ้านอกช่วงเวลาที่อนุญาต ให้ปฏิเสธการสแกนทันที
+      if (!matchedSession) {
+        if (allSessionsToday.length === 0) {
+          return NextResponse.json({
+            success: false,
+            message: `วันนี้ไม่มีตารางเรียนหรือคลาสชดเชยสำหรับวิชานี้ หากมีการสอนนอกตาราง กรุณากดสร้าง "คลาสสอนชดเชย" ก่อนเปิดสแกน`
+          }, { status: 400 });
+        } else {
+          const sessionsText = allSessionsToday.map(s => `${s.startTime} - ${s.endTime} น.`).join(', ');
+          return NextResponse.json({
+            success: false,
+            message: `ไม่อยู่ในช่วงเวลาเรียนของวิชานี้ (ตารางวันนี้: ${sessionsText} โดยอนุญาตให้สแกนได้ก่อนเริ่ม 30 นาที ถึงหลังเลิก 30 นาที) หากสอนนอกเวลา กรุณากดสร้าง "คลาสสอนชดเชย"`
+          }, { status: 400 });
+        }
+      }
+
+      // ถ้าอยู่ในช่วงเวลาเรียน ให้คำนวณว่า PRESENT หรือ LATE
+      const sessionStartMin = parseTimeToMinutes(matchedSession.startTime);
+      const lateCutoffMin = sessionStartMin + lateThreshold;
+
+      if (currentMinutes > lateCutoffMin) {
+        computedStatus = "LATE";
+      } else {
+        computedStatus = "PRESENT";
+      }
+    }
+
     const duplicateWhere: any = { studentId };
 
     if (isAssembly) {
@@ -76,7 +195,7 @@ export async function POST(request: Request) {
       duplicateWhere.type = "assembly";
       duplicateWhere.timestamp = { gte: todayStart, lte: todayEnd };
     } else {
-      // เข้าเรียน: ตรวจซ้ำภายใน 5 นาที (ใซ่คาบเดียวกัน สแกนหลายครั้ง)
+      // เข้าเรียน: ตรวจซ้ำภายใน 5 นาที (ในคาบเดียวกัน สแกนหลายครั้ง)
       duplicateWhere.subjectId = subjectId;
       duplicateWhere.timestamp = { gt: new Date(Date.now() - 5 * 60 * 1000) };
     }
@@ -90,7 +209,7 @@ export async function POST(request: Request) {
         // หากครูเคยเช็คขาดไปแล้ว ให้สแกนหน้าทับเป็นมาเรียน/มาสายได้เลย
         const updated = await prisma.attendance.update({
           where: { id: recent.id },
-          data: { status: status || "PRESENT", timestamp: new Date() }
+          data: { status: computedStatus, timestamp: new Date() }
         });
         return NextResponse.json({ success: true, attendance: updated, updatedFromAbsent: true });
       }
@@ -102,7 +221,7 @@ export async function POST(request: Request) {
         studentId,
         subjectId: subjectId || null,
         type: type || "class",
-        status: status || "PRESENT"
+        status: computedStatus
       }
     });
 

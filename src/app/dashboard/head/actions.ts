@@ -52,14 +52,105 @@ export async function hardDeleteSubject(id: string) {
   revalidatePath("/dashboard/head");
 }
 
+// Helper: แปลง "HH:MM" เป็นจำนวนนาทีจากเที่ยงคืน
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+// Helper: ตรวจว่าช่วงเวลา 2 คู่ซ้อนทับกันหรือไม่
+function isOverlapping(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
+  const aS = timeToMinutes(aStart), aE = timeToMinutes(aEnd);
+  const bS = timeToMinutes(bStart), bE = timeToMinutes(bEnd);
+  return aS < bE && aE > bS;
+}
+
 export async function createSchedule(data: { subjectId: string; dayOfWeek: number; startTime: string; endTime: string }) {
   await requireHeadAuth();
+
+  // ดึงข้อมูลวิชาที่จะสร้างตารางเรียนเพื่อเอาห้องและอาจารย์
+  const currentSubject = await prisma.subject.findUnique({
+    where: { id: data.subjectId },
+    include: { teacher: true }
+  });
+
+  if (!currentSubject) {
+    throw new Error("ไม่พบข้อมูลวิชาที่เลือก");
+  }
+
+  // ดึงตารางเรียนทั้งหมดในวันเดียวกันที่ไม่ถูกลบ
+  const existingSchedules = await prisma.schedule.findMany({
+    where: { dayOfWeek: data.dayOfWeek, deletedAt: null },
+    include: { subject: { include: { teacher: true } } }
+  });
+
+  for (const sc of existingSchedules) {
+    if (!sc.subject || sc.subject.deletedAt) continue;
+
+    if (isOverlapping(data.startTime, data.endTime, sc.startTime, sc.endTime)) {
+      // 1. วิชาเดียวกัน
+      if (sc.subjectId === data.subjectId) {
+        throw new Error(`TIME_COLLISION: วิชานี้ (${currentSubject.name}) มีตารางเรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับ ${data.startTime}–${data.endTime} กรุณาเลือกเวลาอื่น`);
+      }
+
+      // 2. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง)
+      if (currentSubject.room && currentSubject.room.trim() !== "" && currentSubject.room !== "-" && sc.subject.room === currentSubject.room) {
+        throw new Error(`TIME_COLLISION: ห้องเรียน "${currentSubject.room}" มีวิชา "${sc.subject.name}" (${sc.subject.code}) ใช้เรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนห้องหรือเวลา`);
+      }
+
+      // 3. อาจารย์ผู้สอนคนเดียวกัน (ถ้ามีการระบุอาจารย์)
+      if (currentSubject.teacherId && sc.subject.teacherId === currentSubject.teacherId) {
+        const teacherName = currentSubject.teacher?.name || "อาจารย์ผู้สอน";
+        throw new Error(`TIME_COLLISION: ${teacherName} มีคาบสอนวิชา "${sc.subject.name}" ในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนเวลา`);
+      }
+    }
+  }
+
   await prisma.schedule.create({ data });
   revalidatePath("/dashboard/head");
 }
 
 export async function updateSchedule(id: string, data: { subjectId: string; dayOfWeek: number; startTime: string; endTime: string }) {
   await requireHeadAuth();
+
+  // ดึงข้อมูลวิชาที่จะสร้างตารางเรียนเพื่อเอาห้องและอาจารย์
+  const currentSubject = await prisma.subject.findUnique({
+    where: { id: data.subjectId },
+    include: { teacher: true }
+  });
+
+  if (!currentSubject) {
+    throw new Error("ไม่พบข้อมูลวิชาที่เลือก");
+  }
+
+  // ดึงตารางเรียนทั้งหมดในวันเดียวกันที่ไม่ถูกลบ (ยกเว้น record ตัวเอง)
+  const existingSchedules = await prisma.schedule.findMany({
+    where: { dayOfWeek: data.dayOfWeek, deletedAt: null, id: { not: id } },
+    include: { subject: { include: { teacher: true } } }
+  });
+
+  for (const sc of existingSchedules) {
+    if (!sc.subject || sc.subject.deletedAt) continue;
+
+    if (isOverlapping(data.startTime, data.endTime, sc.startTime, sc.endTime)) {
+      // 1. วิชาเดียวกัน
+      if (sc.subjectId === data.subjectId) {
+        throw new Error(`TIME_COLLISION: วิชานี้ (${currentSubject.name}) มีตารางเรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับ ${data.startTime}–${data.endTime} กรุณาเลือกเวลาอื่น`);
+      }
+
+      // 2. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง)
+      if (currentSubject.room && currentSubject.room.trim() !== "" && currentSubject.room !== "-" && sc.subject.room === currentSubject.room) {
+        throw new Error(`TIME_COLLISION: ห้องเรียน "${currentSubject.room}" มีวิชา "${sc.subject.name}" (${sc.subject.code}) ใช้เรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนห้องหรือเวลา`);
+      }
+
+      // 3. อาจารย์ผู้สอนคนเดียวกัน (ถ้ามีการระบุอาจารย์)
+      if (currentSubject.teacherId && sc.subject.teacherId === currentSubject.teacherId) {
+        const teacherName = currentSubject.teacher?.name || "อาจารย์ผู้สอน";
+        throw new Error(`TIME_COLLISION: ${teacherName} มีคาบสอนวิชา "${sc.subject.name}" ในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนเวลา`);
+      }
+    }
+  }
+
   await prisma.schedule.update({ where: { id }, data });
   revalidatePath("/dashboard/head");
 }

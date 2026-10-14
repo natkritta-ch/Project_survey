@@ -59,14 +59,30 @@ model subject {
   term         String       @default("1")
   credit       Float        @default(3)
   teacherId    String?
+  lateThresholdMin Int      @default(15) // เวลาสายของวิชานี้ (นาที)
   deletedAt    DateTime?
   attendance   attendance[]
   grade        grade[]
   schedule     schedule[]
+  makeupClasses makeupClass[]
   teacher      user?        @relation(fields: [teacherId], references: [id], map: "Subject_teacherId_fkey")
 
   @@unique([code, academicYear, term, group, level])
   @@index([teacherId], map: "Subject_teacherId_fkey")
+}
+
+model makeupClass {
+  id        String   @id @default(cuid())
+  subjectId String
+  date      DateTime @db.Date // วันที่สอนชดเชย
+  startTime String   // e.g. "09:00"
+  endTime   String   // e.g. "11:00"
+  remark    String?  // หมายเหตุ เช่น สอนชดเชยคาบวันหยุด
+  createdAt DateTime @default(now())
+  subject   subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade, map: "MakeupClass_subjectId_fkey")
+
+  @@index([subjectId], map: "MakeupClass_subjectId_fkey")
+  @@map("makeup_class")
 }
 
 model termConfig {
@@ -99,6 +115,7 @@ model user {
   bloodType          String?
   gender             String?
   email              String?      @unique(map: "User_email_key")
+  nationalId         String?      // รหัสประจำตัวประชาชน
   profilePicture     String?      @db.MediumText
   studentId          String?
   deletedAt          DateTime?
@@ -110,7 +127,26 @@ model user {
   student            user?        @relation("userTouser", fields: [studentId], references: [id], map: "User_studentId_fkey")
   students           user[]       @relation("userTouser")
 
+  parentLinks        ParentStudentLink[] @relation("ParentLinks")
+  studentLinks       ParentStudentLink[] @relation("StudentLinks")
+
   @@index([studentId], map: "User_studentId_fkey")
+}
+
+model ParentStudentLink {
+  id          String   @id @default(cuid())
+  parentId    String
+  studentId   String
+  status      String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent      user     @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  student     user     @relation("StudentLinks", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+  @@index([parentId])
+  @@index([studentId])
 }
 
 enum attendance_type {

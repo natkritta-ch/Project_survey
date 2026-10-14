@@ -18,10 +18,32 @@ export default function StudentDashboardClient({
   myGrades,
   groupedSchedules,
   dayColors,
-  daysMap
+  daysMap,
+  initialParentLinks
 }: any) {
   const [activeTab, setActiveTab] = useState("overview"); // overview, schedule, attendance, grades, transcript
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [parentLinks, setParentLinks] = useState(initialParentLinks || []);
+
+  const handleUpdateLinkStatus = async (linkId: string, status: string) => {
+    try {
+      const res = await fetch("/api/parent-links", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ linkId, status })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setParentLinks((prev: any) => 
+          prev.map((link: any) => link.id === linkId ? { ...link, status } : link)
+        );
+      } else {
+        alert("เกิดข้อผิดพลาด: " + data.message);
+      }
+    } catch (e) {
+      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+    }
+  };
 
   const tabs = [
     { id: "overview", label: "ข้อมูลของฉัน", icon: <User className="w-5 h-5" /> },
@@ -132,6 +154,46 @@ export default function StudentDashboardClient({
                   <div><p className="text-xs text-muted-foreground mb-1">หมู่เลือด</p><p className="font-semibold text-destructive">{myInfo?.bloodType || "-"}</p></div>
                   <div><p className="text-xs text-muted-foreground mb-1">เบอร์โทรติดต่อ</p><p className="font-semibold text-foreground">{myInfo?.phone || "-"}</p></div>
                   <div className="col-span-2 sm:col-span-1"><p className="text-xs text-muted-foreground mb-1">อีเมล</p><p className="font-semibold text-foreground truncate" title={myInfo?.email}>{myInfo?.email || "-"}</p></div>
+                </div>
+
+                {/* Parent Links Section */}
+                <div className="mt-8 border-t border-border pt-6">
+                  <h4 className="font-bold text-md mb-4 text-foreground">จัดการบัญชีผู้ปกครอง</h4>
+                  {parentLinks.length === 0 ? (
+                    <div className="text-sm text-muted-foreground p-4 bg-muted/30 rounded-xl border border-border text-center">
+                      ยังไม่มีบัญชีผู้ปกครองผูกกับคุณ
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {parentLinks.map((link: any) => (
+                        <div key={link.id} className="flex flex-col sm:flex-row justify-between items-center p-4 bg-background rounded-xl border border-border shadow-sm">
+                          <div>
+                            <p className="font-semibold text-foreground">{link.parent.name}</p>
+                            <p className="text-xs text-muted-foreground">สถานะ: 
+                              <span className={`ml-1 font-bold ${link.status === "PENDING" ? "text-orange-500" : link.status === "APPROVED" ? "text-green-500" : "text-red-500"}`}>
+                                {link.status === "PENDING" ? "รออนุมัติ" : link.status === "APPROVED" ? "อนุมัติแล้ว" : "ถูกปฏิเสธ"}
+                              </span>
+                            </p>
+                          </div>
+                          {link.status === "PENDING" && (
+                            <div className="flex gap-2 mt-3 sm:mt-0 w-full sm:w-auto">
+                              <button onClick={() => handleUpdateLinkStatus(link.id, "APPROVED")} className="flex-1 sm:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
+                                อนุมัติ
+                              </button>
+                              <button onClick={() => handleUpdateLinkStatus(link.id, "REJECTED")} className="flex-1 sm:flex-none px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 text-sm font-bold rounded-lg shadow-sm transition-colors">
+                                ปฏิเสธ
+                              </button>
+                            </div>
+                          )}
+                          {link.status === "APPROVED" && (
+                            <button onClick={() => handleUpdateLinkStatus(link.id, "REJECTED")} className="mt-3 sm:mt-0 w-full sm:w-auto px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-sm font-bold rounded-lg transition-colors">
+                              ยกเลิกการเข้าถึง
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

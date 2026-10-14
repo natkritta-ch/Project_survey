@@ -5,24 +5,55 @@ import AttendanceHistory from "../../../components/AttendanceHistory";
 import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Clock, GraduationCap, Menu, X, Users, Home } from "lucide-react";
+import { User, Clock, GraduationCap, Menu, X, Users, Home, ChevronDown } from "lucide-react";
 
 export default function ParentDashboardClient({
   session,
   parentData,
-  childId,
-  childData,
-  attendances,
-  childSubjects,
-  childSchedules,
-  childGrades
+  childrenData,
+  allAttendances,
+  allSubjects,
+  allSchedules,
+  allGrades
 }: any) {
   const [activeTab, setActiveTab] = useState("overview"); // overview, attendance, transcript
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  const approvedChildren = childrenData?.filter((c: any) => c.linkStatus === "APPROVED") || [];
+  const pendingChildren = childrenData?.filter((c: any) => c.linkStatus === "PENDING") || [];
+  const [activeChildId, setActiveChildId] = useState(approvedChildren[0]?.id || null);
+
+  const [addStudentUsername, setAddStudentUsername] = useState("");
+  const [addStudentNationalId, setAddStudentNationalId] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+
+  const handleAddChild = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAdding(true);
+    try {
+      const res = await fetch("/api/parent-links", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentUsername: addStudentUsername, studentNationalId: addStudentNationalId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("ส่งคำขอสำเร็จ กรุณารอให้นักเรียนกดยืนยันจากหน้าจอของนักเรียน");
+        setAddStudentUsername("");
+        setAddStudentNationalId("");
+        window.location.reload(); // Refresh to show pending child
+      } else {
+        alert(data.message);
+      }
+    } catch (e) {
+      alert("เกิดข้อผิดพลาด");
+    }
+    setIsAdding(false);
+  };
 
   const tabs = [
     { id: "overview", label: "ข้อมูลทั่วไป", icon: <Home className="w-5 h-5" /> },
-    { id: "attendance", label: "ประวัติบุตรหลาน", icon: <Clock className="w-5 h-5" /> },
+    { id: "attendance", label: "ประวัติเข้าเรียน", icon: <Clock className="w-5 h-5" /> },
     { id: "transcript", label: "ผลการเรียน", icon: <GraduationCap className="w-5 h-5" /> }
   ];
 
@@ -31,7 +62,8 @@ export default function ParentDashboardClient({
     setIsMobileMenuOpen(false);
   };
 
-  if (!childId) {
+
+  if (approvedChildren.length === 0 && pendingChildren.length === 0) {
     return (
       <div className="min-h-screen bg-background flex flex-col p-8 font-sans">
         <div className="flex justify-between items-start mb-8">
@@ -45,13 +77,19 @@ export default function ParentDashboardClient({
         </div>
         <div className="bg-orange-50 dark:bg-orange-950/20 border-l-4 border-orange-400 p-4 rounded-xl shadow-sm max-w-2xl">
           <p className="text-orange-800 dark:text-orange-200 font-medium">
-            ระบบตรวจพบว่าบัญชีของคุณยังไม่ได้ผูกกับรหัสนักเรียนใดๆ หรือรหัสนักเรียนไม่ถูกต้อง
+            ระบบตรวจพบว่าบัญชีของคุณยังไม่ได้ผูกกับรหัสนักเรียนใดๆ
           </p>
-          <p className="text-orange-700 dark:text-orange-300 text-sm mt-2">โปรดติดต่อนักเรียนเพื่อขอ "รหัสผูกบัญชีผู้ปกครอง" หรือติดต่อฝ่ายทะเบียน</p>
+          <p className="text-orange-700 dark:text-orange-300 text-sm mt-2">โปรดติดต่อนักเรียนเพื่อขอ "รหัสผูกบัญชีผู้ปกครอง"</p>
         </div>
       </div>
     );
   }
+
+  const activeChild = approvedChildren.find((c: any) => c.id === activeChildId);
+  const attendances = activeChildId ? (allAttendances[activeChildId] || []) : [];
+  const childSubjects = activeChildId ? (allSubjects[activeChildId] || []) : [];
+  const childSchedules = activeChildId ? (allSchedules[activeChildId] || []) : [];
+  const childGrades = activeChildId ? (allGrades[activeChildId] || []) : [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans">
@@ -77,7 +115,6 @@ export default function ParentDashboardClient({
             <Users className="w-6 h-6" />
             ระบบผู้ปกครอง
           </h2>
-          <p className="text-primary-foreground/80 text-sm mt-1">ผู้ปกครองของ {childData?.name?.split(' ')[0]}</p>
         </div>
         
         <div className="p-4 border-b border-border flex items-center gap-3">
@@ -95,11 +132,13 @@ export default function ParentDashboardClient({
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
+              disabled={!activeChildId}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium text-left group
                 ${activeTab === tab.id 
                   ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20' 
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 }
+                ${!activeChildId ? 'opacity-50 cursor-not-allowed' : ''}
               `}
             >
               <span className={`transition-transform duration-200 ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`}>
@@ -119,89 +158,161 @@ export default function ParentDashboardClient({
       <div className="flex-1 overflow-y-auto w-full p-4 md:p-8">
         <div className="max-w-4xl mx-auto space-y-6 pb-24 md:pb-0">
           
-          {/* Overview Tab */}
-          {activeTab === "overview" && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <div className="mb-6">
-                <h1 className="text-2xl md:text-[var(--text-3xl)] font-extrabold text-foreground mb-2 tracking-tight">ข้อมูลผู้ปกครองและนักเรียน</h1>
-                <p className="text-muted-foreground">ตรวจสอบข้อมูลการติดต่อและข้อมูลพื้นฐานของบุตรหลาน</p>
+          {/* Child Selector */}
+          {approvedChildren.length > 0 && (
+            <div className="bg-card p-4 rounded-2xl shadow-sm border border-border flex items-center gap-4 flex-wrap">
+              <span className="font-semibold text-foreground">เลือกบุตรหลานที่ต้องการดูข้อมูล:</span>
+              <div className="flex gap-2 flex-wrap">
+                {approvedChildren.map((child: any) => (
+                  <button
+                    key={child.id}
+                    onClick={() => setActiveChildId(child.id)}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold border transition-colors ${
+                      activeChildId === child.id 
+                      ? 'bg-primary text-primary-foreground border-primary' 
+                      : 'bg-background text-foreground border-border hover:bg-accent'
+                    }`}
+                  >
+                    {child.name}
+                  </button>
+                ))}
               </div>
+            </div>
+          )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
-                  <h3 className="font-bold text-lg mb-4 text-foreground flex items-center gap-2">
-                    <User className="w-5 h-5 text-primary" /> ข้อมูลนักเรียนในความดูแล
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-muted/50 rounded-xl border border-border">
-                      <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase">รหัสนักเรียน (Username)</p>
-                      <p className="font-bold text-lg text-foreground">{childData?.username}</p>
+          {pendingChildren.length > 0 && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 rounded-xl shadow-sm">
+              <p className="text-yellow-800 dark:text-yellow-200 font-medium">รอการอนุมัติการเข้าถึงข้อมูลจากนักเรียน:</p>
+              <ul className="mt-2 text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside">
+                {pendingChildren.map((child: any) => (
+                  <li key={child.id}>{child.name} (รหัส: {child.username})</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Form ขอเพิ่มบุตรหลาน */}
+          <div className="bg-card p-4 rounded-2xl shadow-sm border border-border mt-4">
+            <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
+              <User className="w-5 h-5 text-primary" /> เพิ่มบัญชีบุตรหลานที่ต้องการติดตาม
+            </h3>
+            <form onSubmit={handleAddChild} className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <input
+                  required
+                  type="text"
+                  placeholder="รหัสนักเรียน (Username)"
+                  className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  value={addStudentUsername}
+                  onChange={(e) => setAddStudentUsername(e.target.value)}
+                />
+              </div>
+              <div className="flex-1">
+                <input
+                  required
+                  type="text"
+                  maxLength={4}
+                  placeholder="เลขบัตรประชาชน 4 ตัวท้าย"
+                  className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  value={addStudentNationalId}
+                  onChange={(e) => setAddStudentNationalId(e.target.value)}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isAdding}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm disabled:opacity-50"
+              >
+                {isAdding ? "กำลังส่งคำขอ..." : "ส่งคำขอ"}
+              </button>
+            </form>
+          </div>
+
+          {!activeChildId && approvedChildren.length === 0 ? (
+            <div className="text-center text-muted-foreground p-8 bg-card rounded-2xl border border-dashed border-border mt-8">
+              คุณยังไม่ได้รับการอนุมัติให้เข้าถึงข้อมูลนักเรียนคนใดเลย
+            </div>
+          ) : activeChild && (
+            <>
+              {/* Overview Tab */}
+              {activeTab === "overview" && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div className="bg-card p-6 rounded-2xl shadow-sm border border-border">
+                      <h3 className="font-bold text-lg mb-4 text-foreground flex items-center gap-2">
+                        <User className="w-5 h-5 text-primary" /> ข้อมูลนักเรียนในความดูแล
+                      </h3>
+                      <div className="space-y-4">
+                        <div className="p-4 bg-muted/50 rounded-xl border border-border">
+                          <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase">รหัสนักเรียน</p>
+                          <p className="font-bold text-lg text-foreground">{activeChild.username}</p>
+                        </div>
+                        <div className="p-4 bg-muted/50 rounded-xl border border-border">
+                          <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase">ชื่อ-นามสกุล</p>
+                          <p className="font-bold text-lg text-foreground">{activeChild.name}</p>
+                        </div>
+                        <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
+                          <p className="text-xs text-primary/70 mb-1 font-semibold uppercase">ชั้นปี</p>
+                          <p className="font-bold text-lg text-primary">{activeChild.level || "ไม่ระบุ"}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="p-4 bg-muted/50 rounded-xl border border-border">
-                      <p className="text-xs text-muted-foreground mb-1 font-semibold uppercase">ชื่อ-นามสกุล</p>
-                      <p className="font-bold text-lg text-foreground">{childData?.name}</p>
-                    </div>
-                    <div className="p-4 bg-primary/5 rounded-xl border border-primary/10">
-                      <p className="text-xs text-primary/70 mb-1 font-semibold uppercase">ชั้นปี</p>
-                      <p className="font-bold text-lg text-primary">{childData?.level || "ไม่ระบุ"}</p>
+                    
+                    <div className="bg-card p-6 rounded-2xl shadow-sm border border-border flex flex-col">
+                      <h3 className="font-bold text-lg mb-4 text-foreground flex items-center gap-2">
+                        <Users className="w-5 h-5 text-orange-500" /> ข้อมูลส่วนตัวผู้ปกครอง
+                      </h3>
+                      <div className="flex-1 p-5 bg-orange-50/60 dark:bg-orange-950/10 rounded-xl border border-orange-100 dark:border-orange-900/30 space-y-4">
+                        <div>
+                          <p className="text-xs text-orange-600/80 dark:text-orange-400/80 font-semibold uppercase tracking-wider mb-1">Username (รหัสผ่านเข้าสู่ระบบ)</p>
+                          <p className="font-bold text-orange-900 dark:text-orange-200">{parentData?.username || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-orange-600/80 dark:text-orange-400/80 font-semibold uppercase tracking-wider mb-1">ชื่อ-นามสกุล</p>
+                          <p className="font-bold text-orange-900 dark:text-orange-200">{parentData?.name || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-orange-600/80 dark:text-orange-400/80 font-semibold uppercase tracking-wider mb-1">เบอร์โทรติดต่อ</p>
+                          <p className="font-bold text-orange-900 dark:text-orange-200">{parentData?.phone || "-"}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-orange-600/80 dark:text-orange-400/80 font-semibold uppercase tracking-wider mb-1">ที่อยู่</p>
+                          <p className="text-sm text-orange-900 dark:text-orange-200 leading-relaxed bg-background/60 p-3 rounded-lg border border-orange-100/50 dark:border-orange-900/20">{parentData?.address || "-"}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="bg-card p-6 rounded-2xl shadow-sm border border-border flex flex-col">
-                  <h3 className="font-bold text-lg mb-4 text-foreground flex items-center gap-2">
-                    <Users className="w-5 h-5 text-orange-500" /> ข้อมูลส่วนตัวผู้ปกครอง
-                  </h3>
-                  <div className="flex-1 p-5 bg-orange-50/60 dark:bg-orange-950/10 rounded-xl border border-orange-100 dark:border-orange-900/30 space-y-4">
-                    <div>
-                      <p className="text-xs text-orange-600/80 dark:text-orange-400/80 font-semibold uppercase tracking-wider mb-1">Username (รหัสผ่านเข้าสู่ระบบ)</p>
-                      <p className="font-bold text-orange-900 dark:text-orange-200">{parentData?.username || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-orange-600/80 dark:text-orange-400/80 font-semibold uppercase tracking-wider mb-1">ชื่อ-นามสกุล</p>
-                      <p className="font-bold text-orange-900 dark:text-orange-200">{parentData?.name || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-orange-600/80 dark:text-orange-400/80 font-semibold uppercase tracking-wider mb-1">เบอร์โทรติดต่อ</p>
-                      <p className="font-bold text-orange-900 dark:text-orange-200">{parentData?.phone || "-"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-orange-600/80 dark:text-orange-400/80 font-semibold uppercase tracking-wider mb-1">ที่อยู่</p>
-                      <p className="text-sm text-orange-900 dark:text-orange-200 leading-relaxed bg-background/60 p-3 rounded-lg border border-orange-100/50 dark:border-orange-900/20">{parentData?.address || "-"}</p>
-                    </div>
+
+                  <div className="mt-8">
+                    <StudentStatusOverview attendances={attendances} subjects={childSubjects} />
                   </div>
                 </div>
-              </div>
+              )}
 
-              <div className="mt-8">
-                <StudentStatusOverview attendances={attendances} subjects={childSubjects} />
-              </div>
-            </div>
+              {/* Attendance Tab */}
+              {activeTab === "attendance" && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 mt-6">
+                  <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-6">ประวัติการสแกนเข้าเรียนของ {activeChild.name}</h2>
+                  <div className="bg-card p-2 sm:p-6 rounded-2xl shadow-sm border border-border">
+                    <AttendanceHistory attendances={attendances} subjects={childSubjects} schedules={childSchedules} />
+                  </div>
+                </div>
+              )}
+
+              {/* Transcript Tab */}
+              {activeTab === "transcript" && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 mt-6">
+                  <div className="mb-6">
+                    <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-2">ระเบียนแสดงผลการเรียน (Transcript)</h2>
+                    <p className="text-muted-foreground">ผลการเรียนรวมของ {activeChild.name}</p>
+                  </div>
+                  <div className="bg-card p-4 sm:p-8 rounded-2xl shadow-sm border border-border print:shadow-none print:border-none print:bg-transparent print:p-0">
+                    <TranscriptView grades={childGrades} />
+                  </div>
+                </div>
+              )}
+            </>
           )}
-
-          {/* Attendance Tab */}
-          {activeTab === "attendance" && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-6">ประวัติการสแกนเข้าเรียนของบุตรหลาน</h2>
-              <div className="bg-card p-2 sm:p-6 rounded-2xl shadow-sm border border-border">
-                <AttendanceHistory attendances={attendances} subjects={childSubjects} schedules={childSchedules} />
-              </div>
-            </div>
-          )}
-
-          {/* Transcript Tab */}
-          {activeTab === "transcript" && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <div className="mb-6">
-                <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-2">ระเบียนแสดงผลการเรียน (Transcript)</h2>
-                <p className="text-muted-foreground">ผลการเรียนรวมของ {childData?.name}</p>
-              </div>
-              <div className="bg-card p-4 sm:p-8 rounded-2xl shadow-sm border border-border print:shadow-none print:border-none print:bg-transparent print:p-0">
-                <TranscriptView grades={childGrades} />
-              </div>
-            </div>
-          )}
-
         </div>
       </div>
       

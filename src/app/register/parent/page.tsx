@@ -118,20 +118,41 @@ export default function ParentRegisterPage() {
 
             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                ผูกบัญชีนักเรียน (บุตรหลาน)
+                ผูกบัญชีนักเรียน (บุตรหลาน) - ด่านที่ 1
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Users className="h-5 w-5 text-gray-400" />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                เพื่อความปลอดภัย กรุณากรอกรหัสนักเรียนและ <b>เลขบัตรประชาชน 4 ตัวท้าย</b> ของนักเรียนให้ถูกต้องตรงกับที่ลงทะเบียนไว้ ระบบจะส่งคำขอไปให้นักเรียนอนุมัติ
+              </p>
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Users className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    className="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm bg-blue-50 dark:bg-blue-900/20"
+                    placeholder="รหัสนักเรียน (ตัวอย่าง: 66001)"
+                    value={formData.studentUsername}
+                    onChange={(e) => setFormData({...formData, studentUsername: e.target.value})}
+                  />
                 </div>
-                <input
-                  type="text"
-                  required
-                  className="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm bg-blue-50 dark:bg-blue-900/20"
-                  placeholder="รหัสนักเรียน (อ้างอิงจากตอนที่ นร. สมัคร)"
-                  value={formData.studentUsername}
-                  onChange={(e) => setFormData({...formData, studentUsername: e.target.value})}
-                />
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Users className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    maxLength={4}
+                    pattern="\d{4}"
+                    title="กรุณากรอกตัวเลข 4 หลัก"
+                    className="appearance-none rounded-lg relative block w-full pl-10 px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm bg-blue-50 dark:bg-blue-900/20"
+                    placeholder="เลขบัตรประชาชนนักเรียน 4 ตัวท้าย"
+                    value={(formData as any).studentNationalId || ""}
+                    onChange={(e) => setFormData({...formData, studentNationalId: e.target.value} as any)}
+                  />
+                </div>
               </div>
             </div>
           </div>

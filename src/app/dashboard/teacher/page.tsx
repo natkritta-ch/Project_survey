@@ -58,48 +58,95 @@ export default async function TeacherDashboard() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex flex-col p-8 dark:bg-gray-900">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">แดชบอร์ดอาจารย์</h1>
-          <p className="text-gray-600 dark:text-gray-400">เข้าสู่หน้าระบบสแกนชื่อ, ดูรายงานสรุป และตารางสอนของคุณ</p>
-        </div>
-        <div className="w-full md:w-auto text-sm text-gray-500 bg-white dark:bg-gray-800 px-5 py-3 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col md:items-end gap-2">
-          <div className="text-left md:text-right">ผู้ใช้งาน: <span className="font-semibold text-indigo-600 dark:text-indigo-400 text-base">{session?.user?.name}</span></div>
-          <div className="flex flex-col md:items-end gap-1.5">
-            <a href="/dashboard/2fa" className="inline-flex items-center text-blue-500 hover:text-blue-600 dark:text-blue-400 underline text-xs transition">
-              <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-              ความปลอดภัย (2FA)
-            </a>
-            <LogoutButton />
-          </div>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Link href="/dashboard/teacher/scan?type=assembly" className="bg-blue-600 p-6 rounded-xl shadow-sm text-white flex flex-col items-center justify-center cursor-pointer hover:bg-blue-700 transition">
-          <h3 className="font-bold text-2xl mb-2">เปิดกล้องสแกนชื่อเข้าแถว</h3>
-          <p className="text-blue-100">เช็คชื่อกิจกรรมหน้าเสาธงหรือเข้าแถวตอนเช้าสำหรับทุกชั้นปี</p>
-        </Link>
-        <Link href="/dashboard/teacher/report" className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all group">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h3 className="font-bold text-2xl mb-2 text-gray-900 dark:text-white flex items-center gap-2">
-                <svg className="w-7 h-7 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                ประวัติรายงานรายวิชา
-              </h3>
-              <p className="text-gray-500 dark:text-gray-400">ดูสถิติการเข้าเรียนของนักเรียนแยกตามรายวิชา</p>
-            </div>
-            <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-inner">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
-            </div>
-          </div>
-        </Link>
-      </div>
+  // 5. ข้อมูลนักเรียนและผู้ปกครอง สำหรับแท็บที่ 3 (เฉพาะชั้นปีที่อาจารย์สอน)
+  const studentsWithParents = await prisma.user.findMany({
+    where: { 
+      role: "STUDENT", 
+      level: { in: allLevels },
+      deletedAt: null
+    },
+    select: {
+      id: true,
+      username: true,
+      name: true,
+      level: true,
+      parentLinks: {
+        where: { status: "APPROVED" },
+        include: { parent: { select: { name: true, phone: true } } }
+      }
+    },
+    orderBy: [{ level: 'asc' }, { username: 'asc' }]
+  });
 
-      {/* ตารางสอนแบบสัปดาห์ */}
-      <TeacherDashboardClient schedules={schedules} allLevels={allLevels} initialTerm={activeTermName} />
+  // 6. ดึงสถิติการเข้าเรียนในสัปดาห์นี้ (จันทร์-อาทิตย์) เฉพาะวิชาที่อาจารย์สอน
+  const todayDate = new Date();
+  const currentDay = todayDate.getDay();
+  const diff = todayDate.getDate() - currentDay + (currentDay === 0 ? -6 : 1); // หาวันจันทร์
+  
+  const startOfWeek = new Date(todayDate);
+  startOfWeek.setDate(diff);
+  startOfWeek.setHours(0, 0, 0, 0);
+  
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(endOfWeek.getDate() + 6);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const weeklyAttendances = await prisma.attendance.findMany({
+    where: {
+      subjectId: { in: subjectIds },
+      timestamp: {
+        gte: startOfWeek,
+        lte: endOfWeek
+      }
+    }
+  });
+
+  const weeklyStats = {
+    totalRecords: weeklyAttendances.length,
+    presents: weeklyAttendances.filter(a => a.status === "PRESENT" || a.status === "LATE").length,
+    absents: weeklyAttendances.filter(a => a.status === "ABSENT").length,
+    leaves: weeklyAttendances.filter(a => a.status === "LEAVE_PERSONAL" || a.status === "LEAVE_SICK").length
+  };
+
+  // 7. ดึงคลาสสอนชดเชยของอาจารย์
+  let makeupClasses: any[] = [];
+  try {
+    makeupClasses = await (prisma as any).makeupClass.findMany({
+      where: {
+        subjectId: { in: subjectIds }
+      },
+      include: {
+        subject: {
+          select: { id: true, name: true, code: true, level: true, room: true }
+        }
+      },
+      orderBy: [{ date: 'desc' }, { startTime: 'asc' }]
+    });
+  } catch (err) {
+    makeupClasses = [];
+  }
+
+  // เตรียมรายชื่อวิชาสำหรับ Modal สร้างคลาสสอนชดเชย
+  const simpleSubjects = subjects.map(s => ({
+    id: s.id,
+    name: s.name,
+    code: s.code,
+    level: s.level,
+    lateThresholdMin: s.lateThresholdMin
+  }));
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex flex-col md:flex-row dark:bg-gray-900 font-sans">
+      <TeacherDashboardClient 
+        schedules={schedules} 
+        allLevels={allLevels} 
+        initialTerm={activeTermName} 
+        sessionName={session?.user?.name}
+        studentsWithParents={studentsWithParents}
+        weeklyStats={weeklyStats}
+        subjects={simpleSubjects}
+        initialMakeupClasses={makeupClasses}
+      />
     </div>
   );
 }

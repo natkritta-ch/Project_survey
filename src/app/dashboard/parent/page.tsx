@@ -21,69 +21,81 @@ export default async function ParentDashboard() {
     where: { id: userId }
   });
 
-  const childId = parentData?.studentId;
-  let childData: any = null;
-  let attendances: any[] = [];
-  let childGrades: any[] = [];
-  let childSubjects: any[] = [];
-  let childSchedules: any[] = [];
+  const parentLinks = await prisma.parentStudentLink.findMany({
+    where: { parentId: userId },
+    include: { student: true }
+  });
 
-  if (childId) {
-    childData = await prisma.user.findUnique({ where: { id: childId } });
-    attendances = await prisma.attendance.findMany({
-      where: { studentId: childId },
-      include: { subject: true },
-      orderBy: { timestamp: "desc" },
+  const childrenData = parentLinks.map(link => ({
+    ...link.student,
+    linkStatus: link.status
+  }));
+
+  const approvedChildren = childrenData.filter((c: any) => c.linkStatus === "APPROVED");
+  
+  // เตรียมเก็บข้อมูลของลูกทุกคนที่ผ่านการอนุมัติ
+  let allAttendances: any = {};
+  let allGrades: any = {};
+  let allSubjects: any = {};
+  let allSchedules: any = {};
+
+  if (approvedChildren.length > 0) {
+    const today = new Date();
+    const currentTerm = await prisma.termConfig.findFirst({
+      where: { startDate: { lte: today }, endDate: { gte: today } }
     });
-    childGrades = await prisma.grade.findMany({
-      where: { studentId: childId },
-      include: { subject: true }
-    });
+
     const schedules = await prisma.schedule.findMany({
       where: { deletedAt: null },
       include: { subject: true },
       orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
     });
 
-    // 1. หาเทอมปัจจุบันอัตโนมัติจากวันที่ปัจจุบัน
-    const today = new Date();
-    const currentTerm = await prisma.termConfig.findFirst({
-      where: { startDate: { lte: today }, endDate: { gte: today } }
-    });
+    for (const child of approvedChildren) {
+      const childId = child.id;
+      allAttendances[childId] = await prisma.attendance.findMany({
+        where: { studentId: childId },
+        include: { subject: true },
+        orderBy: { timestamp: "desc" },
+      });
+      allGrades[childId] = await prisma.grade.findMany({
+        where: { studentId: childId },
+        include: { subject: true }
+      });
 
-    // 2. กรองเฉพาะตารางเรียนของชั้นปีเดียวกับลูก และ ต้องอยู่ในเทอมปัจจุบัน (ถ้ามีข้อมูลเทอมกำหนดไว้)
-    childSchedules = schedules.filter((sc: any) => {
-      const subj = sc.subject;
-      if (!subj) return false;
-      const isSameLevel = subj.level === childData?.level;
-      const isCurrentTerm = currentTerm 
-        ? (subj.academicYear === currentTerm.academicYear && subj.term === currentTerm.term)
-        : true; 
-      return isSameLevel && isCurrentTerm;
-    });
-        
+      const childSchedules = schedules.filter((sc: any) => {
+        const subj = sc.subject;
+        if (!subj) return false;
+        const isSameLevel = subj.level === child.level;
+        const isCurrentTerm = currentTerm 
+          ? (subj.academicYear === currentTerm.academicYear && subj.term === currentTerm.term)
+          : true; 
+        return isSameLevel && isCurrentTerm;
+      });
+
       const uniqueSubjectsMap = new Map();
       childSchedules.forEach((sc: any) => {
         if (sc.subject) uniqueSubjectsMap.set(sc.subject.id, sc.subject);
       });
-      attendances.forEach(a => {
+      allAttendances[childId].forEach((a: any) => {
         if (a.subject && !uniqueSubjectsMap.has(a.subject.id)) {
           uniqueSubjectsMap.set(a.subject.id, a.subject);
         }
       });
-      childSubjects = Array.from(uniqueSubjectsMap.values());
+      allSubjects[childId] = Array.from(uniqueSubjectsMap.values());
+      allSchedules[childId] = childSchedules;
     }
+  }
 
   return (
     <ParentDashboardClient 
       session={session}
       parentData={parentData}
-      childId={childId}
-      childData={childData}
-      attendances={attendances}
-      childSubjects={childSubjects}
-      childSchedules={childSchedules}
-      childGrades={childGrades}
+      childrenData={childrenData}
+      allAttendances={allAttendances}
+      allSubjects={allSubjects}
+      allSchedules={allSchedules}
+      allGrades={allGrades}
     />
   );
 }

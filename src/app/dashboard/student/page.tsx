@@ -61,6 +61,13 @@ export default async function StudentDashboard() {
     orderBy: { timestamp: "desc" },
   });
 
+  // ดึงคำขอผูกบัญชีผู้ปกครอง (Parent Links)
+  const parentLinks = await prisma.parentStudentLink.findMany({
+    where: { studentId: userId },
+    include: { parent: { select: { id: true, name: true, phone: true } } },
+    orderBy: { createdAt: "desc" }
+  });
+
   // ดึงรายชื่อวิชาเพื่อใช้ในตัวกรอง
   const allSubjects = await prisma.subject.findMany({ where: { deletedAt: null }, orderBy: { name: 'asc' } });
   const schedules = await prisma.schedule.findMany({
@@ -141,6 +148,7 @@ export default async function StudentDashboard() {
       groupedSchedules={groupedSchedules}
       dayColors={dayColors}
       daysMap={daysMap}
+      initialParentLinks={parentLinks}
     />
   );
 }
