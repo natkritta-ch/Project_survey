@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown } from "lucide-react";
 import { signOut } from "next-auth/react";
+import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm, showPromptNumber } from "@/lib/alerts";
 
 export default function TeacherDashboardClient({ 
   schedules, 
@@ -48,7 +49,7 @@ export default function TeacherDashboardClient({
   const handleCreateMakeup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!makeupSubjectId || !makeupDate || !makeupStartTime || !makeupEndTime) {
-      return alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+      return showWarning("กรุณากรอกข้อมูลให้ครบถ้วน", "โปรดระบุวิชา วันที่ และเวลาสอนชดเชย");
     }
 
     setIsSubmittingMakeup(true);
@@ -66,21 +67,28 @@ export default function TeacherDashboardClient({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        alert("สร้างคลาสสอนชดเชยสำเร็จ!");
+        showSuccess("สร้างคลาสสอนชดเชยสำเร็จ!", "เพิ่มคลาสลงในรายการสอนชดเชยเรียบร้อยแล้ว");
         setMakeupClasses(prev => [data.makeupClass, ...prev]);
         setIsMakeupModalOpen(false);
       } else {
-        alert("เกิดข้อผิดพลาด: " + (data.message || "ไม่สามารถสร้างคลาสชดเชยได้"));
+        showError("เกิดข้อผิดพลาด", data.message || "ไม่สามารถสร้างคลาสชดเชยได้");
       }
     } catch (err: any) {
-      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + err.message);
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ", err.message);
     } finally {
       setIsSubmittingMakeup(false);
     }
   };
 
   const handleDeleteMakeup = async (id: string) => {
-    if (!confirm("คุณต้องการลบคลาสสอนชดเชยนี้ใช่หรือไม่?")) return;
+    const ok = await showConfirm({
+      title: "ยืนยันการลบคลาสชดเชย?",
+      text: "คุณต้องการลบคลาสสอนชดเชยนี้ใช่หรือไม่?",
+      confirmText: "ลบคลาส",
+      cancelText: "ยกเลิก",
+      isDanger: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch('/api/makeup-classes', {
         method: 'DELETE',
@@ -89,24 +97,25 @@ export default function TeacherDashboardClient({
       });
       if (res.ok) {
         setMakeupClasses(prev => prev.filter(m => m.id !== id));
-        alert("ลบคลาสสอนชดเชยเรียบร้อยแล้ว");
+        showToast("ลบคลาสสอนชดเชยเรียบร้อยแล้ว", "success");
       } else {
         const data = await res.json();
-        alert("เกิดข้อผิดพลาด: " + data.message);
+        showError("เกิดข้อผิดพลาด", data.message);
       }
     } catch (err: any) {
-      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
     }
   };
 
   const handleEditThreshold = async (subjectId: string, currentVal: number) => {
-    const input = window.prompt("ตั้งค่าเวลาอนุโลมให้มาสายได้กี่นาที? (กรอกเป็นตัวเลขนาที)", (currentVal || 15).toString());
-    if (input === null) return;
-    const num = parseInt(input, 10);
-    if (isNaN(num) || num < 0) {
-      alert("กรุณากรอกตัวเลขที่ถูกต้อง");
-      return;
-    }
+    const num = await showPromptNumber({
+      title: "ตั้งค่าเวลาอนุโลมสาย",
+      text: "ระบุจำนวนนาทีหลังจากเริ่มคาบที่อนุโลมให้นักเรียนเช็คชื่อแล้วเป็นสถานะ 'สาย' (นาที)",
+      defaultValue: currentVal || 15,
+      min: 0,
+      max: 180,
+    });
+    if (num === null) return;
     try {
       const res = await fetch("/api/subjects/late-threshold", {
         method: "PUT",
@@ -114,14 +123,14 @@ export default function TeacherDashboardClient({
         body: JSON.stringify({ subjectId, lateThresholdMin: num })
       });
       if (res.ok) {
-        alert("บันทึกการตั้งค่าเวลาสายสำเร็จ!");
-        window.location.reload();
+        showSuccess("บันทึกการตั้งค่าสำเร็จ!", `ตั้งค่าเวลาสายเป็น ${num} นาที เรียบร้อยแล้ว`);
+        setTimeout(() => window.location.reload(), 1200);
       } else {
         const data = await res.json();
-        alert("เกิดข้อผิดพลาด: " + data.message);
+        showError("เกิดข้อผิดพลาด", data.message);
       }
     } catch (e) {
-      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
     }
   };
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, ShieldCheck, Loader2, ArrowLeft, Send, CheckCircle2 } from "lucide-react";
 import { sendOtp, verifyOtp, updatePassword } from "./actions";
+import { showInfo } from "@/lib/alerts";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -33,7 +34,12 @@ export default function ForgotPasswordPage() {
         setMaskedEmail(res.displayEmail);
         setStep(2);
         if (res.mockOtp) {
-          setTimeout(() => alert(`[ระบบทดสอบ - ไม่ได้ส่งอีเมลจริง]\nรหัส OTP 6 หลักของคุณคือ: ${res.mockOtp}\n(มีอายุการใช้งาน 5 นาที)`), 500);
+          setTimeout(() => {
+            showInfo(
+              "รหัส OTP (ระบบทดสอบ)",
+              `รหัส OTP 6 หลักของคุณคือ: ${res.mockOtp}\n(มีอายุการใช้งาน 5 นาที)`
+            );
+          }, 300);
         }
       } else {
         setError(res.error || "ไม่สามารถส่ง OTP ได้");

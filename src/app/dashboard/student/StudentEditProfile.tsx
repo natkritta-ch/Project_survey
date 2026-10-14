@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import * as faceapi from "face-api.js";
 import { Camera, Loader2, Save, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { showError } from "@/lib/alerts";
 
 export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
   const router = useRouter();
@@ -82,7 +83,7 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
   const startCamera = async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("ไม่สามารถเปิดกล้องได้: เบราว์เซอร์บล็อกการเข้าถึง (ต้องใช้ผ่าน HTTPS หรือ localhost เท่านั้น)");
+        showError("ไม่สามารถเปิดกล้องได้", "เบราว์เซอร์บล็อกการเข้าถึง (ต้องใช้งานผ่าน HTTPS หรือ localhost เท่านั้น)");
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -92,7 +93,7 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
       }
     } catch (e: any) {
       console.error("Camera access error:", e);
-      alert("ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบสิทธิ์การเข้าถึงกล้องในเบราว์เซอร์");
+      showError("ไม่สามารถเปิดกล้องได้", "กรุณาตรวจสอบสิทธิ์การเข้าถึงกล้องในเบราว์เซอร์ของคุณ หรืออาจมีโปรแกรมอื่นกำลังใช้งานกล้องอยู่");
     }
   };
 

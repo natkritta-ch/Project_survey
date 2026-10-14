@@ -5,6 +5,7 @@ import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restor
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import TranscriptView from "../../../components/TranscriptView";
 import HeadAdminOverview from "./HeadAdminOverview";
+import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
 
 export default function HeadAdminClient({ subjects, schedules, users, termConfigs = [] }: { subjects: any[], schedules: any[], users: any[], termConfigs?: any[] }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -109,12 +110,14 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       const payload = { code: subjCode, name: subjName, level: subjLevel, group: subjGroup, room: subjRoom || null, teacherId: subjTeacherId || null, academicYear: subjAcademicYear, term: subjTerm, credit: subjCredit };
       if (subjId) {
         await updateSubject(subjId, payload);
+        showToast("บันทึกการแก้ไขวิชาเรียบร้อยแล้ว", "success");
       } else {
         await createSubject(payload);
+        showToast("เพิ่มรายวิชาใหม่เรียบร้อยแล้ว", "success");
       }
       resetSubjectForm();
     } catch {
-      alert("เกิดข้อผิดพลาดในการบันทึกวิชา (อาจมีรหัสวิชา, กลุ่มเรียน และชั้นปีซ้ำในเทอมเดียวกัน)");
+      showError("เกิดข้อผิดพลาดในการบันทึกวิชา", "อาจมีรหัสวิชา, กลุ่มเรียน และชั้นปีซ้ำในเทอมเดียวกัน กรุณาตรวจสอบข้อมูล");
     } finally {
       setIsLoading(false);
       setIsEditSubjectModalOpen(false);
@@ -123,11 +126,19 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
   const handleDeleteSelectedSubjects = async () => {
     if (selectedSubjects.length === 0) return;
-    if (confirm(`คุณแน่ใจหรือไม่ที่จะลบ ${selectedSubjects.length} วิชาที่เลือก? (ข้อมูลจะถูกย้ายไปทื่ถังขยะ และลบถาวรใน 7 วัน)`)) {
+    const confirmed = await showConfirm({
+      title: "ยืนยันการลบวิชาที่เลือก?",
+      text: `คุณแน่ใจหรือไม่ที่จะลบ ${selectedSubjects.length} วิชาที่เลือก?\n(ข้อมูลจะถูกย้ายไปที่ถังขยะ และลบถาวรใน 7 วัน)`,
+      confirmText: "ลบวิชา",
+      cancelText: "ยกเลิก",
+      isDanger: true,
+    });
+    if (confirmed) {
       setIsLoading(true);
       await deleteManySubjects(selectedSubjects);
       setSelectedSubjects([]);
       setIsLoading(false);
+      showToast("ย้ายวิชาที่เลือกไปถังขยะเรียบร้อยแล้ว", "success");
     }
   };
 
@@ -150,21 +161,23 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!schedSubjId) return alert("กรุณาเลือกวิชา");
+    if (!schedSubjId) return showWarning("กรุณาเลือกวิชา", "โปรดเลือกรายวิชาก่อนบันทึกตารางเรียน");
     setIsLoading(true);
     try {
       if (schedId) {
         await updateSchedule(schedId, { subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
+        showToast("แก้ไขตารางเรียนสำเร็จ", "success");
       } else {
         await createSchedule({ subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
+        showToast("เพิ่มคาบเรียนลงในตารางสำเร็จ", "success");
       }
       resetScheduleForm();
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("TIME_COLLISION")) {
-        alert("⚠️ เวลาชนกัน!\n\n" + msg.replace("TIME_COLLISION: ", ""));
+        showWarning("เวลาเรียนชนกัน!", msg.replace("TIME_COLLISION: ", ""));
       } else {
-        alert("เกิดข้อผิดพลาดในการบันทึกตารางเรียน");
+        showError("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกตารางเรียนได้");
       }
     } finally {
       setIsLoading(false);
@@ -210,13 +223,15 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       
       if (userId) {
         await updateUser(userId, data);
+        showToast("บันทึกข้อมูลผู้ใช้เรียบร้อยแล้ว", "success");
       } else {
-        if (!userPassword) return alert("กรุณากำหนดรหัสผ่านสำหรับการสร้างผู้ใช้ใหม่");
+        if (!userPassword) return showWarning("กรุณากำหนดรหัสผ่าน", "โปรดตั้งรหัสผ่านสำหรับการสร้างผู้ใช้ใหม่");
         await createUser(data);
+        showToast("สร้างผู้ใช้ใหม่เรียบร้อยแล้ว", "success");
       }
       resetUserForm();
     } catch {
-      alert("เกิดข้อผิดพลาดในการบันทึกผู้ใช้ (อาจมี Username ซ้ำ)");
+      showError("เกิดข้อผิดพลาดในการบันทึกผู้ใช้", "อาจมี Username ซ้ำในระบบ กรุณาลองใช้ Username อื่น");
     } finally {
       setIsLoading(false);
     }
@@ -265,11 +280,19 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
   const handleDeleteSelectedUsers = async () => {
     if (selectedUsers.length === 0) return;
-    if (confirm(`คุณแน่ใจหรือไม่ที่จะลบ ${selectedUsers.length} ผู้ใช้งานที่เลือก? (ข้อมูลจะถูกย้ายไปทื่ถังขยะ และลบถาวรใน 7 วัน)`)) {
+    const confirmed = await showConfirm({
+      title: "ยืนยันการลบผู้ใช้ที่เลือก?",
+      text: `คุณแน่ใจหรือไม่ที่จะลบ ${selectedUsers.length} ผู้ใช้งานที่เลือก?\n(ข้อมูลจะถูกย้ายไปที่ถังขยะ และลบถาวรใน 7 วัน)`,
+      confirmText: "ลบผู้ใช้",
+      cancelText: "ยกเลิก",
+      isDanger: true,
+    });
+    if (confirmed) {
       setIsLoading(true);
       await deleteManyUsers(selectedUsers);
       setSelectedUsers([]);
       setIsLoading(false);
+      showToast("ย้ายผู้ใช้ที่เลือกไปถังขยะเรียบร้อยแล้ว", "success");
     }
   };
 
@@ -300,29 +323,41 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const isAllStudentsGradesUnlocked = activeStudents.length > 0 && activeStudents.every(u => u.canSubmitGrades);
 
   const handlePromoteStudents = async () => {
-    if (confirm("คุณแน่ใจหรือไม่ที่จะเลื่อนชั้นปีนักเรียนทั้งวิทยาลัย?\n\n- ปวช.1 -> ปวช.2, ปวช.2 -> ปวช.3\n- ปวส.1 -> ปวส.2, ปวส.1(ม.6) -> ปวส.2(ม.6)\n- ปวช.3, ปวส.2 และ ปวส.2(ม.6) จะเปลี่ยนสถานะเป็น 'จบการศึกษา' (ระบบจะเก็บข้อมูลไว้อย่างน้อย 3 ปี)")) {
-      setIsLoading(true);
-      try {
-        await promoteStudents();
-        alert("เลื่อนชั้นปีนักเรียนเสร็จสมบูรณ์");
-      } catch (e) {
-        alert("เกิดข้อผิดพลาดในการเลื่อนชั้นปี");
-      }
-      setIsLoading(false);
+    const confirmed = await showConfirm({
+      title: "ยืนยันเลื่อนชั้นปีนักเรียนทั้งวิทยาลัย?",
+      text: "- ปวช.1 -> ปวช.2, ปวช.2 -> ปวช.3\n- ปวส.1 -> ปวส.2, ปวส.1(ม.6) -> ปวส.2(ม.6)\n- ปวช.3, ปวส.2 และ ปวส.2(ม.6) จะเปลี่ยนสถานะเป็น 'จบการศึกษา' (ระบบจะเก็บข้อมูลไว้อย่างน้อย 3 ปี)",
+      confirmText: "เลื่อนชั้นปี",
+      cancelText: "ยกเลิก",
+      icon: "question",
+    });
+    if (!confirmed) return;
+    setIsLoading(true);
+    try {
+      await promoteStudents();
+      showSuccess("เลื่อนชั้นปีนักเรียนเสร็จสมบูรณ์", "ระบบได้ปรับปรุงระดับชั้นของนักเรียนทุกคนเรียบร้อยแล้ว");
+    } catch (e) {
+      showError("เกิดข้อผิดพลาดในการเลื่อนชั้นปี");
     }
+    setIsLoading(false);
   };
 
   const handleClearOldGraduates = async () => {
-    if (confirm("คุณแน่ใจหรือไม่ที่จะลบข้อมูลนักเรียนที่ 'จบการศึกษา' ไปแล้วเกิน 3 ปี ถาวร?\n(การกระทำนี้ไม่สามารถกู้คืนได้ และจะช่วยเพิ่มพื้นที่ว่างให้ฐานข้อมูล)")) {
-      setIsLoading(true);
-      try {
-        await clearOldGraduates();
-        alert("ล้างข้อมูลผู้ที่จบการศึกษาเกิน 3 ปี เรียบร้อยแล้ว");
-      } catch (e) {
-        alert("เกิดข้อผิดพลาดในการล้างข้อมูล");
-      }
-      setIsLoading(false);
+    const confirmed = await showConfirm({
+      title: "ยืนยันล้างข้อมูลคนจบการศึกษา > 3 ปี?",
+      text: "คุณแน่ใจหรือไม่ที่จะลบข้อมูลนักเรียนที่ 'จบการศึกษา' ไปแล้วเกิน 3 ปี ถาวร?\n(การกระทำนี้ไม่สามารถกู้คืนได้ และจะช่วยเพิ่มพื้นที่ว่างให้ฐานข้อมูล)",
+      confirmText: "ล้างข้อมูลถาวร",
+      cancelText: "ยกเลิก",
+      isDanger: true,
+    });
+    if (!confirmed) return;
+    setIsLoading(true);
+    try {
+      await clearOldGraduates();
+      showSuccess("ล้างข้อมูลเรียบร้อยแล้ว", "ระบบได้ลบข้อมูลผู้ที่จบการศึกษาเกิน 3 ปี ถาวรแล้ว");
+    } catch (e) {
+      showError("เกิดข้อผิดพลาดในการล้างข้อมูล");
     }
+    setIsLoading(false);
   };
 
   const handleViewAttendance = async (u: any) => {
@@ -331,7 +366,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       const details = await getUserDetails(u.id);
       setViewAttendanceUser({ ...u, ...details });
     } catch (e) {
-      alert("เกิดข้อผิดพลาดในการดึงข้อมูลประวัติการเข้าเรียน");
+      showError("เกิดข้อผิดพลาดในการดึงข้อมูลประวัติการเข้าเรียน");
     }
     setIsLoading(false);
   };
@@ -700,7 +735,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{s.teacher ? s.teacher.name : "-"}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button disabled={isLoading} onClick={() => handleEditSubject(s)} className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50">แก้ไข</button>
-                        <button disabled={isLoading} onClick={() => { if(confirm("ยืนยันการลบวิชานี้? (วิชาจะถูกย้ายไปถังขยะและลบถาวรใน 7 วัน)")) deleteSubject(s.id); }} className="text-red-600 hover:text-red-900 ml-4 disabled:opacity-50">ลบ</button>
+                        <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบวิชานี้?", text: `ต้องการลบวิชา "${s.name}" (${s.code}) ใช่หรือไม่?\n(วิชาจะถูกย้ายไปถังขยะและลบถาวรใน 7 วัน)`, isDanger: true }); if(ok) deleteSubject(s.id); }} className="text-red-600 hover:text-red-900 ml-4 disabled:opacity-50">ลบ</button>
                       </td>
                     </tr>
                   ))}
@@ -928,7 +963,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                                 <button disabled={isLoading} onClick={() => handleEditSchedule(sc)} className="text-gray-500 hover:text-indigo-600 p-1 rounded transition disabled:opacity-50" title="แก้ไข">
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                 </button>
-                                <button disabled={isLoading} onClick={() => { if(confirm(`ยืนยันการลบ "${sc.subject?.name}" ออกจากตาราง? (จะถูกย้ายไปถังขยะและลบถาวรใน 7 วัน)`)) deleteSchedule(sc.id); }} className="text-gray-500 hover:text-red-600 p-1 rounded transition disabled:opacity-50" title="ลบ">
+                                <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบตารางเรียน?", text: `ต้องการนำวิชา "${sc.subject?.name}" ออกจากตารางเรียนใช่หรือไม่?`, isDanger: true }); if(ok) deleteSchedule(sc.id); }} className="text-gray-500 hover:text-red-600 p-1 rounded transition disabled:opacity-50" title="ลบ">
                                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
                               </div>
@@ -961,7 +996,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                             </div>
                             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
                                 <button disabled={isLoading} onClick={() => handleEditSchedule(sc)} className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-xs px-2 py-1 font-semibold transition border-r border-gray-200 dark:border-gray-600">แก้ไข</button>
-                                <button disabled={isLoading} onClick={() => { if(confirm(`ยืนยันการลบ "${sc.subject?.name}" ออกจากตาราง? (จะถูกย้ายไปถังขยะและลบถาวรใน 7 วัน)`)) deleteSchedule(sc.id); }} className="text-gray-600 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 text-xs px-2 py-1 font-semibold transition">ลบ</button>
+                                <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบตารางเรียน?", text: `ต้องการนำวิชา "${sc.subject?.name}" ออกจากตารางเรียนใช่หรือไม่?`, isDanger: true }); if(ok) deleteSchedule(sc.id); }} className="text-gray-600 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 text-xs px-2 py-1 font-semibold transition">ลบ</button>
                             </div>
                           </div>
                         ))}
@@ -1120,10 +1155,17 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         <button 
                           disabled={isLoading}
                           onClick={async () => { 
-                            if(confirm(isAllStudentsGradesUnlocked ? "ยันยืนปิดสิทธิ์การกรอกเกรดนักเรียน 'ทุกคน'?" : "ยันยืนเปิดสิทธิ์การกรอกเกรดให้นักเรียน 'ทุกคน'?")) { 
+                            const ok = await showConfirm({
+                              title: isAllStudentsGradesUnlocked ? "ยืนยันปิดสิทธิ์การกรอกเกรด?" : "ยืนยันเปิดสิทธิ์การกรอกเกรด?",
+                              text: isAllStudentsGradesUnlocked ? "ต้องการปิดสิทธิ์การกรอกเกรดสำหรับนักเรียนทุกคนใช่หรือไม่?" : "ต้องการเปิดสิทธิ์ให้นักเรียนทุกคนสามารถกรอกเกรดได้ใช่หรือไม่?",
+                              confirmText: isAllStudentsGradesUnlocked ? "ปิดสิทธิ์" : "เปิดสิทธิ์",
+                              isDanger: isAllStudentsGradesUnlocked,
+                            });
+                            if (ok) { 
                               setIsLoading(true); 
                               await toggleAllStudentsGradeSubmission(!isAllStudentsGradesUnlocked); 
                               setIsLoading(false); 
+                              showToast(isAllStudentsGradesUnlocked ? "ปิดสิทธิ์การกรอกเกรดแล้ว" : "เปิดสิทธิ์การกรอกเกรดแล้ว", "success");
                             } 
                           }}
                           className={`w-9 h-5 rounded-full relative transition-colors ${isAllStudentsGradesUnlocked ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}
@@ -1304,7 +1346,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         </a>
                         <div className="flex gap-2">
                            <button disabled={isLoading} onClick={() => handleEditUser(u)} className="text-slate-600 hover:text-slate-900 border text-xs font-bold border-slate-200 bg-white hover:bg-slate-50 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 px-3 py-1.5 rounded-md transition shadow-sm">แก้ไข</button>
-                           <button disabled={isLoading} onClick={() => { if(confirm(`ยืนยันการลบ "${u.name}" ออกจากระบบ? (ข้อมูลจะถูกย้ายไปถังขยะ)`)) deleteUser(u.id); }} className="text-red-600 hover:text-red-800 border text-xs font-bold border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300 px-3 py-1.5 rounded-md transition shadow-sm">ลบ</button>
+                           <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบผู้ใช้?", text: `ต้องการย้าย "${u.name}" ออกจากระบบใช่หรือไม่? (ข้อมูลจะถูกย้ายไปถังขยะ)`, isDanger: true }); if(ok) deleteUser(u.id); }} className="text-red-600 hover:text-red-800 border text-xs font-bold border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300 px-3 py-1.5 rounded-md transition shadow-sm">ลบ</button>
                         </div>
                       </div>
                       
@@ -1409,8 +1451,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           {filterUserRole === "TRASH" ? (
                             <>
-                              <button disabled={isLoading} onClick={async () => { if(confirm("ยืนยันการกู้คืนข้อมูล?")) { setIsLoading(true); await restoreUser(u.id); setIsLoading(false); } }} className="text-green-600 hover:text-green-900 mr-4">กู้คืน</button>
-                              <button disabled={isLoading} onClick={async () => { if(confirm("ยืนยันการลบถาวร? (ไม่สามารถกู้คืนได้)")) { setIsLoading(true); await hardDeleteUser(u.id); setIsLoading(false); } }} className="text-red-600 hover:text-red-900">ลบถาวร</button>
+                              <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการกู้คืนข้อมูล?", text: `ต้องการกู้คืนผู้ใช้ "${u.name}" กลับสู่ระบบใช่หรือไม่?`, confirmText: "กู้คืน", icon: "question" }); if(ok) { setIsLoading(true); await restoreUser(u.id); setIsLoading(false); showToast("กู้คืนผู้ใช้สำเร็จ", "success"); } }} className="text-green-600 hover:text-green-900 mr-4">กู้คืน</button>
+                              <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบถาวร?", text: `ต้องการลบข้อมูล "${u.name}" ออกจากระบบถาวรใช่หรือไม่?\n(ไม่สามารถกู้คืนได้)`, confirmText: "ลบถาวร", isDanger: true }); if(ok) { setIsLoading(true); await hardDeleteUser(u.id); setIsLoading(false); showToast("ลบข้อมูลถาวรแล้ว", "success"); } }} className="text-red-600 hover:text-red-900">ลบถาวร</button>
                             </>
                           ) : (
                             <>
@@ -1418,7 +1460,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                                 <a href={`/dashboard/head/transcript/${u.id}`} target="_blank" className="text-green-600 hover:text-green-900 mr-4 disabled:opacity-50 inline-block">ดูเกรด</a>
                               )}
                               <button disabled={isLoading} onClick={() => handleEditUser(u)} className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50">แก้ไข</button>
-                              <button disabled={isLoading} onClick={() => { if(confirm("ยืนยันการลบผู้ใช้นี้?")) deleteUser(u.id); }} className="text-red-600 hover:text-red-900 ml-4 disabled:opacity-50">ลบ</button>
+                              <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบผู้ใช้?", text: `ต้องการย้าย "${u.name}" ไปที่ถังขยะใช่หรือไม่?`, isDanger: true }); if(ok) deleteUser(u.id); }} className="text-red-600 hover:text-red-900 ml-4 disabled:opacity-50">ลบ</button>
                             </>
                           )}
                         </td>
@@ -1458,8 +1500,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </h4>
                 {trashedSubjects.length > 0 && (
                   <div className="flex gap-2">
-                    <button disabled={isLoading} onClick={async () => { if(confirm(`ยืนยันกู้คืนวิชาทั้งหมด ${trashedSubjects.length} รายการ?`)) { setIsLoading(true); await restoreAllSubjects(); setIsLoading(false); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800 transition disabled:opacity-50">กู้คืนทั้งหมด</button>
-                    <button disabled={isLoading} onClick={async () => { if(confirm(`⚠️ ยืนยันลบถาวรวิชาทั้งหมด ${trashedSubjects.length} รายการ? (ไม่สามารถกู้คืนได้!)`)) { setIsLoading(true); await hardDeleteAllSubjects(); setIsLoading(false); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800 transition disabled:opacity-50">ลบถาวรทั้งหมด</button>
+                    <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันกู้คืนวิชาทั้งหมด?", text: `ต้องการกู้คืนรายวิชาทั้งหมด ${trashedSubjects.length} รายการใช่หรือไม่?`, confirmText: "กู้คืนทั้งหมด", icon: "question" }); if(ok) { setIsLoading(true); await restoreAllSubjects(); setIsLoading(false); showToast("กู้คืนวิชาทั้งหมดแล้ว", "success"); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800 transition disabled:opacity-50">กู้คืนทั้งหมด</button>
+                    <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "⚠️ ยืนยันลบถาวรวิชาทั้งหมด?", text: `คุณแน่ใจหรือไม่ที่จะลบถาวรวิชาทั้งหมด ${trashedSubjects.length} รายการ?\n(ไม่สามารถกู้คืนข้อมูลได้!)`, confirmText: "ลบถาวรทั้งหมด", isDanger: true }); if(ok) { setIsLoading(true); await hardDeleteAllSubjects(); setIsLoading(false); showToast("ลบวิชาทั้งหมดถาวรแล้ว", "success"); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800 transition disabled:opacity-50">ลบถาวรทั้งหมด</button>
                   </div>
                 )}
               </div>
@@ -1481,8 +1523,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{s.name}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-red-500 text-right">{new Date(s.deletedAt).toLocaleDateString('th-TH')}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                          <button disabled={isLoading} onClick={async () => { if(confirm("ยืนยันกู้คืน?")) { setIsLoading(true); await restoreSubject(s.id); setIsLoading(false); } }} className="text-green-600 hover:text-green-900 mr-4 font-medium">กู้คืน</button>
-                          <button disabled={isLoading} onClick={async () => { if(confirm("ยืนยันการลบถาวร? (ไม่สามารถกู้คืนได้)")) { setIsLoading(true); await hardDeleteSubject(s.id); setIsLoading(false); } }} className="text-red-600 hover:text-red-900 font-medium">ลบถาวร</button>
+                          <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันกู้คืนวิชา?", text: `ต้องการกู้คืนวิชา "${s.name}" กลับสู่ระบบใช่หรือไม่?`, confirmText: "กู้คืน", icon: "question" }); if(ok) { setIsLoading(true); await restoreSubject(s.id); setIsLoading(false); showToast("กู้คืนวิชาสำเร็จ", "success"); } }} className="text-green-600 hover:text-green-900 mr-4 font-medium">กู้คืน</button>
+                          <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบถาวร?", text: `ต้องการลบวิชา "${s.name}" ถาวรใช่หรือไม่?\n(ไม่สามารถกู้คืนได้)`, confirmText: "ลบถาวร", isDanger: true }); if(ok) { setIsLoading(true); await hardDeleteSubject(s.id); setIsLoading(false); showToast("ลบวิชาถาวรแล้ว", "success"); } }} className="text-red-600 hover:text-red-900 font-medium">ลบถาวร</button>
                         </td>
                       </tr>
                     ))}
@@ -1499,8 +1541,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </h4>
                 {trashedSchedules.length > 0 && (
                   <div className="flex gap-2">
-                    <button disabled={isLoading} onClick={async () => { if(confirm(`ยืนยันกู้คืนตารางเรียนทั้งหมด ${trashedSchedules.length} รายการ?`)) { setIsLoading(true); await restoreAllSchedules(); setIsLoading(false); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800 transition disabled:opacity-50">กู้คืนทั้งหมด</button>
-                    <button disabled={isLoading} onClick={async () => { if(confirm(`⚠️ ยืนยันลบถาวรตารางเรียนทั้งหมด ${trashedSchedules.length} รายการ? (ไม่สามารถกู้คืนได้!)`)) { setIsLoading(true); await hardDeleteAllSchedules(); setIsLoading(false); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800 transition disabled:opacity-50">ลบถาวรทั้งหมด</button>
+                    <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันกู้คืนตารางเรียนทั้งหมด?", text: `ต้องการกู้คืนตารางเรียนทั้งหมด ${trashedSchedules.length} รายการใช่หรือไม่?`, confirmText: "กู้คืนทั้งหมด", icon: "question" }); if(ok) { setIsLoading(true); await restoreAllSchedules(); setIsLoading(false); showToast("กู้คืนตารางเรียนทั้งหมดแล้ว", "success"); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800 transition disabled:opacity-50">กู้คืนทั้งหมด</button>
+                    <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "⚠️ ยืนยันลบถาวรตารางเรียนทั้งหมด?", text: `คุณแน่ใจหรือไม่ที่จะลบถาวรตารางเรียนทั้งหมด ${trashedSchedules.length} รายการ?\n(ไม่สามารถกู้คืนข้อมูลได้!)`, confirmText: "ลบถาวรทั้งหมด", isDanger: true }); if(ok) { setIsLoading(true); await hardDeleteAllSchedules(); setIsLoading(false); showToast("ลบตารางเรียนถาวรแล้ว", "success"); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800 transition disabled:opacity-50">ลบถาวรทั้งหมด</button>
                   </div>
                 )}
               </div>
@@ -1520,8 +1562,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{sc.subject?.name} <span className="text-gray-400">({sc.subject?.code})</span></td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{daysMap[sc.dayOfWeek] || "-"} / {sc.startTime}-{sc.endTime}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                          <button disabled={isLoading} onClick={async () => { if(confirm("ยืนยันกู้คืน?")) { setIsLoading(true); await restoreSchedule(sc.id); setIsLoading(false); } }} className="text-green-600 hover:text-green-900 mr-4 font-medium">กู้คืน</button>
-                          <button disabled={isLoading} onClick={async () => { if(confirm("ยืนยันการลบถาวร? (ไม่สามารถกู้คืนได้)")) { setIsLoading(true); await hardDeleteSchedule(sc.id); setIsLoading(false); } }} className="text-red-600 hover:text-red-900 font-medium">ลบถาวร</button>
+                          <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันกู้คืนตารางเรียน?", text: `ต้องการกู้คืนวิชา "${sc.subject?.name}" กลับสู่ตารางเรียนใช่หรือไม่?`, confirmText: "กู้คืน", icon: "question" }); if(ok) { setIsLoading(true); await restoreSchedule(sc.id); setIsLoading(false); showToast("กู้คืนตารางเรียนสำเร็จ", "success"); } }} className="text-green-600 hover:text-green-900 mr-4 font-medium">กู้คืน</button>
+                          <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบถาวร?", text: `ต้องการลบคาบวิชา "${sc.subject?.name}" ถาวรใช่หรือไม่?\n(ไม่สามารถกู้คืนได้)`, confirmText: "ลบถาวร", isDanger: true }); if(ok) { setIsLoading(true); await hardDeleteSchedule(sc.id); setIsLoading(false); showToast("ลบตารางเรียนถาวรแล้ว", "success"); } }} className="text-red-600 hover:text-red-900 font-medium">ลบถาวร</button>
                         </td>
                       </tr>
                     ))}
@@ -1538,8 +1580,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </h4>
                 {trashedUsers.length > 0 && (
                   <div className="flex gap-2">
-                    <button disabled={isLoading} onClick={async () => { if(confirm(`ยืนยันกู้คืนผู้ใช้งานทั้งหมด ${trashedUsers.length} คน?`)) { setIsLoading(true); await restoreAllUsers(); setIsLoading(false); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800 transition disabled:opacity-50">กู้คืนทั้งหมด</button>
-                    <button disabled={isLoading} onClick={async () => { if(confirm(`⚠️ ยืนยันลบถาวรผู้ใช้งานทั้งหมด ${trashedUsers.length} คน? (ไม่สามารถกู้คืนได้!)`)) { setIsLoading(true); await hardDeleteAllUsers(); setIsLoading(false); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800 transition disabled:opacity-50">ลบถาวรทั้งหมด</button>
+                    <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันกู้คืนผู้ใช้งานทั้งหมด?", text: `ต้องการกู้คืนผู้ใช้งานทั้งหมด ${trashedUsers.length} คนใช่หรือไม่?`, confirmText: "กู้คืนทั้งหมด", icon: "question" }); if(ok) { setIsLoading(true); await restoreAllUsers(); setIsLoading(false); showToast("กู้คืนผู้ใช้งานทั้งหมดแล้ว", "success"); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800 transition disabled:opacity-50">กู้คืนทั้งหมด</button>
+                    <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "⚠️ ยืนยันลบถาวรผู้ใช้งานทั้งหมด?", text: `คุณแน่ใจหรือไม่ที่จะลบถาวรผู้ใช้งานทั้งหมด ${trashedUsers.length} คน?\n(ไม่สามารถกู้คืนได้!)`, confirmText: "ลบถาวรทั้งหมด", isDanger: true }); if(ok) { setIsLoading(true); await hardDeleteAllUsers(); setIsLoading(false); showToast("ลบผู้ใช้ถาวรทั้งหมดแล้ว", "success"); } }} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800 transition disabled:opacity-50">ลบถาวรทั้งหมด</button>
                   </div>
                 )}
               </div>
@@ -1566,8 +1608,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-red-500 text-right">{new Date(u.deletedAt).toLocaleDateString('th-TH')}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
-                          <button disabled={isLoading} onClick={async () => { if(confirm("ยืนยันกู้คืน?")) { setIsLoading(true); await restoreUser(u.id); setIsLoading(false); } }} className="text-green-600 hover:text-green-900 mr-4 font-medium">กู้คืน</button>
-                          <button disabled={isLoading} onClick={async () => { if(confirm("ยืนยันการลบถาวร? (ไม่สามารถกู้คืนได้)")) { setIsLoading(true); await hardDeleteUser(u.id); setIsLoading(false); } }} className="text-red-600 hover:text-red-900 font-medium">ลบถาวร</button>
+                          <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันกู้คืนผู้ใช้?", text: `ต้องการกู้คืนผู้ใช้ "${u.name}" กลับสู่ระบบใช่หรือไม่?`, confirmText: "กู้คืน", icon: "question" }); if(ok) { setIsLoading(true); await restoreUser(u.id); setIsLoading(false); showToast("กู้คืนผู้ใช้สำเร็จ", "success"); } }} className="text-green-600 hover:text-green-900 mr-4 font-medium">กู้คืน</button>
+                          <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบถาวร?", text: `ต้องการลบข้อมูลผู้ใช้ "${u.name}" ออกจากระบบถาวรใช่หรือไม่?\n(ไม่สามารถกู้คืนได้)`, confirmText: "ลบถาวร", isDanger: true }); if(ok) { setIsLoading(true); await hardDeleteUser(u.id); setIsLoading(false); showToast("ลบข้อมูลผู้ใช้ถาวรแล้ว", "success"); } }} className="text-red-600 hover:text-red-900 font-medium">ลบถาวร</button>
                         </td>
                       </tr>
                     ))}

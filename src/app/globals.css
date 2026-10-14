@@ -94,3 +94,68 @@
     print-color-adjust: exact !important;
   }
 }
+
+/* ================= SweetAlert2 Premium Enterprise Theme ================= */
+.swal2-container {
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+  z-index: 999999 !important;
+}
+
+.custom-swal-popup {
+  border-radius: 1.25rem !important;
+  padding: 1.75rem !important;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+}
+
+.dark .custom-swal-popup {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+}
+
+.dark .swal2-title {
+  color: #f8fafc !important;
+}
+
+.dark .swal2-html-container {
+  color: #cbd5e1 !important;
+}
+
+.swal2-title {
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  padding-top: 0.5rem !important;
+  line-height: 1.4 !important;
+}
+
+.swal2-html-container {
+  font-size: 0.95rem !important;
+  line-height: 1.6 !important;
+  white-space: pre-line !important;
+  margin: 0.75rem 0.5rem 0.25rem !important;
+}
+
+.swal2-actions {
+  margin-top: 1.5rem !important;
+  gap: 0.75rem !important;
+}
+
+.swal2-styled {
+  border-radius: 0.75rem !important;
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  padding: 0.625rem 1.5rem !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.2s ease !important;
+}
+
+.swal2-styled:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+}
+
+.swal2-styled:active {
+  transform: translateY(0) !important;
+}
+

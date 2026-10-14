@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { UserPlus, Loader2, Users, Search, ChevronDown, CheckCircle2, Sparkles } from "lucide-react";
+import { showSuccess, showError } from "@/lib/alerts";
 
 export default function ParentRegisterPage() {
   const [formData, setFormData] = useState({
@@ -70,15 +71,15 @@ export default function ParentRegisterPage() {
 
       const data = await response.json();
       if (data.success) {
-        alert("สมัครบัญชีผู้ปกครองสำเร็จ และผูกข้อมูลกับนักเรียนเรียบร้อยแล้ว!");
+        await showSuccess("สมัครสมาชิกสำเร็จ", "สมัครบัญชีผู้ปกครองและผูกข้อมูลกับนักเรียนเรียบร้อยแล้ว");
         setFormData({ name: "", username: "", password: "", phone: "", address: "", studentUsername: "", email: "", studentNationalId: "" });
         setSelectedStudentInfo(null);
       } else {
-        alert("สมัครสมาชิกล้มเหลว: " + data.message);
+        showError("สมัครสมาชิกล้มเหลว", data.message || "กรุณาตรวจสอบข้อมูลแล้วลองใหม่อีกครั้ง");
       }
     } catch (error) {
       console.error(error);
-      alert("เกิดข้อผิดพลาดระหว่างส่งข้อมูล");
+      showError("เกิดข้อผิดพลาด", "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์หรือส่งข้อมูลได้");
     } finally {
       setIsLoading(false);
     }

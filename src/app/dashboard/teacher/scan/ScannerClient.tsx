@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
 import { Camera, RefreshCcw, CheckCircle2, StopCircle, UserPlus, FlipHorizontal, Clock, AlertTriangle, CalendarPlus, X, Sparkles, Search, BookOpen, ChevronDown } from "lucide-react";
+import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
 
 export default function TeacherScannerClient({ 
   students, 
@@ -123,7 +124,7 @@ export default function TeacherScannerClient({
   const handleCreateMakeup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!makeupSubjectId || !makeupDate || !makeupStartTime || !makeupEndTime) {
-      return alert("กรุณากรอกข้อมูลให้ครบถ้วน");
+      return showWarning("กรุณากรอกข้อมูลให้ครบถ้วน", "โปรดระบุวิชา วันที่ และเวลาสอนชดเชย");
     }
 
     setIsSubmittingMakeup(true);
@@ -141,7 +142,7 @@ export default function TeacherScannerClient({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        alert("สร้างคลาสสอนชดเชยเรียบร้อยแล้ว! ระบบเปิดให้สแกนได้ทันที");
+        showSuccess("สร้างคลาสสอนชดเชยเรียบร้อยแล้ว!", "ระบบเปิดให้สแกนเข้าเรียนได้ทันที");
         // อัปเดต state วิชาในหน้านี้
         setSubjectsList(prev => prev.map(s => {
           if (s.id === makeupSubjectId) {
@@ -164,10 +165,10 @@ export default function TeacherScannerClient({
         setSelectedSubject(makeupSubjectId);
         setIsMakeupModalOpen(false);
       } else {
-        alert("เกิดข้อผิดพลาด: " + (data.message || "ไม่สามารถสร้างคลาสชดเชยได้"));
+        showError("เกิดข้อผิดพลาด", data.message || "ไม่สามารถสร้างคลาสชดเชยได้");
       }
     } catch (err: any) {
-      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ: " + err.message);
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ", err.message);
     } finally {
       setIsSubmittingMakeup(false);
     }
@@ -227,20 +228,19 @@ export default function TeacherScannerClient({
   const startCamera = async () => {
     if (scanType === "class") {
       if (!selectedSubject) {
-        return alert("กรุณาเลือกวิชาก่อนเริ่มเช็คชื่อ");
+        return showWarning("กรุณาเลือกวิชา", "โปรดเลือกรายวิชาก่อนเริ่มเปิดกล้องเช็คชื่อ");
       }
       const timeStatus = getSubjectTimeStatus(selectedSubject);
       if (timeStatus && !timeStatus.isAllowed) {
-        alert(
-          "⛔ ไม่อยู่ในช่วงเวลาเรียนของวิชานี้!\n\n" +
-          "ระบบอนุญาตให้เปิดกล้องสแกนได้เฉพาะช่วง ก่อนเริ่มคาบ 30 นาที จนถึง หลังหมดคาบ 30 นาทีเท่านั้น\n\n" +
-          "หากคุณกำลังสอนนอกตาราง กรุณากดปุ่ม 'สร้างคลาสสอนชดเชย' เพื่อเปิดสิทธิ์การสแกน"
+        showWarning(
+          "⛔ ไม่อยู่ในช่วงเวลาเรียนของวิชานี้!",
+          "ระบบอนุญาตให้เปิดกล้องสแกนได้เฉพาะช่วง ก่อนเริ่มคาบ 30 นาที จนถึง หลังหมดคาบ 30 นาทีเท่านั้น\n\nหากคุณกำลังสอนนอกตาราง กรุณากดปุ่ม 'สร้างคลาสสอนชดเชย' เพื่อเปิดสิทธิ์การสแกน"
         );
         return;
       }
     }
     if (scanType === "assembly" && !assemblyLevel) {
-      return alert("กรุณาเลือกชั้นปีที่ต้องการเช็คแถว");
+      return showWarning("กรุณาเลือกชั้นปี", "โปรดเลือกระดับชั้นที่ต้องการเช็คแถวหน้าเสาธง");
     }
     // เคลียร์ประวัติการเช็คชื่อเมื่อเปิดกล้องเริ่มรอบใหม่
     setLogs([]);
@@ -248,7 +248,7 @@ export default function TeacherScannerClient({
     
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("ไม่สามารถเปิดกล้องได้: เบราว์เซอร์บล็อกการเข้าถึง (ต้องใช้ผ่าน HTTPS หรือ localhost เท่านั้น)");
+        showError("ไม่สามารถเปิดกล้องได้", "เบราว์เซอร์บล็อกการเข้าถึง (ต้องใช้ผ่าน HTTPS หรือ localhost เท่านั้น)");
         return;
       }
       
@@ -261,7 +261,7 @@ export default function TeacherScannerClient({
       }
     } catch (e: any) {
       console.error("Camera error:", e);
-      alert("ไม่สามารถเปิดกล้องได้ กรุณาตรวจสอบสิทธิ์การเข้าถึงกล้อง");
+      showError("ไม่สามารถเปิดกล้องได้", "กรุณาตรวจสอบสิทธิ์การเข้าถึงกล้องในเบราว์เซอร์");
     }
   };
 
@@ -320,7 +320,13 @@ export default function TeacherScannerClient({
     }
     
     if (sessionUnloggedStudents.length > 0) {
-      const confirmAbsent = window.confirm(`คุณต้องการบันทึกสถานะ "ขาดเรียน" ให้นักเรียนที่เหลือจำนวน ${sessionUnloggedStudents.length} คน ใช่หรือไม่?`);
+      const confirmAbsent = await showConfirm({
+        title: "บันทึกขาดเรียน?",
+        text: `คุณต้องการบันทึกสถานะ "ขาดเรียน" ให้นักเรียนที่เหลือจำนวน ${sessionUnloggedStudents.length} คน ใช่หรือไม่?`,
+        confirmText: "บันทึกขาดเรียน",
+        cancelText: "ยกเลิก",
+        isDanger: true,
+      });
       if (confirmAbsent) {
         try {
           await fetch('/api/attendance/absent', {
@@ -332,10 +338,10 @@ export default function TeacherScannerClient({
               type: scanType
             })
           });
-          alert("บันทึกสถานะขาดเรียนเรียบร้อยแล้ว");
+          showSuccess("บันทึกสถานะขาดเรียนเรียบร้อยแล้ว", `เช็คขาดให้นักเรียนจำนวน ${sessionUnloggedStudents.length} คน`);
         } catch (e) {
           console.error("Failed to mark absentees", e);
-          alert("เกิดข้อผิดพลาดในการบันทึกสถานะขาดเรียน");
+          showError("เกิดข้อผิดพลาดในการบันทึกสถานะขาดเรียน");
         }
       }
     }
@@ -345,11 +351,17 @@ export default function TeacherScannerClient({
     stopCamera();
     
     if (logs.length === 0) {
-      alert("ไม่มีประวัติการเช็คชื่อในรอบนี้ที่ต้องยกเลิก");
+      showInfo("ไม่พบข้อมูล", "ไม่มีประวัติการเช็คชื่อในรอบนี้ที่ต้องยกเลิก");
       return;
     }
 
-    const confirmCancel = window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบประวัติการเช็คชื่อที่เพิ่งสแกนติดไปทั้งหมด ${logs.length} คนในรอบนี้?`);
+    const confirmCancel = await showConfirm({
+      title: "ยืนยันยกเลิกและลบประวัติ?",
+      text: `คุณแน่ใจหรือไม่ว่าต้องการยกเลิกและลบประวัติการเช็คชื่อที่เพิ่งสแกนติดไปทั้งหมด ${logs.length} คนในรอบนี้?`,
+      confirmText: "ยกเลิกการเช็คชื่อ",
+      cancelText: "ไม่ยกเลิก",
+      isDanger: true,
+    });
     if (confirmCancel) {
       const attendanceIds = logs.filter(l => l.attendanceId).map(l => l.attendanceId);
       
@@ -362,14 +374,14 @@ export default function TeacherScannerClient({
           });
         } catch (e) {
           console.error("Failed to cancel session", e);
-          alert("เกิดข้อผิดพลาดในการยกเลิกประวัติบางส่วน");
+          showError("เกิดข้อผิดพลาดในการยกเลิกประวัติบางส่วน");
         }
       }
       
       // Clear logs state
       setLogs([]);
       logsRef.current = [];
-      alert("ยกเลิกการเช็คชื่อรอบนี้และลบประวัติเรียบร้อยแล้ว");
+      showSuccess("ยกเลิกการเช็คชื่อเรียบร้อยแล้ว", "ลบประวัติการเช็คชื่อในรอบนี้เรียบร้อยแล้ว");
     }
   };
 
@@ -487,8 +499,8 @@ export default function TeacherScannerClient({
   };
 
   const handleManualAdd = async () => {
-    if (!manualStudentId) return alert("กรุณาเลือกนักเรียน");
-    if (scanType === "class" && !selectedSubject) return alert("กรุณาเลือกวิชา");
+    if (!manualStudentId) return showWarning("กรุณาเลือกนักเรียน", "โปรดเลือกนักเรียนที่ต้องการเช็คชื่อ");
+    if (scanType === "class" && !selectedSubject) return showWarning("กรุณาเลือกวิชา", "โปรดเลือกรายวิชาก่อนเช็คชื่อ");
     
     const student = students.find(s => s.id === manualStudentId);
     if (!student) return;
@@ -511,11 +523,12 @@ export default function TeacherScannerClient({
       const data = await res.json();
       if (data.attendance?.id) {
         setLogs(prev => prev.map(l => l.logId === manualLogId ? { ...l, attendanceId: data.attendance.id } : l));
+        showToast(`เช็คชื่อ ${student.name} สำเร็จ`, "success");
       }
       setManualStudentId("");
     } catch (e) {
       console.error(e);
-      alert("เกิดข้อผิดพลาดในการบันทึก");
+      showError("เกิดข้อผิดพลาดในการบันทึก");
     }
   };
 

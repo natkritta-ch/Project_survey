@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Save, Loader2, BookOpen, Lock, ShieldCheck } from "lucide-react";
+import { showError, showToast } from "@/lib/alerts";
 
 // Bug #8 fix: เพิ่ม canSubmitGrades prop — ต้องได้รับอนุญาตจากอาจารย์ก่อน
 export default function StudentGrades({
@@ -44,14 +45,15 @@ export default function StudentGrades({
       });
       const data = await res.json();
       if (!data.success) {
-        alert("บันทึกเกรดไม่สำเร็จ: " + data.message);
+        showError("บันทึกเกรดไม่สำเร็จ", data.message);
       } else {
         setSavedId(subjectId);
+        showToast("บันทึกเกรดสำเร็จ", "success");
         setTimeout(() => setSavedId(null), 3000);
       }
     } catch (e) {
       console.error(e);
-      alert("เกิดข้อผิดพลาดในการบันทึกเกรด");
+      showError("เกิดข้อผิดพลาด", "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์เพื่อบันทึกเกรดได้");
     } finally {
       setSavingId(null);
     }

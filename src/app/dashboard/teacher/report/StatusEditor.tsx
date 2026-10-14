@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateAttendanceStatus } from "./actions";
+import { showError, showToast } from "@/lib/alerts";
 
 export default function StatusEditor({ id, initialStatus }: { id: string, initialStatus: string }) {
   const [status, setStatus] = useState(initialStatus);
@@ -21,8 +22,9 @@ export default function StatusEditor({ id, initialStatus }: { id: string, initia
     setLoading(true);
     try {
       await updateAttendanceStatus(id, newStatus);
+      showToast("อัปเดตสถานะสำเร็จ", "success");
     } catch (err) {
-      alert("เกิดข้อผิดพลาดในการอัปเดตสถานะ");
+      showError("เกิดข้อผิดพลาดในการอัปเดตสถานะ");
       setStatus(initialStatus); // revert on failure
     } finally {
       setLoading(false);

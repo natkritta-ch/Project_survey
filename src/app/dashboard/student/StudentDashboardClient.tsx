@@ -8,6 +8,7 @@ import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
 import { User, Calendar, Clock, BookOpen, GraduationCap, Menu, X, Settings, Camera } from "lucide-react";
+import { showError, showToast } from "@/lib/alerts";
 
 export default function StudentDashboardClient({
   session,
@@ -37,11 +38,12 @@ export default function StudentDashboardClient({
         setParentLinks((prev: any) => 
           prev.map((link: any) => link.id === linkId ? { ...link, status } : link)
         );
+        showToast(status === "APPROVED" ? "อนุมัติการเชื่อมต่อผู้ปกครองแล้ว" : "ปฏิเสธการเชื่อมต่อแล้ว", "success");
       } else {
-        alert("เกิดข้อผิดพลาด: " + data.message);
+        showError("เกิดข้อผิดพลาด", data.message);
       }
     } catch (e) {
-      alert("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
     }
   };
 

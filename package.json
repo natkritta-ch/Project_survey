@@ -26,6 +26,7 @@
     "react-dom": "^18",
     "react-leaflet": "^4.2.1",
     "speakeasy": "^2.0.0",
+    "sweetalert2": "^11.26.25",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

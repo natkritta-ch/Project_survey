@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Save, Search, ChevronDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import { createOrUpdateTermConfig, resetAllFaces } from "./actions";
+import { showSuccess, showError, showConfirm } from "@/lib/alerts";
 
 export default function HeadAdminOverview({ subjects, users, levelsOptions, termConfigs = [] }: { subjects: any[], users: any[], levelsOptions: string[], termConfigs?: any[] }) {
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
@@ -501,15 +502,19 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
           </div>
           <button 
             onClick={async () => {
-              if (window.confirm("คำเตือน: คุณกำลังจะ 'ลบข้อมูลใบหน้า' ของนักเรียนทุกคนในระบบ\n\nการกระทำนี้จะทำให้นักเรียนทุกคนสแกนหน้าไม่ผ่าน จนกว่าพวกเขาจะเข้าสู่ระบบไปกด 'ถ่ายรูปใหม่' ในหน้าโปรไฟล์\n\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?")) {
-                const doubleCheck = window.prompt("พิมพ์คำว่า 'ยืนยัน' เพื่อดำเนินการลบ:");
-                if (doubleCheck === 'ยืนยัน') {
-                  try {
-                    await resetAllFaces();
-                    alert("รีเซ็ตใบหน้านักเรียนทุกคนสำเร็จแล้ว!");
-                  } catch(e) {
-                    alert("เกิดข้อผิดพลาดในการลบข้อมูล");
-                  }
+              const ok = await showConfirm({
+                title: "คำเตือน: ลบข้อมูลใบหน้านักเรียนทุกคน?",
+                text: "การกระทำนี้จะล้างข้อมูลใบหน้าของนักเรียนทุกคนในระบบ\nส่งผลให้นักเรียนทุกคนสแกนหน้าไม่ผ่าน จนกว่าจะเข้าสู่ระบบไปถ่ายรูปใหม่ในหน้าโปรไฟล์\n\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?",
+                confirmText: "ยืนยันล้างข้อมูลใบหน้า",
+                cancelText: "ยกเลิก",
+                isDanger: true,
+              });
+              if (ok) {
+                try {
+                  await resetAllFaces();
+                  showSuccess("รีเซ็ตใบหน้านักเรียนทุกคนสำเร็จแล้ว!", "นักเรียนทุกคนจะต้องถ่ายภาพใบหน้าใหม่ก่อนสแกนเข้าเรียน");
+                } catch(e) {
+                  showError("เกิดข้อผิดพลาดในการลบข้อมูล");
                 }
               }
             }}
@@ -569,10 +574,9 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
                        endDate: new Date(assemblyEndDate)
                      });
                      setShowConfigModal(false);
-                     // The revalidatePath will refresh the component remotely.
-                     alert("บันทึกการตั้งค่าเทอมสำเร็จ!");
+                     showSuccess("บันทึกการตั้งค่าเทอมสำเร็จ!", `ปีการศึกษา ${configYear} ภาคเรียนที่ ${configTerm}`);
                    } catch(err) {
-                     alert("เกิดข้อผิดพลาดในการบันทึก");
+                     showError("เกิดข้อผิดพลาดในการบันทึก");
                    }
                    setIsSaving(false);
                  }}

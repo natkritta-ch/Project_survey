@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { get2FAStatus, generate2FASecret, verifyAndEnable2FA, disable2FA } from "./actions";
 import { ShieldCheck, ShieldAlert, Loader2, QrCode, ArrowLeft, Copy, Check, LogOut } from "lucide-react";
 import LogoutButton from "../../../components/LogoutButton";
+import { showConfirm, showSuccess, showError } from "@/lib/alerts";
 
 export default function Security2FAPage() {
   const router = useRouter();
@@ -74,13 +75,23 @@ export default function Security2FAPage() {
   };
 
   const handleDisable = async () => {
-    if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการปิดการใช้งาน 2FA? ความปลอดภัยของบัญชีจะลดลง")) return;
+    const confirmed = await showConfirm({
+      title: "ปิดการใช้งาน 2FA หรือไม่?",
+      text: "คุณแน่ใจหรือไม่ว่าต้องการปิดการใช้งาน 2FA? ระดับความปลอดภัยของบัญชีจะลดลง",
+      confirmText: "ยืนยันปิด 2FA",
+      cancelText: "ยกเลิก",
+      isDanger: true
+    });
+    if (!confirmed) return;
     
     setLoading(true);
     const res = await disable2FA();
     if (res.success) {
       setIsEnabled(false);
       setSuccess("ปิดการใช้งาน 2FA แล้ว");
+      showSuccess("สำเร็จ", "ปิดการใช้งานระบบยืนยันตัวตน 2 ขั้นตอนแล้ว");
+    } else {
+      showError("เกิดข้อผิดพลาด", res.error || "ไม่สามารถปิด 2FA ได้");
     }
     setLoading(false);
   };

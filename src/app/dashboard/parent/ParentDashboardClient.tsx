@@ -6,6 +6,7 @@ import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
 import { User, Clock, GraduationCap, Menu, X, Users, Home, ChevronDown, Search, Loader2, Sparkles } from "lucide-react";
+import { showSuccess, showError } from "@/lib/alerts";
 
 export default function ParentDashboardClient({
   session,
@@ -77,15 +78,15 @@ export default function ParentDashboardClient({
       });
       const data = await res.json();
       if (data.success) {
-        alert("ส่งคำขอสำเร็จ กรุณารอให้นักเรียนกดยืนยันจากหน้าจอของนักเรียน");
+        await showSuccess("ส่งคำขอสำเร็จ", "กรุณารอให้นักเรียนกดยืนยันการผูกบัญชีจากหน้าจอของนักเรียน");
         setAddStudentUsername("");
         setAddStudentNationalId("");
         window.location.reload(); // Refresh to show pending child
       } else {
-        alert(data.message);
+        showError("ไม่สามารถส่งคำขอได้", data.message || "กรุณาตรวจสอบข้อมูลและลองใหม่อีกครั้ง");
       }
     } catch (e) {
-      alert("เกิดข้อผิดพลาด");
+      showError("เกิดข้อผิดพลาด", "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง");
     }
     setIsAdding(false);
   };
