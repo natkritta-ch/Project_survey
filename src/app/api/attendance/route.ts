@@ -60,8 +60,38 @@ export async function POST(request: Request) {
     const isAssembly = !subjectId || type === "assembly";
     let computedStatus = status || "PRESENT";
 
-    // 💡 ระบบตรวจสอบช่วงเวลาเรียนและคำนวณสถานะ (Schedule & Make-up Class with 30-min buffer)
-    if (!isAssembly && subjectId) {
+    // 💡 ระบบตรวจสอบช่วงเวลาเข้าแถว (Assembly with 30-min buffer: 07:10 - 08:30 น.)
+    if (isAssembly) {
+      const parseTimeToMinutes = (timeStr: string) => {
+        const [h, m] = timeStr.split(":").map(Number);
+        return h * 60 + m;
+      };
+
+      const now = new Date();
+      const thaiTimeStr = new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Bangkok',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).format(now); // "HH:mm"
+      const currentMinutes = parseTimeToMinutes(thaiTimeStr);
+
+      const ASSEMBLY_START_MIN = 7 * 60 + 40; // 07:40 น. (460 นาที)
+      const ASSEMBLY_END_MIN = 8 * 60;        // 08:00 น. (480 นาที)
+      const BUFFER_MINUTES = 30;
+      const windowStart = ASSEMBLY_START_MIN - BUFFER_MINUTES; // 07:10 น. (430 นาที)
+      const windowEnd = ASSEMBLY_END_MIN + BUFFER_MINUTES;     // 08:30 น. (510 นาที)
+
+      if (currentMinutes < windowStart || currentMinutes > windowEnd) {
+        return NextResponse.json({
+          success: false,
+          message: "ไม่อยู่ในช่วงเวลาเข้าแถวหน้าเสาธง (เวลาเข้าแถวปกติ 07:40 - 08:00 น. โดยอนุญาตให้สแกนได้ก่อนเริ่ม 30 นาที ถึงหลังเลิก 30 นาที คือช่วงเวลา 07:10 - 08:30 น.)"
+        }, { status: 400 });
+      }
+
+      // เข้าแถวมีสถานะเดียวคือมา (PRESENT) ไม่มีสถานะมาสาย
+      computedStatus = "PRESENT";
+    } else if (subjectId) {
       const parseTimeToMinutes = (timeStr: string) => {
         const [h, m] = timeStr.split(":").map(Number);
         return h * 60 + m;

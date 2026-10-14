@@ -104,6 +104,28 @@ export default function TeacherScannerClient({
     };
   };
 
+  // ฟังก์ชันคำนวณช่วงเวลาเข้าแถวหน้าเสาธง (07:40 - 08:00 น. รวมก่อน-หลัง 30 นาที เป็น 07:10 - 08:30 น.)
+  const getAssemblyTimeStatus = () => {
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const ASSEMBLY_START_MIN = 7 * 60 + 40; // 07:40 น. (460 นาที)
+    const ASSEMBLY_END_MIN = 8 * 60;        // 08:00 น. (480 นาที)
+    const BUFFER = 30;
+    const windowStart = ASSEMBLY_START_MIN - BUFFER; // 07:10 น. (430 นาที)
+    const windowEnd = ASSEMBLY_END_MIN + BUFFER;     // 08:30 น. (510 นาที)
+
+    const isAllowed = currentMinutes >= windowStart && currentMinutes <= windowEnd;
+    return {
+      isAllowed,
+      currentMinutes,
+      startTime: "07:40",
+      endTime: "08:00",
+      windowStartStr: "07:10",
+      windowEndStr: "08:30",
+    };
+  };
+
   const openMakeupModal = (subId?: string) => {
     const targetId = subId || selectedSubject || (subjectsList[0]?.id || "");
     setMakeupSubjectId(targetId);
@@ -239,8 +261,18 @@ export default function TeacherScannerClient({
         return;
       }
     }
-    if (scanType === "assembly" && !assemblyLevel) {
-      return showWarning("กรุณาเลือกชั้นปี", "โปรดเลือกระดับชั้นที่ต้องการเช็คแถวหน้าเสาธง");
+    if (scanType === "assembly") {
+      if (!assemblyLevel) {
+        return showWarning("กรุณาเลือกชั้นปี", "โปรดเลือกระดับชั้นที่ต้องการเช็คแถวหน้าเสาธง");
+      }
+      const assemblyStatus = getAssemblyTimeStatus();
+      if (!assemblyStatus.isAllowed) {
+        showWarning(
+          "⛔ ไม่อยู่ในช่วงเวลาเข้าแถวหน้าเสาธง!",
+          "เวลาเข้าแถวปกติคือ 07:40 - 08:00 น.\nระบบอนุญาตให้เปิดกล้องสแกนได้เฉพาะช่วงเวลา 07:10 - 08:30 น. (ก่อนเริ่ม 30 นาที ถึงหลังเลิก 30 นาที) เท่านั้น"
+        );
+        return;
+      }
     }
     // เคลียร์ประวัติการเช็คชื่อเมื่อเปิดกล้องเริ่มรอบใหม่
     setLogs([]);
@@ -500,7 +532,21 @@ export default function TeacherScannerClient({
 
   const handleManualAdd = async () => {
     if (!manualStudentId) return showWarning("กรุณาเลือกนักเรียน", "โปรดเลือกนักเรียนที่ต้องการเช็คชื่อ");
-    if (scanType === "class" && !selectedSubject) return showWarning("กรุณาเลือกวิชา", "โปรดเลือกรายวิชาก่อนเช็คชื่อ");
+    if (scanType === "class") {
+      if (!selectedSubject) return showWarning("กรุณาเลือกวิชา", "โปรดเลือกรายวิชาก่อนเช็คชื่อ");
+      const timeStatus = getSubjectTimeStatus(selectedSubject);
+      if (timeStatus && !timeStatus.isAllowed) {
+        return showWarning("⛔ ไม่อยู่ในช่วงเวลาเรียน", "ระบบอนุญาตให้เช็คชื่อได้เฉพาะช่วงเวลาเรียนของวิชานี้เท่านั้น");
+      }
+    } else if (scanType === "assembly") {
+      const assemblyStatus = getAssemblyTimeStatus();
+      if (!assemblyStatus.isAllowed) {
+        return showWarning(
+          "⛔ ไม่อยู่ในช่วงเวลาเข้าแถวหน้าเสาธง!",
+          "เวลาเข้าแถวปกติคือ 07:40 - 08:00 น.\nระบบอนุญาตให้เช็คชื่อได้เฉพาะช่วงเวลา 07:10 - 08:30 น. เท่านั้น"
+        );
+      }
+    }
     
     const student = students.find(s => s.id === manualStudentId);
     if (!student) return;
@@ -744,17 +790,66 @@ export default function TeacherScannerClient({
         )}
 
         {scanType === "assembly" && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">เลือกชั้นปีที่จะเช็คชื่อเข้าแถว</label>
-            <select 
-              disabled={isScanning}
-              value={assemblyLevel} 
-              onChange={e => setAssemblyLevel(e.target.value)} 
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border disabled:bg-gray-100 dark:disabled:bg-gray-800"
-            >
-              <option value="">-- กรุณาเลือกชั้นปี --</option>
-              {levelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">เลือกชั้นปีที่จะเช็คชื่อเข้าแถว</label>
+              <select 
+                disabled={isScanning}
+                value={assemblyLevel} 
+                onChange={e => setAssemblyLevel(e.target.value)} 
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border disabled:bg-gray-100 dark:disabled:bg-gray-800"
+              >
+                <option value="">-- กรุณาเลือกชั้นปี --</option>
+                {levelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+
+            {/* แถบแจ้งเตือนสถานะช่วงเวลาเข้าแถวหน้าเสาธง */}
+            {(() => {
+              const aStatus = getAssemblyTimeStatus();
+              if (aStatus.isAllowed) {
+                return (
+                  <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/90 dark:border-emerald-800/60 dark:bg-emerald-950/30 flex flex-col gap-2 animate-in fade-in">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        </span>
+                        <span className="font-bold text-sm text-emerald-900 dark:text-emerald-200">
+                          อยู่ในช่วงเวลาเข้าแถวหน้าเสาธง ({aStatus.startTime} - {aStatus.endTime} น.)
+                        </span>
+                      </div>
+                      <span className="text-xs text-emerald-700 dark:text-emerald-300">
+                        สแกนได้ถึง {aStatus.windowEndStr} น. (หลังเลิกแถว 30 น.)
+                      </span>
+                    </div>
+                    <div className="text-xs flex items-center gap-2 pt-1 border-t border-emerald-200/60 dark:border-emerald-800/40">
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 rounded">
+                        ✓ สถานะขณะนี้: มาเข้าแถวปกติ (PRESENT)
+                      </span>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/90 dark:border-amber-800/60 dark:bg-amber-950/30 flex flex-col gap-2 animate-in fade-in">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-bold text-sm text-amber-900 dark:text-amber-200">
+                        ไม่อยู่ในช่วงเวลาเข้าแถวหน้าเสาธง
+                      </h4>
+                      <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5 leading-relaxed">
+                        เวลาเข้าแถวปกติคือ <strong>{aStatus.startTime} - {aStatus.endTime} น.</strong><br/>
+                        ระบบอนุญาตให้เปิดกล้องสแกนได้เฉพาะช่วง <strong>{aStatus.windowStartStr} - {aStatus.windowEndStr} น.</strong> (ก่อนเริ่ม 30 นาที ถึงหลังเลิก 30 นาที)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -805,8 +900,15 @@ export default function TeacherScannerClient({
           </div>
         ) : (
           (() => {
-            const timeStatus = scanType === "class" && selectedSubject ? getSubjectTimeStatus(selectedSubject) : null;
-            const isBlockedByTime = scanType === "class" && timeStatus ? !timeStatus.isAllowed : false;
+            const classTimeStatus = scanType === "class" && selectedSubject ? getSubjectTimeStatus(selectedSubject) : null;
+            const assemblyTimeStatus = scanType === "assembly" ? getAssemblyTimeStatus() : null;
+            const isBlockedByTime = scanType === "class"
+              ? (classTimeStatus ? !classTimeStatus.isAllowed : false)
+              : (assemblyTimeStatus ? !assemblyTimeStatus.isAllowed : false);
+
+            const blockedMessage = scanType === "class"
+              ? "⛔ ไม่อยู่ในช่วงเวลาเรียน (สร้างคลาสสอนชดเชยเพื่อเปิดสแกน)"
+              : "⛔ ไม่อยู่ในช่วงเวลาเข้าแถวหน้าเสาธง (เปิดสแกน 07:10 - 08:30 น.)";
 
             return (
               <button
@@ -818,7 +920,7 @@ export default function TeacherScannerClient({
                 {students.length === 0 
                   ? "ยังไม่มีฐานข้อมูลหน้านักเรียน" 
                   : isBlockedByTime
-                    ? "⛔ ไม่อยู่ในช่วงเวลาเรียน (สร้างคลาสสอนชดเชยเพื่อเปิดสแกน)"
+                    ? blockedMessage
                     : (!modelsLoaded ? "กำลังโหลดโมเดล AI..." : "เริ่มเช็คชื่อกล้อง AI")
                 }
               </button>
@@ -919,13 +1021,23 @@ export default function TeacherScannerClient({
               </div>
             </div>
 
-            <button
-              onClick={handleManualAdd}
-              disabled={!manualStudentId || (scanType === "class" && !selectedSubject)}
-              className="px-5 py-2 bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 rounded-md font-medium transition disabled:opacity-50 shadow-sm shrink-0 h-[38px] flex items-center"
-            >
-              บันทึกเข้าเรียน
-            </button>
+            {(() => {
+              const classTimeStatus = scanType === "class" && selectedSubject ? getSubjectTimeStatus(selectedSubject) : null;
+              const assemblyTimeStatus = scanType === "assembly" ? getAssemblyTimeStatus() : null;
+              const isManualTimeBlocked = scanType === "class"
+                ? (classTimeStatus ? !classTimeStatus.isAllowed : false)
+                : (assemblyTimeStatus ? !assemblyTimeStatus.isAllowed : false);
+
+              return (
+                <button
+                  onClick={handleManualAdd}
+                  disabled={!manualStudentId || (scanType === "class" && !selectedSubject) || isManualTimeBlocked}
+                  className="px-5 py-2 bg-indigo-600 text-white hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 rounded-md font-medium transition disabled:opacity-50 shadow-sm shrink-0 h-[38px] flex items-center"
+                >
+                  {scanType === "class" ? "บันทึกเข้าเรียน" : "บันทึกเข้าแถว"}
+                </button>
+              );
+            })()}
           </div>
         </div>
 
