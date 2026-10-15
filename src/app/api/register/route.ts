@@ -44,13 +44,18 @@ export async function POST(request: Request) {
         where: { name: name.trim(), role: "STUDENT", deletedAt: null, NOT: { username } }
       });
       if (existingName) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `ชื่อ-นามสกุล "${name}" มีอยู่ในระบบแล้ว (รหัสประจำตัว ${existingName.username}) หากท่านเป็นเจ้าของบัญชีเดิมกรุณาเข้าสู่ระบบ หรือติดต่ออาจารย์ที่ปรึกษา`
-          },
-          { status: 409 }
-        );
+        // หากไม่ได้กรอกเลขบัตร ปชช. หรือมีเลขบัตรตรงกับคนเดิม ให้ปฏิเสธเพื่อป้องกันบัญชีทับซ้อน
+        const cleanNatId = nationalId?.trim();
+        if (!cleanNatId || (existingName.nationalId && existingName.nationalId === cleanNatId)) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: `ชื่อ-นามสกุล "${name}" มีอยู่ในระบบแล้ว (รหัสประจำตัว ${existingName.username}) หากท่านเป็นเจ้าของบัญชีเดิมกรุณาเข้าสู่ระบบ หรือหากเป็นบุคคลคนละท่านที่ชื่อ-สกุลพ้องกัน กรุณากรอกเลขประจำตัวประชาชน 13 หลักเพื่อยืนยันสิทธิ์`
+            },
+            { status: 409 }
+          );
+        }
+        // หากเลขบัตร ปชช. ต่างกัน ชี้ชัดว่าเป็นคนละบุคคลกันตามกฎหมาย อนุญาตให้สมัครได้ตามปกติ
       }
     }
 

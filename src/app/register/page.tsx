@@ -657,10 +657,10 @@ export default function RegisterPage() {
                     />
                     <div>
                       <span className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                        <User className="w-4 h-4 text-primary" /> ฉันมีพี่น้องฝาแฝดแท้ที่ศึกษาในแผนกวิชานี้ (Identical Twin)
+                        <User className="w-4 h-4 text-primary" /> ฉันมีพี่น้องฝาแฝดที่ศึกษาในแผนกวิชานี้ (แฝดแท้ หรือ แฝดเทียม)
                       </span>
                       <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                        ทำเครื่องหมายนี้เพื่อป้องกันระบบ AI ตรวจพบใบหน้าคล้ายกัน และระบบจะส่งข้อมูลให้อาจารย์ที่ปรึกษาช่วยรับรองสถานะเพิ่มเติม
+                        ทำเครื่องหมายนี้เพื่อป้องกันระบบ AI ตรวจพบใบหน้าหรือประวัติใกล้เคียงกัน โดยระบบจะใช้เลขบัตรประชาชน 13 หลักในการแยกแยะบุคคล และส่งข้อมูลให้อาจารย์ช่วยรับรอง
                       </p>
                     </div>
                   </label>
