@@ -16,7 +16,7 @@ export default async function HeadDashboard() {
 
   const subjects = await prisma.subject.findMany({ include: { teacher: true }, orderBy: { code: 'asc' } });
   const schedules = await prisma.schedule.findMany({ 
-    include: { subject: true }, 
+    include: { subject: { include: { teacher: true } } }, 
     orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] 
   });
   const rawUsers = await prisma.user.findMany({ 

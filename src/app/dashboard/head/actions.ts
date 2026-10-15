@@ -88,20 +88,28 @@ export async function createSchedule(data: { subjectId: string; dayOfWeek: numbe
     if (!sc.subject || sc.subject.deletedAt) continue;
 
     if (isOverlapping(data.startTime, data.endTime, sc.startTime, sc.endTime)) {
-      // 1. วิชาเดียวกัน
+      // 1. วิชาเดียวกัน (แถวเดียวกันใน DB)
       if (sc.subjectId === data.subjectId) {
-        throw new Error(`TIME_COLLISION: วิชานี้ (${currentSubject.name}) มีตารางเรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับ ${data.startTime}–${data.endTime} กรุณาเลือกเวลาอื่น`);
+        const grp = currentSubject.group ? ` [กลุ่ม ${currentSubject.group}]` : "";
+        throw new Error(`TIME_COLLISION: วิชานี้ (${currentSubject.name}${grp}) มีตารางเรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับ ${data.startTime}–${data.endTime} กรุณาเลือกเวลาอื่น`);
       }
 
-      // 2. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง)
-      if (currentSubject.room && currentSubject.room.trim() !== "" && currentSubject.room !== "-" && sc.subject.room === currentSubject.room) {
-        throw new Error(`TIME_COLLISION: ห้องเรียน "${currentSubject.room}" มีวิชา "${sc.subject.name}" (${sc.subject.code}) ใช้เรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนห้องหรือเวลา`);
+      // 2. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง และไม่ใช่ห้องเรียนรวม/สนาม/ลาน/ออนไลน์)
+      const currentRoom = currentSubject.room?.trim() || "";
+      const existingRoom = sc.subject.room?.trim() || "";
+      const isExemptRoom = (r: string) => !r || r === "-" || r.includes("รวม") || r.includes("สนาม") || r.includes("ลาน") || r.includes("ออนไลน์");
+
+      if (currentRoom && existingRoom && currentRoom === existingRoom && !isExemptRoom(currentRoom)) {
+        const scTeacher = sc.subject.teacher?.name ? ` (อ.${sc.subject.teacher.name})` : "";
+        const scGroup = sc.subject.group ? ` [กลุ่ม ${sc.subject.group}]` : "";
+        throw new Error(`TIME_COLLISION: ห้องเรียน "${currentRoom}" มีวิชา "${sc.subject.name}"${scGroup}${scTeacher} ใช้เรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาระบุห้องเรียนคนละห้อง (เช่น แยกห้อง 201, 202) หรือเปลี่ยนเวลาเรียน`);
       }
 
       // 3. อาจารย์ผู้สอนคนเดียวกัน (ถ้ามีการระบุอาจารย์)
       if (currentSubject.teacherId && sc.subject.teacherId === currentSubject.teacherId) {
         const teacherName = currentSubject.teacher?.name || "อาจารย์ผู้สอน";
-        throw new Error(`TIME_COLLISION: ${teacherName} มีคาบสอนวิชา "${sc.subject.name}" ในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนเวลา`);
+        const scGroup = sc.subject.group ? ` [กลุ่ม ${sc.subject.group}]` : "";
+        throw new Error(`TIME_COLLISION: ${teacherName} มีคาบสอนวิชา "${sc.subject.name}"${scGroup} ในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนเวลา`);
       }
     }
   }
@@ -135,18 +143,26 @@ export async function updateSchedule(id: string, data: { subjectId: string; dayO
     if (isOverlapping(data.startTime, data.endTime, sc.startTime, sc.endTime)) {
       // 1. วิชาเดียวกัน
       if (sc.subjectId === data.subjectId) {
-        throw new Error(`TIME_COLLISION: วิชานี้ (${currentSubject.name}) มีตารางเรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับ ${data.startTime}–${data.endTime} กรุณาเลือกเวลาอื่น`);
+        const grp = currentSubject.group ? ` [กลุ่ม ${currentSubject.group}]` : "";
+        throw new Error(`TIME_COLLISION: วิชานี้ (${currentSubject.name}${grp}) มีตารางเรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับ ${data.startTime}–${data.endTime} กรุณาเลือกเวลาอื่น`);
       }
 
-      // 2. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง)
-      if (currentSubject.room && currentSubject.room.trim() !== "" && currentSubject.room !== "-" && sc.subject.room === currentSubject.room) {
-        throw new Error(`TIME_COLLISION: ห้องเรียน "${currentSubject.room}" มีวิชา "${sc.subject.name}" (${sc.subject.code}) ใช้เรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนห้องหรือเวลา`);
+      // 2. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง และไม่ใช่ห้องเรียนรวม/สนาม/ลาน/ออนไลน์)
+      const currentRoom = currentSubject.room?.trim() || "";
+      const existingRoom = sc.subject.room?.trim() || "";
+      const isExemptRoom = (r: string) => !r || r === "-" || r.includes("รวม") || r.includes("สนาม") || r.includes("ลาน") || r.includes("ออนไลน์");
+
+      if (currentRoom && existingRoom && currentRoom === existingRoom && !isExemptRoom(currentRoom)) {
+        const scTeacher = sc.subject.teacher?.name ? ` (อ.${sc.subject.teacher.name})` : "";
+        const scGroup = sc.subject.group ? ` [กลุ่ม ${sc.subject.group}]` : "";
+        throw new Error(`TIME_COLLISION: ห้องเรียน "${currentRoom}" มีวิชา "${sc.subject.name}"${scGroup}${scTeacher} ใช้เรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาระบุห้องเรียนคนละห้อง (เช่น แยกห้อง 201, 202) หรือเปลี่ยนเวลาเรียน`);
       }
 
       // 3. อาจารย์ผู้สอนคนเดียวกัน (ถ้ามีการระบุอาจารย์)
       if (currentSubject.teacherId && sc.subject.teacherId === currentSubject.teacherId) {
         const teacherName = currentSubject.teacher?.name || "อาจารย์ผู้สอน";
-        throw new Error(`TIME_COLLISION: ${teacherName} มีคาบสอนวิชา "${sc.subject.name}" ในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนเวลา`);
+        const scGroup = sc.subject.group ? ` [กลุ่ม ${sc.subject.group}]` : "";
+        throw new Error(`TIME_COLLISION: ${teacherName} มีคาบสอนวิชา "${sc.subject.name}"${scGroup} ในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาเปลี่ยนเวลา`);
       }
     }
   }

@@ -44,6 +44,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
   // ---------- Schedules State ----------
   const [schedFilterLevel, setSchedFilterLevel] = useState("ปวช.1");
+  const [schedFilterGroup, setSchedFilterGroup] = useState("ทั้งหมด");
   const [schedId, setSchedId] = useState("");
   const [schedSubjId, setSchedSubjId] = useState("");
   const [schedDay, setSchedDay] = useState("1");
@@ -305,7 +306,14 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const trashedUsers = users.filter(u => !!u.deletedAt);
 
   const displaySubjects = filterLevel === "ทั้งหมด" ? activeSubjects : activeSubjects.filter(s => s.level === filterLevel);
-  const displaySchedules = schedFilterLevel === "ทั้งหมด" ? activeSchedules : activeSchedules.filter(sc => (sc.subject?.level || "ไม่ระบุ") === schedFilterLevel);
+  const displaySchedules = activeSchedules.filter(sc => {
+    if (schedFilterLevel !== "ทั้งหมด" && (sc.subject?.level || "ไม่ระบุ") !== schedFilterLevel) return false;
+    if (schedFilterGroup !== "ทั้งหมด") {
+      const grp = sc.subject?.group || "";
+      if (grp !== schedFilterGroup && !grp.includes(schedFilterGroup)) return false;
+    }
+    return true;
+  });
   const displayUsers = activeUsers.filter(u => {
     if (filterUserRole !== "ทั้งหมด" && u.role !== filterUserRole) return false;
     // Bug #12 fix: กรอง level ได้เสมอ ไม่ต้องกำหนดว่าต้องเลือก role=STUDENT ก่อน
@@ -753,12 +761,22 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-300">จัดการตารางเรียนแยกตามชั้นปี</h3>
                 <p className="text-sm text-indigo-700 dark:text-indigo-400">เลือกชั้นปีเพื่อดูและเพิ่มตารางเรียน</p>
               </div>
-              <div className="flex items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">ชั้นปี:</span>
-                <select value={schedFilterLevel} onChange={e => setSchedFilterLevel(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium outline-none">
-                  {levelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
-                  <option value="ทั้งหมด">แสดงทั้งหมด</option>
-                </select>
+              <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">ชั้นปี:</span>
+                  <select value={schedFilterLevel} onChange={e => setSchedFilterLevel(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium outline-none">
+                    {levelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
+                    <option value="ทั้งหมด">แสดงทั้งหมด</option>
+                  </select>
+                </div>
+                <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">กลุ่มเรียน:</span>
+                  <select value={schedFilterGroup} onChange={e => setSchedFilterGroup(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium outline-none">
+                    <option value="ทั้งหมด">ทุกกลุ่มเรียน</option>
+                    {groupOptions.map(g => <option key={g} value={g}>กลุ่ม {g}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -766,7 +784,10 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               <h3 className="text-md font-bold mb-4 dark:text-white">{schedId ? "แก้ไขวิชาเรียนในตาราง" : "เพิ่มวิชาเรียนลงตาราง"}</h3>
               <form onSubmit={handleSaveSchedule} className="flex gap-4 items-end flex-wrap">
                 <div className="flex-1 min-w-[250px] relative">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">วิชา {schedFilterLevel !== "ทั้งหมด" ? `(เฉพาะ ${schedFilterLevel})` : ""}</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    วิชา {schedFilterLevel !== "ทั้งหมด" ? `(เฉพาะ ${schedFilterLevel}` : "("}
+                    {schedFilterGroup !== "ทั้งหมด" ? ` | กลุ่ม ${schedFilterGroup})` : (schedFilterLevel !== "ทั้งหมด" ? ")" : "ทั้งหมด)")}
+                  </label>
                   
                   {isSchedDropdownOpen && (
                     <div className="fixed inset-0 z-40" onClick={() => setIsSchedDropdownOpen(false)}></div>
@@ -777,22 +798,28 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                       onClick={() => setIsSchedDropdownOpen(!isSchedDropdownOpen)}
                       className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isSchedDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
                     >
-                      <span className={`${schedSubjId ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}`}>
+                      <span className={`${schedSubjId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'}`}>
                         {schedSubjId 
-                          ? (() => { const s = subjects.find(x => x.id === schedSubjId); return s ? `${s.code} ${s.name}` : "-- เลือกวิชา --"; })()
+                          ? (() => {
+                              const s = subjects.find(x => x.id === schedSubjId);
+                              if (!s) return "-- เลือกวิชา --";
+                              const groupBadge = s.group ? ` [กลุ่ม ${s.group}]` : "";
+                              const teacherPart = s.teacher?.name ? ` (อ.${s.teacher.name}${s.room ? ` | ห้อง ${s.room}` : ""})` : (s.room ? ` (ห้อง ${s.room})` : "");
+                              return `${s.code} ${s.name}${groupBadge}${teacherPart}`;
+                            })()
                           : "-- เลือกวิชา --"}
                       </span>
                       <svg className={`w-4 h-4 text-gray-400 transition-transform ${isSchedDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                     </div>
 
                     {isSchedDropdownOpen && (
-                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
+                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-64 overflow-y-auto z-50">
                         <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
                           <input
                             type="text"
                             value={schedSearchQuery}
                             onChange={e => setSchedSearchQuery(e.target.value)}
-                            placeholder="ค้นหารหัส หรือชื่อวิชา..."
+                            placeholder="ค้นหารหัส, ชื่อวิชา, กลุ่ม, อาจารย์ หรือห้อง..."
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
                             autoFocus
                           />
@@ -807,9 +834,19 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                           {(schedFilterLevel === "ทั้งหมด" ? levelsOptions : [schedFilterLevel]).map(level => {
                             const levelSubjects = subjects.filter(s => {
                                if ((s.level || "ไม่ระบุ") !== level) return false;
+                               if (schedFilterGroup !== "ทั้งหมด") {
+                                 const grp = s.group || "";
+                                 if (grp !== schedFilterGroup && !grp.includes(schedFilterGroup)) return false;
+                               }
                                if (!schedSearchQuery) return true;
                                const q = schedSearchQuery.toLowerCase();
-                               return s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q);
+                               return (
+                                 s.code.toLowerCase().includes(q) || 
+                                 s.name.toLowerCase().includes(q) ||
+                                 (s.group && s.group.toLowerCase().includes(q)) ||
+                                 (s.teacher?.name && s.teacher.name.toLowerCase().includes(q)) ||
+                                 (s.room && s.room.toLowerCase().includes(q))
+                                );
                             });
                             if (levelSubjects.length === 0) return null;
 
@@ -835,8 +872,18 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                                     onClick={() => { setSchedSubjId(s.id); setIsSchedDropdownOpen(false); setSchedSearchQuery(""); }}
                                     className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${schedSubjId === s.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
                                   >
-                                    <span className="font-semibold text-gray-900 dark:text-gray-100 mr-2">{s.code}</span>
-                                    <span>{s.name}</span>
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="font-semibold text-gray-900 dark:text-gray-100">{s.code}</span>
+                                        <span className="text-gray-800 dark:text-gray-200 font-medium">{s.name}</span>
+                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                                          กลุ่ม {s.group || "-"}
+                                        </span>
+                                      </div>
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                                        {s.teacher?.name ? `อ.${s.teacher.name}` : "ไม่ระบุผู้สอน"} {s.room ? `| ห้อง ${s.room}` : ""}
+                                      </span>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -939,9 +986,11 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                               <div className="font-bold text-[13px] text-gray-900 dark:text-white mb-1 leading-tight">
                                 {sc.subject?.name}
                               </div>
-                              <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 flex gap-2">
+                              <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5 flex-wrap">
                                 <span>รหัส: {sc.subject?.code}</span>
-                                <span>กลุ่ม: {sc.subject?.group || "-"}</span>
+                                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                                  กลุ่ม {sc.subject?.group || "-"}
+                                </span>
                               </div>
                               <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900/40 w-fit px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800">
                                 <svg className="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -953,9 +1002,14 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                                     {sc.subject?.level || "-"}
                                   </div>
                                 )}
-                                  <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm inline-block w-fit ${sc.subject?.room ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
-                                    🏫 ห้อง: {sc.subject?.room || "-"}
+                                <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm inline-block w-fit ${sc.subject?.room ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
+                                  🏫 ห้อง: {sc.subject?.room || "-"}
+                                </div>
+                                {sc.subject?.teacher && (
+                                  <div className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm inline-block w-fit bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                                    👨‍🏫 อ.{sc.subject.teacher.name}
                                   </div>
+                                )}
                               </div>
                               
                               {/* Hover actions */}
@@ -991,8 +1045,17 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         {daySchedules.map(sc => (
                           <div key={sc.id} className="p-2.5 flex justify-between items-center bg-white dark:bg-gray-800 rounded-lg border border-orange-100 dark:border-orange-800/50 shadow-sm">
                             <div>
-                               <div className="font-bold text-sm text-orange-800 dark:text-orange-300 mb-1">{sc.subject?.name}</div>
-                               <div className="text-[11px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded w-fit">{sc.startTime} - {sc.endTime}</div>
+                               <div className="font-bold text-sm text-orange-800 dark:text-orange-300 mb-1 flex items-center gap-1.5 flex-wrap">
+                                 <span>{sc.subject?.name}</span>
+                                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                                   กลุ่ม {sc.subject?.group || "-"}
+                                 </span>
+                               </div>
+                               <div className="flex items-center gap-2 flex-wrap">
+                                 <div className="text-[11px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded w-fit">{sc.startTime} - {sc.endTime}</div>
+                                 {sc.subject?.teacher && <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">👨‍🏫 อ.{sc.subject.teacher.name}</span>}
+                                 {sc.subject?.room && <span className="text-xs text-blue-700 dark:text-blue-300">🏫 ห้อง {sc.subject.room}</span>}
+                               </div>
                             </div>
                             <div className="flex bg-gray-100 dark:bg-gray-700 rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
                                 <button disabled={isLoading} onClick={() => handleEditSchedule(sc)} className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-xs px-2 py-1 font-semibold transition border-r border-gray-200 dark:border-gray-600">แก้ไข</button>
