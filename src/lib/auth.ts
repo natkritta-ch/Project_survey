@@ -50,7 +50,17 @@ export const authOptions: NextAuthOptions = {
         }
 
         const user = await prisma.user.findUnique({
-          where: { username: credentials.username, deletedAt: null }
+          where: { username: credentials.username, deletedAt: null },
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            password: true,
+            role: true,
+            twoFactorSecret: true,
+            isTwoFactorEnabled: true,
+            deletedAt: true
+          }
         });
 
         console.log("DB User Found:", user ? user.username : "None");
