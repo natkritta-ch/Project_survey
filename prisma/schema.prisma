@@ -36,6 +36,32 @@ model grade {
   @@index([subjectId], map: "Grade_subjectId_fkey")
 }
 
+model gradeSubmission {
+  id            String    @id @default(cuid())
+  studentId     String
+  academicYear  String    @default("2569")
+  term          String    @default("1")
+  pdfPath       String?   @db.Text
+  fileData      String?   @db.LongText
+  fileName      String?
+  gpa           Float?
+  gpax          Float?
+  totalCredits  Float?
+  extractedData String?   @db.LongText
+  status        String    @default("SUBMITTED") // SUBMITTED, APPROVED, REJECTED
+  rejectReason  String?   @db.Text
+  approvedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  student       user      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, academicYear, term])
+  @@index([studentId])
+  @@map("grade_submission")
+}
+
 model schedule {
   id        String    @id @default(cuid())
   subjectId String
@@ -124,6 +150,7 @@ model user {
   attendances        attendance[]
   grades             grade[]
   subjects           subject[]
+  gradeSubmissions   gradeSubmission[]
   student            user?        @relation("userTouser", fields: [studentId], references: [id], map: "User_studentId_fkey")
   students           user[]       @relation("userTouser")
 

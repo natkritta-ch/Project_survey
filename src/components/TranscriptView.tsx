@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { GraduationCap, Award, BookOpen, Printer } from "lucide-react";
+import { GraduationCap, Award, BookOpen, Printer, ShieldCheck } from "lucide-react";
 
 export default function TranscriptView({ grades, showPrintButton = false }: { grades: any[], showPrintButton?: boolean }) {
   const { termsData, gpax, totalCredits } = useMemo(() => {
@@ -102,6 +102,17 @@ export default function TranscriptView({ grades, showPrintButton = false }: { gr
               <p className="text-2xl font-bold print:text-black">{grades.length}</p>
             </div>
           </div>
+        </div>
+
+        {/* Verified Badge Bar */}
+        <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs text-indigo-100 print:text-gray-600">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-300" />
+            <span>ผ่านการตรวจสอบความถูกต้องจากเอกสารรายงานผลการศึกษาฉบับจริง (ศธ.02 / RMS)</span>
+          </div>
+          <span className="hidden sm:inline bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-2 py-0.5 rounded-full text-[11px] font-medium">
+            Verified Digital Transcript
+          </span>
         </div>
       </div>
 

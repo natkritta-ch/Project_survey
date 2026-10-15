@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown } from "lucide-react";
+import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm, showPromptNumber } from "@/lib/alerts";
 
@@ -267,7 +267,7 @@ export default function TeacherDashboardClient({
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Link href="/dashboard/teacher/scan?type=assembly" className="bg-gradient-to-br from-blue-600 to-indigo-700 p-6 rounded-2xl shadow-md text-white flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1">
                 <div className="bg-white/20 p-3 rounded-full mb-3">
                   <Camera className="w-8 h-8" />
@@ -276,6 +276,14 @@ export default function TeacherDashboardClient({
                 <p className="text-blue-100 text-sm text-center">เช็คชื่อกิจกรรมหน้าเสาธงตอนเช้า</p>
               </Link>
               
+              <Link href="/dashboard/teacher/grades" className="bg-gradient-to-br from-purple-600 to-indigo-800 p-6 rounded-2xl shadow-md text-white flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-all hover:-translate-y-1">
+                <div className="bg-white/20 p-3 rounded-full mb-3">
+                  <FileCheck className="w-8 h-8" />
+                </div>
+                <h3 className="font-bold text-xl mb-1">ตรวจใบเกรด (PDF)</h3>
+                <p className="text-purple-100 text-sm text-center">ตรวจและอนุมัติเกรด ศธ.02 แบบ Split-Screen</p>
+              </Link>
+
               <Link href="/dashboard/teacher/report" className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md transition-all flex items-center group">
                 <div className="flex-1">
                   <h3 className="font-bold text-xl mb-1 text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">ประวัติรายงานและการขาดเรียน</h3>
