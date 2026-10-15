@@ -53,6 +53,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [selectedSchedules, setSelectedSchedules] = useState<string[]>([]);
   const [isSchedDropdownOpen, setIsSchedDropdownOpen] = useState(false);
   const [schedSearchQuery, setSchedSearchQuery] = useState("");
+  const [isEditScheduleModalOpen, setIsEditScheduleModalOpen] = useState(false);
 
   // ---------- Users State ----------
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -187,10 +188,12 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
   const handleEditSchedule = (sc: any) => {
     setSchedId(sc.id); setSchedSubjId(sc.subjectId); setSchedDay(sc.dayOfWeek.toString()); setSchedStart(sc.startTime); setSchedEnd(sc.endTime);
+    setIsEditScheduleModalOpen(true);
   };
 
   const resetScheduleForm = () => {
     setSchedId(""); setSchedSubjId(""); setSchedDay("1"); setSchedStart("08:00"); setSchedEnd("10:00");
+    setIsEditScheduleModalOpen(false);
   };
 
   // ================= USER HANDLERS =================
@@ -781,7 +784,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
-              <h3 className="text-md font-bold mb-4 dark:text-white">{schedId ? "แก้ไขวิชาเรียนในตาราง" : "เพิ่มวิชาเรียนลงตาราง"}</h3>
+              <h3 className="text-md font-bold mb-4 dark:text-white">เพิ่มวิชาเรียนลงตาราง</h3>
               <form onSubmit={handleSaveSchedule} className="flex gap-4 items-end flex-wrap">
                 <div className="flex-1 min-w-[250px] relative">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1898,6 +1901,178 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </button>
                 <button disabled={isLoading} type="submit" className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50">
                   บันทึกการแก้ไข
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= Edit Schedule Modal ================= */}
+      {isEditScheduleModalOpen && schedId && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 flex flex-col rounded-2xl shadow-2xl max-w-lg w-full animate-in fade-in zoom-in-95 duration-200 overflow-hidden border border-gray-100 dark:border-gray-700">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-indigo-50/50 to-white dark:from-gray-800 dark:to-gray-800 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-lg">
+                  📅
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">แก้ไขคาบเรียนในตาราง</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">ปรับเปลี่ยนวัน เวลา หรือรายวิชาในตารางเรียน</p>
+                </div>
+              </div>
+              <button 
+                onClick={resetScheduleForm} 
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-full transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSaveSchedule} className="p-6 space-y-5">
+              {/* Subject Selection */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  รายวิชา <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={schedSubjId}
+                  onChange={e => setSchedSubjId(e.target.value)}
+                  required
+                  className="block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3.5 py-2.5 border bg-white dark:bg-gray-700 dark:text-white font-medium outline-none"
+                >
+                  <option value="">-- เลือกวิชา --</option>
+                  {subjects.filter(s => !s.deletedAt).map(s => {
+                    const grp = s.group ? ` [กลุ่ม ${s.group}]` : "";
+                    const teacher = s.teacher?.name ? ` (อ.${s.teacher.name})` : "";
+                    const room = s.room ? ` ห้อง ${s.room}` : "";
+                    return (
+                      <option key={s.id} value={s.id}>
+                        {s.code} {s.name}{grp}{teacher}{room}
+                      </option>
+                    );
+                  })}
+                </select>
+                {/* Subject Quick Preview Card */}
+                {(() => {
+                  const s = subjects.find(x => x.id === schedSubjId);
+                  if (!s) return null;
+                  return (
+                    <div className="mt-2.5 p-3 rounded-lg bg-indigo-50/60 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/40 text-xs flex flex-wrap gap-x-4 gap-y-1.5 text-indigo-900 dark:text-indigo-200">
+                      <div><span className="font-semibold text-gray-600 dark:text-gray-400">ชั้นปี:</span> {s.level || "-"}</div>
+                      <div><span className="font-semibold text-gray-600 dark:text-gray-400">กลุ่ม:</span> <span className="font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/40 px-1 rounded">กลุ่ม {s.group || "-"}</span></div>
+                      <div><span className="font-semibold text-gray-600 dark:text-gray-400">ผู้สอน:</span> {s.teacher?.name ? `อ.${s.teacher.name}` : "-"}</div>
+                      <div><span className="font-semibold text-gray-600 dark:text-gray-400">ห้อง:</span> {s.room || "-"}</div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Day of Week */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  วันที่เรียน <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-5 sm:grid-cols-7 gap-1.5">
+                  {Object.entries(daysMap).map(([k, v]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => setSchedDay(k)}
+                      className={`py-2 px-1 text-xs font-bold rounded-lg border transition text-center ${
+                        schedDay === k
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200 dark:ring-indigo-900'
+                          : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Time Range */}
+              <div className="grid grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">เวลาเริ่ม</label>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={schedStart ? schedStart.split(':')[0] : '08'}
+                      onChange={e => setSchedStart(`${e.target.value}:${schedStart ? schedStart.split(':')[1] || '00' : '00'}`)}
+                      className="block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2.5 py-2 border bg-white dark:bg-gray-700 dark:text-white font-medium outline-none text-center"
+                    >
+                      {Array.from({length: 24}).map((_, i) => {
+                        const v = i.toString().padStart(2, '0');
+                        return <option key={v} value={v}>{v}</option>;
+                      })}
+                    </select>
+                    <span className="font-bold text-gray-400">:</span>
+                    <select
+                      value={schedStart ? schedStart.split(':')[1] : '00'}
+                      onChange={e => setSchedStart(`${schedStart ? schedStart.split(':')[0] || '08' : '08'}:${e.target.value}`)}
+                      className="block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2.5 py-2 border bg-white dark:bg-gray-700 dark:text-white font-medium outline-none text-center"
+                    >
+                      {Array.from({length: 60}).map((_, i) => {
+                        const v = i.toString().padStart(2, '0');
+                        return <option key={v} value={v}>{v}</option>;
+                      })}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">เวลาสิ้นสุด</label>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={schedEnd ? schedEnd.split(':')[0] : '10'}
+                      onChange={e => setSchedEnd(`${e.target.value}:${schedEnd ? schedEnd.split(':')[1] || '00' : '00'}`)}
+                      className="block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2.5 py-2 border bg-white dark:bg-gray-700 dark:text-white font-medium outline-none text-center"
+                    >
+                      {Array.from({length: 24}).map((_, i) => {
+                        const v = i.toString().padStart(2, '0');
+                        return <option key={v} value={v}>{v}</option>;
+                      })}
+                    </select>
+                    <span className="font-bold text-gray-400">:</span>
+                    <select
+                      value={schedEnd ? schedEnd.split(':')[1] : '00'}
+                      onChange={e => setSchedEnd(`${schedEnd ? schedEnd.split(':')[0] || '10' : '10'}:${e.target.value}`)}
+                      className="block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2.5 py-2 border bg-white dark:bg-gray-700 dark:text-white font-medium outline-none text-center"
+                    >
+                      {Array.from({length: 60}).map((_, i) => {
+                        const v = i.toString().padStart(2, '0');
+                        return <option key={v} value={v}>{v}</option>;
+                      })}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={resetScheduleForm}
+                  className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isLoading ? (
+                    <span>กำลังบันทึก...</span>
+                  ) : (
+                    <>
+                      <span>✓</span>
+                      <span>บันทึกการแก้ไข</span>
+                    </>
+                  )}
                 </button>
               </div>
             </form>

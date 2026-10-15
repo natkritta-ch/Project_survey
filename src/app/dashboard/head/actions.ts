@@ -58,6 +58,24 @@ function timeToMinutes(t: string): number {
   return h * 60 + m;
 }
 
+// Helper: ตรวจสอบว่า 2 กลุ่มเรียนมีนักเรียนกลุ่มเดียวกันหรือไม่ (เช่น ก.1,2 ชนกับ ก.1)
+function doGroupsOverlap(g1?: string | null, g2?: string | null): boolean {
+  const a = (g1 || "").trim();
+  const b = (g2 || "").trim();
+  if (!a || !b) return true; // ถ้าไม่ระบุ ถือว่าเรียนรวมทุกกลุ่ม
+  if (a === b) return true; // กลุ่มเดียวกันเป๊ะ เช่น ก.1 กับ ก.1
+
+  const extractTokens = (s: string) => {
+    const nums = s.match(/\d+/g);
+    if (nums && nums.length > 0) return nums;
+    return [s.toLowerCase()];
+  };
+
+  const partsA = extractTokens(a);
+  const partsB = extractTokens(b);
+  return partsA.some(x => partsB.includes(x));
+}
+
 // Helper: ตรวจว่าช่วงเวลา 2 คู่ซ้อนทับกันหรือไม่
 function isOverlapping(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
   const aS = timeToMinutes(aStart), aE = timeToMinutes(aEnd);
@@ -94,7 +112,18 @@ export async function createSchedule(data: { subjectId: string; dayOfWeek: numbe
         throw new Error(`TIME_COLLISION: วิชานี้ (${currentSubject.name}${grp}) มีตารางเรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับ ${data.startTime}–${data.endTime} กรุณาเลือกเวลาอื่น`);
       }
 
-      // 2. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง และไม่ใช่ห้องเรียนรวม/สนาม/ลาน/ออนไลน์)
+      // 2. นักเรียนชั้นปีและกลุ่มเรียนเดียวกัน (ห้ามมีเรียนซ้อนกัน เช่น เรียนอังกฤษอยู่ จะลงคณิตเวลาเดียวกันไม่ได้)
+      const currentLevel = (currentSubject.level || "").trim();
+      const existingLevel = (sc.subject.level || "").trim();
+      const sameLevel = (!currentLevel && !existingLevel) || currentLevel === existingLevel;
+
+      if (sameLevel && doGroupsOverlap(currentSubject.group, sc.subject.group)) {
+        const scGroup = sc.subject.group ? ` [กลุ่ม ${sc.subject.group}]` : "";
+        const levelDisplay = currentSubject.level && currentSubject.level !== "-" ? `ชั้น ${currentSubject.level}` : "";
+        throw new Error(`TIME_COLLISION: นักเรียน${levelDisplay}${scGroup} มีตารางเรียนวิชา "${sc.subject.name}" (${sc.subject.code}) ในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก (${data.startTime}–${data.endTime}) นักเรียนไม่สามารถเรียน 2 วิชาพร้อมกันได้ กรุณาเลือกเวลาอื่น`);
+      }
+
+      // 3. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง และไม่ใช่ห้องเรียนรวม/สนาม/ลาน/ออนไลน์)
       const currentRoom = currentSubject.room?.trim() || "";
       const existingRoom = sc.subject.room?.trim() || "";
       const isExemptRoom = (r: string) => !r || r === "-" || r.includes("รวม") || r.includes("สนาม") || r.includes("ลาน") || r.includes("ออนไลน์");
@@ -105,7 +134,7 @@ export async function createSchedule(data: { subjectId: string; dayOfWeek: numbe
         throw new Error(`TIME_COLLISION: ห้องเรียน "${currentRoom}" มีวิชา "${sc.subject.name}"${scGroup}${scTeacher} ใช้เรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาระบุห้องเรียนคนละห้อง (เช่น แยกห้อง 201, 202) หรือเปลี่ยนเวลาเรียน`);
       }
 
-      // 3. อาจารย์ผู้สอนคนเดียวกัน (ถ้ามีการระบุอาจารย์)
+      // 4. อาจารย์ผู้สอนคนเดียวกัน (ถ้ามีการระบุอาจารย์)
       if (currentSubject.teacherId && sc.subject.teacherId === currentSubject.teacherId) {
         const teacherName = currentSubject.teacher?.name || "อาจารย์ผู้สอน";
         const scGroup = sc.subject.group ? ` [กลุ่ม ${sc.subject.group}]` : "";
@@ -141,13 +170,24 @@ export async function updateSchedule(id: string, data: { subjectId: string; dayO
     if (!sc.subject || sc.subject.deletedAt) continue;
 
     if (isOverlapping(data.startTime, data.endTime, sc.startTime, sc.endTime)) {
-      // 1. วิชาเดียวกัน
+      // 1. วิชาเดียวกัน (แถวเดียวกันใน DB)
       if (sc.subjectId === data.subjectId) {
         const grp = currentSubject.group ? ` [กลุ่ม ${currentSubject.group}]` : "";
         throw new Error(`TIME_COLLISION: วิชานี้ (${currentSubject.name}${grp}) มีตารางเรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับ ${data.startTime}–${data.endTime} กรุณาเลือกเวลาอื่น`);
       }
 
-      // 2. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง และไม่ใช่ห้องเรียนรวม/สนาม/ลาน/ออนไลน์)
+      // 2. นักเรียนชั้นปีและกลุ่มเรียนเดียวกัน (ห้ามมีเรียนซ้อนกัน)
+      const currentLevel = (currentSubject.level || "").trim();
+      const existingLevel = (sc.subject.level || "").trim();
+      const sameLevel = (!currentLevel && !existingLevel) || currentLevel === existingLevel;
+
+      if (sameLevel && doGroupsOverlap(currentSubject.group, sc.subject.group)) {
+        const scGroup = sc.subject.group ? ` [กลุ่ม ${sc.subject.group}]` : "";
+        const levelDisplay = currentSubject.level && currentSubject.level !== "-" ? `ชั้น ${currentSubject.level}` : "";
+        throw new Error(`TIME_COLLISION: นักเรียน${levelDisplay}${scGroup} มีตารางเรียนวิชา "${sc.subject.name}" (${sc.subject.code}) ในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก (${data.startTime}–${data.endTime}) นักเรียนไม่สามารถเรียน 2 วิชาพร้อมกันได้ กรุณาเลือกเวลาอื่น`);
+      }
+
+      // 3. ห้องเรียนเดียวกัน (ถ้ามีการระบุห้อง และไม่ใช่ห้องเรียนรวม/สนาม/ลาน/ออนไลน์)
       const currentRoom = currentSubject.room?.trim() || "";
       const existingRoom = sc.subject.room?.trim() || "";
       const isExemptRoom = (r: string) => !r || r === "-" || r.includes("รวม") || r.includes("สนาม") || r.includes("ลาน") || r.includes("ออนไลน์");
@@ -158,7 +198,7 @@ export async function updateSchedule(id: string, data: { subjectId: string; dayO
         throw new Error(`TIME_COLLISION: ห้องเรียน "${currentRoom}" มีวิชา "${sc.subject.name}"${scGroup}${scTeacher} ใช้เรียนในวันนี้ที่เวลา ${sc.startTime}–${sc.endTime} แล้ว ซึ่งชนกับเวลาที่เลือก กรุณาระบุห้องเรียนคนละห้อง (เช่น แยกห้อง 201, 202) หรือเปลี่ยนเวลาเรียน`);
       }
 
-      // 3. อาจารย์ผู้สอนคนเดียวกัน (ถ้ามีการระบุอาจารย์)
+      // 4. อาจารย์ผู้สอนคนเดียวกัน (ถ้ามีการระบุอาจารย์)
       if (currentSubject.teacherId && sc.subject.teacherId === currentSubject.teacherId) {
         const teacherName = currentSubject.teacher?.name || "อาจารย์ผู้สอน";
         const scGroup = sc.subject.group ? ` [กลุ่ม ${sc.subject.group}]` : "";
