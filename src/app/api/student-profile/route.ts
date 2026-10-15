@@ -22,6 +22,43 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const { level, faceDescriptor, profilePicture, email } = body;
 
+    // ตรวจสอบใบหน้าซ้ำกับนักเรียนคนอื่น
+    if (faceDescriptor) {
+      const { calculateEuclideanDistance, distanceToSimilarity } = await import("../../../lib/faceLiveness");
+      let incomingDesc: number[] = [];
+      try {
+        incomingDesc = typeof faceDescriptor === "string" ? JSON.parse(faceDescriptor) : faceDescriptor;
+      } catch {}
+
+      if (Array.isArray(incomingDesc) && incomingDesc.length === 128) {
+        const otherStudents = await prisma.user.findMany({
+          where: {
+            role: "STUDENT",
+            deletedAt: null,
+            faceDescriptor: { not: null },
+            id: { not: studentId }
+          },
+          select: { id: true, name: true, username: true, faceDescriptor: true, isTwin: true }
+        });
+
+        for (const other of otherStudents) {
+          try {
+            const otherDesc = JSON.parse(other.faceDescriptor!);
+            const dist = calculateEuclideanDistance(incomingDesc, otherDesc);
+            if (dist < 0.38) {
+              const simPercent = distanceToSimilarity(dist);
+              if (!student.isTwin) {
+                return NextResponse.json({
+                  success: false,
+                  message: `ใบหน้านี้มีความเหมือนกับ "${other.name}" (${simPercent}%) ระบบไม่อนุญาตให้ใช้ใบหน้าซ้ำกับผู้อื่น`
+                }, { status: 409 });
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+
     // อัปเดตเฉพาะฟิลด์ที่ส่งมา
     const updateData: any = {};
     if (level !== undefined) updateData.level = level;

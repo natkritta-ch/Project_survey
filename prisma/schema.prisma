@@ -142,6 +142,9 @@ model user {
   gender             String?
   email              String?      @unique(map: "User_email_key")
   nationalId         String?      // รหัสประจำตัวประชาชน
+  isTwin             Boolean      @default(false)
+  twinNote           String?      @db.Text
+  twinVerified       Boolean      @default(false)
   profilePicture     String?      @db.MediumText
   studentId          String?
   deletedAt          DateTime?

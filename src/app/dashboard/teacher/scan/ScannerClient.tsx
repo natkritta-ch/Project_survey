@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
-import { Camera, RefreshCcw, CheckCircle2, StopCircle, UserPlus, FlipHorizontal, Clock, AlertTriangle, CalendarPlus, X, Sparkles, Search, BookOpen, ChevronDown } from "lucide-react";
+import { Camera, RefreshCcw, CheckCircle2, StopCircle, UserPlus, FlipHorizontal, Clock, AlertTriangle, CalendarPlus, X, Sparkles, Search, BookOpen, ChevronDown, ShieldCheck, Eye, Sun } from "lucide-react";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
+import { checkFaceQuality, getAverageEAR, getHeadPoseYaw } from "@/lib/faceLiveness";
 
 export default function TeacherScannerClient({ 
   students, 
@@ -32,6 +33,8 @@ export default function TeacherScannerClient({
   const [manualStudentSearch, setManualStudentSearch] = useState("");
   const [assemblyLevel, setAssemblyLevel] = useState("");
   const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
+  const [antiSpoofMode, setAntiSpoofMode] = useState<boolean>(true);
+  const livenessTrackerRef = useRef<Map<string, any>>(new Map());
 
   // State สำหรับวิชาและคลาสสอนชดเชย
   const [subjectsList, setSubjectsList] = useState<any[]>(subjects);
@@ -450,13 +453,18 @@ export default function TeacherScannerClient({
             let allowedToLog = true;
             let rejectReason = "";
 
-            // ป้องกันการแสกนหน้าคนที่อยู่ไกลหรือเป็นฉากหลัง (หน้าเล็กเกินไปความแม่นยำจะต่ำ)
-            const minFaceSize = 90; // พิกเซล
+            // 1. ตรวจสอบคุณภาพใบหน้า: ขนาด ระยะห่าง แสงสว่าง และคอนทราสต์
             const faceBox = resizedDetections[i].detection.box;
+            const quality = checkFaceQuality(
+              canvasRef.current.getContext('2d'),
+              faceBox,
+              displaySize.width,
+              displaySize.height
+            );
 
-            if (faceBox.width < minFaceSize || faceBox.height < minFaceSize) {
+            if (!quality.passed) {
               allowedToLog = false;
-              rejectReason = "ขยับหน้าเข้ามาใกล้ๆ";
+              rejectReason = quality.overallFeedback;
             } else if (scanType === "assembly" && assemblyLevel) {
               if (student?.level !== assemblyLevel) {
                 allowedToLog = false;
@@ -464,13 +472,67 @@ export default function TeacherScannerClient({
               }
             }
 
+            // 2. ตรวจสอบความมีชีวิตจริง (Anti-Spoofing & Liveness Detection) ป้องกันการเปิดรูปภาพในโทรศัพท์
+            let isLiveVerified = false;
+            if (allowedToLog && antiSpoofMode) {
+              const earData = getAverageEAR(detections[i].landmarks);
+              const currentYaw = getHeadPoseYaw(detections[i].landmarks);
+              
+              let tracker = livenessTrackerRef.current.get(studentId);
+              if (!tracker) {
+                tracker = {
+                  studentId,
+                  firstSeen: now,
+                  blinkCount: 0,
+                  lastEAR: earData.avgEAR,
+                  eyeState: "OPEN",
+                  challengePassed: false,
+                  headInitial: currentYaw,
+                  headMoved: false,
+                };
+                livenessTrackerRef.current.set(studentId, tracker);
+              }
+
+              // ตรวจจับจังหวะกะพริบตาจริง (Blink State Machine)
+              if (tracker.eyeState === "OPEN" && earData.avgEAR < 0.19) {
+                tracker.eyeState = "CLOSED";
+              } else if (tracker.eyeState === "CLOSED" && earData.avgEAR > 0.23) {
+                tracker.eyeState = "OPEN";
+                tracker.blinkCount += 1;
+              }
+              tracker.lastEAR = earData.avgEAR;
+
+              // ตรวจจับการขยับองศาใบหน้าเล็กน้อย
+              if (tracker.headInitial === "FRONT" && (currentYaw === "LEFT" || currentYaw === "RIGHT")) {
+                tracker.headMoved = true;
+              }
+
+              // เกณฑ์ผ่านคนจริง: มีการกะพริบตาอย่างน้อย 1 ครั้ง หรือหันศีรษะ
+              if (tracker.blinkCount >= 1 || tracker.headMoved) {
+                tracker.challengePassed = true;
+                isLiveVerified = true;
+              } else {
+                allowedToLog = false;
+                rejectReason = "👁️ กรุณากะพริบตา 1 ครั้ง";
+              }
+            } else if (allowedToLog && !antiSpoofMode) {
+              isLiveVerified = true; // โหมดสแกนรวดเร็ว
+            }
+
             if (!allowedToLog) {
-              boxLabel = rejectReason === "ขยับหน้าเข้ามาใกล้ๆ" ? rejectReason : `${studentName} (${rejectReason})`;
-              boxColor = rejectReason === "ขยับหน้าเข้ามาใกล้ๆ" ? "gray" : "orange";
+              if (rejectReason === "👁️ กรุณากะพริบตา 1 ครั้ง") {
+                boxLabel = `${studentName} [${rejectReason}]`;
+                boxColor = "#0284c7"; // สีฟ้าแจ้งให้กะพริบตา
+              } else {
+                boxLabel = `${studentName ? studentName + ": " : ""}${rejectReason}`;
+                boxColor = "#f59e0b"; // สีส้มแจ้งเตือนแสงหรือระยะห่าง
+              }
             } else {
               const similarity = Math.max(0, 100 - (result.distance * 100)); // แปลง Distance ให้เป็น % ความเหมือน
-              boxLabel = `${studentName} (${Math.round(similarity)}%)`;
-              boxColor = "green"; // วาดกรอบสีเขียวถ้าจับคู่ผ่าน
+              boxLabel = antiSpoofMode
+                ? `✅ ${studentName} (${Math.round(similarity)}%) [คนจริง]`
+                : `${studentName} (${Math.round(similarity)}%)`;
+              boxColor = "#10b981"; // วาดกรอบสีเขียวมรกตเมื่อผ่านการยืนยันตัวตนจริง
               
               const recent = logsRef.current.find(l => l.id === studentId);
               // เข้าแถว: block ตลอด session (ไม่มี cooldown หมดอายุ) เพราะมา/ขาด มีแค่ 2 สถานะต่อวัน
@@ -498,7 +560,6 @@ export default function TeacherScannerClient({
                   });
                   const data = await res.json();
                   if (data.duplicate) {
-                    // Fix #4: match ด้วย logId แทน time string ป้องกัน race condition อีกรอบ
                     setLogs(prev => prev.map(l => l.logId === logId ? { ...l, status: "duplicate" } : l));
                   } else if (data.attendance?.id) {
                     setLogs(prev => prev.map(l => l.logId === logId ? { ...l, attendanceId: data.attendance.id } : l));
@@ -852,6 +913,54 @@ export default function TeacherScannerClient({
             })()}
           </div>
         )}
+
+        {/* แถบควบคุมระบบตรวจสอบคนจริง Anti-Spoofing & Liveness Detection */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 bg-gradient-to-r from-gray-50 to-slate-100 dark:from-gray-800 dark:to-slate-800 rounded-xl border border-gray-200 dark:border-gray-700 gap-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${antiSpoofMode ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-900 dark:text-white">
+                  ระบบตรวจสอบคนจริง (Anti-Spoofing Liveness)
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  antiSpoofMode 
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700' 
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border border-amber-300'
+                }`}>
+                  {antiSpoofMode ? "เปิดใช้งาน: ป้องกันรูปภาพมือถือ" : "โหมดสแกนรวดเร็ว"}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                {antiSpoofMode 
+                  ? "บังคับตรวจจับการกะพริบตา (Blink), แสง (60-220), และขนาดใบหน้าระยะ 0.5-1.2 ม." 
+                  : "สแกนทันทีเมื่อพบหน้า เหมาะสำหรับเข้าแถวที่มีนักเรียนจำนวนมาก"}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setAntiSpoofMode(!antiSpoofMode)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
+              antiSpoofMode
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200'
+            }`}
+          >
+            {antiSpoofMode ? (
+              <>
+                <ShieldCheck className="w-4 h-4" /> ป้องกันรูปถ่าย (เปิดอยู่)
+              </>
+            ) : (
+              <>
+                ⚡ เปลี่ยนเป็นโหมดป้องกันรูปถ่าย
+              </>
+            )}
+          </button>
+        </div>
 
         <div className={`relative rounded-xl overflow-hidden w-full aspect-video bg-black flex justify-center items-center ${isScanning ? 'block' : 'hidden'}`}>
           <video

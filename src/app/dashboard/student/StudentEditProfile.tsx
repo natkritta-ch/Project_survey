@@ -5,6 +5,7 @@ import * as faceapi from "face-api.js";
 import { Camera, Loader2, Save, ShieldCheck, CheckCircle2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { showError } from "@/lib/alerts";
+import { checkFaceQuality } from "@/lib/faceLiveness";
 
 export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
   const router = useRouter();
@@ -126,10 +127,11 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
         .withFaceDescriptor();
         
       if (detection) {
-        // Enforce face size constraint
+        // Enforce face size & lighting constraints
         const box = detection.detection.box;
-        if (box.width < 160 || box.height < 160) {
-          setMessage("กรุณาขยับหน้าเข้าใกล้กล้องให้มากกว่านี้ (เพื่อให้เห็นหน้าชัดเจนที่สุด)");
+        const quality = checkFaceQuality(freezeCtx, box, freezeCanvas.width, freezeCanvas.height);
+        if (!quality.passed) {
+          setMessage(`⚠️ ${quality.overallFeedback}`);
           setIsScanning(false);
           return;
         }

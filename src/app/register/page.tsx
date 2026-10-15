@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as faceapi from "face-api.js";
-import { Camera, UserPlus, FileJson, Loader2, MapPin, Phone, Droplets, User, ChevronRight, Check, Database, Search, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
+import { Camera, UserPlus, FileJson, Loader2, MapPin, Phone, Droplets, User, ChevronRight, Check, Database, Search, Sparkles, CheckCircle2, AlertCircle, ShieldCheck, Eye, Sun } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { checkFaceQuality, getAverageEAR } from "@/lib/faceLiveness";
 
 const BLOOD_TYPES = ["A", "B", "AB", "O", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -41,6 +42,21 @@ export default function RegisterPage() {
     gender: "ไม่ระบุ",
     bloodType: "A",
     profilePicture: "",
+    nationalId: "",
+    isTwin: false,
+    twinNote: "",
+  });
+
+  // State สำหรับ Anti-Spoofing & Liveness Checklist
+  const [livenessStatus, setLivenessStatus] = useState({
+    sizePassed: false,
+    lightPassed: false,
+    blinkPassed: false,
+    feedback: "เปิดกล้องและจัดใบหน้าให้อยู่ในกรอบ",
+  });
+  const blinkStateRef = useRef<{ eyeState: "OPEN" | "CLOSED"; blinkCount: number }>({
+    eyeState: "OPEN",
+    blinkCount: 0,
   });
 
   // Debounced search for existing student in database
@@ -139,25 +155,54 @@ export default function RegisterPage() {
     setInterval(async () => {
       if (video.paused || video.ended || !modelsLoaded) return;
       try {
-        // ใช้ความมั่นใจ 0.4 เพื่อให้ตรวจจับหน้าติดง่ายขึ้นตอนโชว์กรอบ (แต่ตอนบันทึกจริงจะใช้ 0.85)
-        const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }));
+        const detection = await faceapi
+          .detectSingleFace(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 }))
+          .withFaceLandmarks();
+
         const ctx = canvas.getContext("2d");
         if (ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           if (detection) {
             const resizedDetection = faceapi.resizeResults(detection, displaySize);
-            const box = resizedDetection.box;
+            const box = resizedDetection.detection.box;
             
-            const isConfident = detection.score >= 0.85;
-            const isLargeEnough = box.width >= 160 && box.height >= 160;
+            // 1. ตรวจสอบคุณภาพใบหน้า: ขนาด ระยะห่าง แสงสว่าง และคอนทราสต์
+            const quality = checkFaceQuality(ctx, box, displaySize.width, displaySize.height);
 
-            if (isConfident && isLargeEnough) {
-              // Draw a green bounding box
-              ctx.strokeStyle = "#22c55e"; // green-500
+            // 2. ตรวจจับการกะพริบตา (Blink Detection) ป้องกันการนำรูปถ่าย/จอมือถือมาสแกน
+            const earData = getAverageEAR(detection.landmarks);
+            if (blinkStateRef.current.eyeState === "OPEN" && earData.avgEAR < 0.19) {
+              blinkStateRef.current.eyeState = "CLOSED";
+            } else if (blinkStateRef.current.eyeState === "CLOSED" && earData.avgEAR > 0.23) {
+              blinkStateRef.current.eyeState = "OPEN";
+              blinkStateRef.current.blinkCount += 1;
+            }
+
+            const sizeOk = quality.sizeStatus === "optimal";
+            const lightOk = quality.luminanceStatus === "optimal" && quality.contrastStatus === "optimal";
+            const blinkOk = blinkStateRef.current.blinkCount >= 1;
+
+            setLivenessStatus({
+              sizePassed: sizeOk,
+              lightPassed: lightOk,
+              blinkPassed: blinkOk,
+              feedback: !sizeOk 
+                ? quality.distanceFeedback 
+                : !lightOk 
+                ? quality.lightingFeedback 
+                : !blinkOk 
+                ? "👁️ กรุณากะพริบตา 1 ครั้งเพื่อยืนยันบุคคลจริง" 
+                : "✅ ยืนยันบุคคลจริงเรียบร้อย พร้อมบันทึกภาพ",
+            });
+
+            if (sizeOk && lightOk && blinkOk) {
+              ctx.strokeStyle = "#10b981"; // emerald-500
               ctx.lineWidth = 4;
+            } else if (sizeOk && lightOk && !blinkOk) {
+              ctx.strokeStyle = "#38bdf8"; // sky-400 (รอจังหวะกะพริบตา)
+              ctx.lineWidth = 3;
             } else {
-              // Draw a red bounding box for warning
-              ctx.strokeStyle = "#ef4444"; // red-500
+              ctx.strokeStyle = "#f59e0b"; // amber-500 (แจ้งเตือนขนาด/แสง)
               ctx.lineWidth = 2;
             }
             ctx.strokeRect(box.x, box.y, box.width, box.height);
@@ -174,6 +219,23 @@ export default function RegisterPage() {
     setIsScanning(true);
     setScanError("");
     try {
+      // ตรวจสอบเงื่อนไข Anti-Spoofing & คุณภาพก่อนบันทึก
+      if (!livenessStatus.sizePassed) {
+        setScanError("❌ กรุณาจัดระยะห่างใบหน้าให้อยู่ในกรอบที่เหมาะสม (ระยะ 0.5 - 1.2 เมตร)");
+        setIsScanning(false);
+        return;
+      }
+      if (!livenessStatus.lightPassed) {
+        setScanError("❌ แสงสว่างไม่เพียงพอหรือมีแสงสะท้อนจ้าเกินไป กรุณาจัดแสงให้พอดี");
+        setIsScanning(false);
+        return;
+      }
+      if (!livenessStatus.blinkPassed) {
+        setScanError("❌ กรุณากะพริบตา 1 ครั้งที่หน้ากล้อง เพื่อยืนยันว่าเป็นบุคคลจริง (ไม่ใช่ภาพถ่ายหรือจอมือถือ)");
+        setIsScanning(false);
+        return;
+      }
+
       // 1. Freeze the frame INSTANTLY on click so the user doesn't have to hold still
       const freezeCanvas = document.createElement("canvas");
       freezeCanvas.width = videoRef.current.videoWidth;
@@ -190,14 +252,6 @@ export default function RegisterPage() {
         .withFaceDescriptor();
         
       if (detection) {
-        // Enforce face size constraint (e.g. width >= 160)
-        const box = detection.detection.box;
-        if (box.width < 160 || box.height < 160) {
-          setScanError("❌ กรุณาขยับหน้าเข้าใกล้กล้องให้มากขึ้น (เพื่อให้เห็นใบหน้าชัดเจนที่สุด)");
-          setIsScanning(false);
-          return;
-        }
-
         setFaceDescriptor(JSON.stringify(Array.from(detection.descriptor)));
         
         // 3. Save the exact frozen frame that was processed
@@ -591,6 +645,42 @@ export default function RegisterPage() {
                     ))}
                   </select>
                 </div>
+
+                {/* ข้อมูลพี่น้องฝาแฝด (ป้องกัน AI แจ้งเตือนหน้าซ้ำ) */}
+                <div className="md:col-span-2 p-4 rounded-xl border border-primary/20 bg-primary/5">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.isTwin)}
+                      onChange={(e) => setFormData({ ...formData, isTwin: e.target.checked })}
+                      className="mt-1 w-4 h-4 rounded text-primary focus:ring-primary border-border"
+                    />
+                    <div>
+                      <span className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                        <User className="w-4 h-4 text-primary" /> ฉันมีพี่น้องฝาแฝดแท้ที่ศึกษาในแผนกวิชานี้ (Identical Twin)
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                        ทำเครื่องหมายนี้เพื่อป้องกันระบบ AI ตรวจพบใบหน้าคล้ายกัน และระบบจะส่งข้อมูลให้อาจารย์ที่ปรึกษาช่วยรับรองสถานะเพิ่มเติม
+                      </p>
+                    </div>
+                  </label>
+
+                  {formData.isTwin && (
+                    <div className="mt-3 pt-3 border-t border-border/60 animate-in fade-in space-y-2">
+                      <label className={labelClass}>ชื่อ หรือ รหัสนักศึกษาของคู่แฝด (ถ้ามี)</label>
+                      <input
+                        type="text"
+                        className={inputClass}
+                        placeholder="เช่น นายปัญญาวุธ (รหัส 69301090016)"
+                        value={formData.twinNote}
+                        onChange={(e) => setFormData({ ...formData, twinNote: e.target.value })}
+                      />
+                      <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                        * โปรดระบุเลขประจำตัวประชาชน 13 หลักด้านบนให้ถูกต้องเพื่อใช้ในการแยกแยะบุคคล
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="mt-8 flex justify-end">
@@ -687,6 +777,53 @@ export default function RegisterPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Real-time Quality & Liveness Detection Checklist */}
+                  {streamActive && !formData.profilePicture && (
+                    <div className="w-full max-w-md bg-card border border-border rounded-xl p-3.5 space-y-2.5 text-xs shadow-sm animate-in fade-in">
+                      <div className="flex items-center justify-between font-semibold border-b border-border pb-2">
+                        <span className="flex items-center gap-1.5 text-foreground font-bold">
+                          <ShieldCheck className="w-4 h-4 text-emerald-500" /> ตรวจสอบคนจริง (Liveness & Anti-Spoofing)
+                        </span>
+                        <span className="text-[11px] text-muted-foreground truncate max-w-[200px]">
+                          {livenessStatus.feedback}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className={`p-2 rounded-lg border flex flex-col items-center gap-0.5 transition-colors ${
+                          livenessStatus.sizePassed 
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
+                            : "bg-muted border-border text-muted-foreground"
+                        }`}>
+                          <span className="font-bold">📏 ระยะห่าง</span>
+                          <span className="text-[10px]">{livenessStatus.sizePassed ? "✓ พอดี (0.5-1.2ม.)" : "รอปรับระยะ"}</span>
+                        </div>
+
+                        <div className={`p-2 rounded-lg border flex flex-col items-center gap-0.5 transition-colors ${
+                          livenessStatus.lightPassed 
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
+                            : "bg-muted border-border text-muted-foreground"
+                        }`}>
+                          <span className="font-bold">💡 แสงสว่าง</span>
+                          <span className="text-[10px]">{livenessStatus.lightPassed ? "✓ แสงพอดี" : "รอปรับแสง"}</span>
+                        </div>
+
+                        <div className={`p-2 rounded-lg border flex flex-col items-center gap-0.5 transition-colors ${
+                          livenessStatus.blinkPassed 
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400" 
+                            : "bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400"
+                        }`}>
+                          <span className="font-bold flex items-center gap-1">
+                            <Eye className="w-3 h-3" /> กะพริบตา
+                          </span>
+                          <span className="text-[10px] font-semibold">
+                            {livenessStatus.blinkPassed ? "✓ ตรวจพบคนจริง" : "กรุณากะพริบตา"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {scanError && (
                     <div className="w-full max-w-md px-4 py-3 bg-destructive/10 border-l-4 border-destructive rounded-md text-sm text-destructive font-medium shadow-sm animate-in fade-in slide-in-from-top-2">

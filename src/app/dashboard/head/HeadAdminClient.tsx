@@ -1295,7 +1295,14 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                       
                       {/* Details */}
                       <div className="text-[13px] flex flex-col min-w-0 justify-center space-y-2 flex-1">
-                        <p className="font-bold text-[15px] text-gray-900 dark:text-white leading-tight truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition" title={u.name}>{u.name}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-bold text-[15px] text-gray-900 dark:text-white leading-tight truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition" title={u.name}>{u.name}</p>
+                          {u.isTwin && (
+                            <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-purple-200 dark:border-purple-800" title={u.twinNote ? `คู่แฝด: ${u.twinNote}` : "มีคู่แฝดในระบบ"}>
+                              👥 คู่แฝด
+                            </span>
+                          )}
+                        </div>
                         
                         <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 mt-1">
                           <p className="text-gray-500 dark:text-gray-400 truncate">
