@@ -166,8 +166,8 @@ export default function RegisterPage() {
             const resizedDetection = faceapi.resizeResults(detection, displaySize);
             const box = resizedDetection.detection.box;
             
-            // 1. ตรวจสอบคุณภาพใบหน้า: ขนาด ระยะห่าง แสงสว่าง และคอนทราสต์
-            const quality = checkFaceQuality(ctx, box, displaySize.width, displaySize.height);
+            // 1. ตรวจสอบคุณภาพใบหน้า: ขนาด ระยะห่าง แสงสว่าง และคอนทราสต์ (ส่ง video element เพื่อวิเคราะห์พิกเซลจริงจากกล้อง)
+            const quality = checkFaceQuality(video, box, displaySize.width, displaySize.height);
 
             // 2. ตรวจจับการกะพริบตา (Blink Detection) ป้องกันการนำรูปถ่าย/จอมือถือมาสแกน
             const earData = getAverageEAR(detection.landmarks);
@@ -247,7 +247,7 @@ export default function RegisterPage() {
 
       // 2. Run heavy AI detection on the frozen frame
       const detection = await faceapi
-        .detectSingleFace(freezeCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }))
+        .detectSingleFace(freezeCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.60 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
         

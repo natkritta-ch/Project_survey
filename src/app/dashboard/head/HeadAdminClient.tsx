@@ -257,7 +257,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setUserPhone(u.phone || "");
     setUserAddress(u.address || "");
     setUserEmail(u.email || "");
-    setUserStudentId(u.studentId || "");
+    setUserStudentId(u.approvedChildren?.[0]?.id || u.studentId || "");
     setIsStudentDropdownOpen(false);
     setStudentSearchQuery("");
     setIsEditUserModalOpen(true);
@@ -1471,8 +1471,16 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{u.username}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                           {u.name}
-                          {u.role === "PARENT" && u.student && (
-                            <span className="block text-xs text-indigo-500 mt-1 dark:text-indigo-400">บุตร: {u.student.name}</span>
+                          {u.role === "PARENT" && (
+                            <span className="block text-xs text-indigo-500 mt-1 dark:text-indigo-400">
+                              {u.approvedChildren && u.approvedChildren.length > 0 ? (
+                                `บุตร: ${u.approvedChildren.map((s: any) => s.name || s.username).join(", ")}`
+                              ) : u.student ? (
+                                `บุตร: ${u.student.name}`
+                              ) : (
+                                <span className="text-gray-400 font-normal">ยังไม่ผูกกับนักเรียน</span>
+                              )}
+                            </span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-300">

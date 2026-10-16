@@ -242,8 +242,20 @@ export async function createUser(data: any) {
   if (data.password) {
     data.password = await bcrypt.hash(data.password, 10);
   }
-  await prisma.user.create({ data });
+  const created = await prisma.user.create({ data });
+
+  // ถ้าเป็นผู้ปกครองและมีการระบุ studentId ให้สร้าง ParentStudentLink สถานะ APPROVED อัตโนมัติ
+  if (data.role === "PARENT" && data.studentId) {
+    await prisma.parentStudentLink.upsert({
+      where: { parentId_studentId: { parentId: created.id, studentId: data.studentId } },
+      create: { parentId: created.id, studentId: data.studentId, status: "APPROVED" },
+      update: { status: "APPROVED" }
+    });
+  }
+
   revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/parent");
+  revalidatePath("/dashboard/student");
 }
 
 export async function updateUser(id: string, data: any) {
@@ -253,7 +265,27 @@ export async function updateUser(id: string, data: any) {
     data.password = await bcrypt.hash(data.password, 10);
   }
   await prisma.user.update({ where: { id }, data });
+
+  // ซิงค์ ParentStudentLink สำหรับผู้ปกครอง
+  if (data.role === "PARENT" || data.studentId !== undefined) {
+    if (data.studentId) {
+      await prisma.parentStudentLink.upsert({
+        where: { parentId_studentId: { parentId: id, studentId: data.studentId } },
+        create: { parentId: id, studentId: data.studentId, status: "APPROVED" },
+        update: { status: "APPROVED" }
+      });
+    } else if (data.studentId === null) {
+      // ถ้าเคลียร์ studentId ให้ปรับสถานะ ParentStudentLink เป็น REJECTED
+      await prisma.parentStudentLink.updateMany({
+        where: { parentId: id },
+        data: { status: "REJECTED" }
+      });
+    }
+  }
+
   revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/parent");
+  revalidatePath("/dashboard/student");
 }
 
 export async function deleteUser(id: string) {

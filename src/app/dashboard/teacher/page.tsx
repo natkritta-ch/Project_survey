@@ -59,7 +59,7 @@ export default async function TeacherDashboard() {
   }
 
   // 5. ข้อมูลนักเรียนและผู้ปกครอง สำหรับแท็บที่ 3 (เฉพาะชั้นปีที่อาจารย์สอน)
-  const studentsWithParents = await prisma.user.findMany({
+  const rawStudentsWithParents = await prisma.user.findMany({
     where: { 
       role: "STUDENT", 
       level: { in: allLevels },
@@ -70,13 +70,21 @@ export default async function TeacherDashboard() {
       username: true,
       name: true,
       level: true,
-      parentLinks: {
+      studentLinks: {
         where: { status: "APPROVED" },
         include: { parent: { select: { name: true, phone: true } } }
       }
     },
     orderBy: [{ level: 'asc' }, { username: 'asc' }]
   });
+
+  const studentsWithParents = rawStudentsWithParents.map(st => ({
+    id: st.id,
+    username: st.username,
+    name: st.name,
+    level: st.level,
+    parentLinks: st.studentLinks
+  }));
 
   // 6. ดึงสถิติการเข้าเรียนในสัปดาห์นี้ (จันทร์-อาทิตย์) เฉพาะวิชาที่อาจารย์สอน
   const todayDate = new Date();

@@ -121,58 +121,129 @@ export function getHeadPoseYaw(landmarks: any): "FRONT" | "LEFT" | "RIGHT" {
   }
 }
 
+export type FaceQualitySource =
+  | CanvasRenderingContext2D
+  | HTMLVideoElement
+  | HTMLCanvasElement
+  | OffscreenCanvas
+  | null
+  | undefined;
+
+export interface FaceQualityOptions {
+  isScanner?: boolean;
+  minFaceSize?: number;
+  maxFaceSize?: number;
+  minLuminance?: number;
+  maxLuminance?: number;
+  minContrast?: number;
+}
+
+let sampleCanvas: HTMLCanvasElement | null = null;
+let sampleCtx: CanvasRenderingContext2D | null = null;
+
+function getSampleCtx(): CanvasRenderingContext2D | null {
+  if (typeof document === "undefined") return null;
+  if (!sampleCanvas) {
+    sampleCanvas = document.createElement("canvas");
+    sampleCanvas.width = 48;
+    sampleCanvas.height = 48;
+    sampleCtx = sampleCanvas.getContext("2d", { willReadFrequently: true });
+  }
+  return sampleCtx;
+}
+
 /**
  * ตรวจสอบคุณภาพใบหน้า: ขนาด ระยะห่าง แสงสว่าง และคอนทราสต์
  * ป้องกันการถ่ายภาพจากระยะไกล หรือภาพจอมือถือที่มีแสงสะท้อนจ้า
  */
 export function checkFaceQuality(
-  ctx: CanvasRenderingContext2D | null,
+  source: FaceQualitySource,
   box: { x: number; y: number; width: number; height: number },
   videoWidth: number,
-  videoHeight: number
+  videoHeight: number,
+  options?: FaceQualityOptions
 ): FaceQualityResult {
   const w = box.width;
   const h = box.height;
+  const isScanner = options?.isScanner ?? false;
 
-  // 1. ตรวจสอบขนาดใบหน้า & ระยะห่าง
-  // เหมาะสมสำหรับวิดีโอทั่วไป (ประมาณ 130px ถึง 300px)
+  // 1. ตรวจสอบขนาดใบหน้า & ระยะห่าง (ปรับเกณฑ์ให้เหมาะสมกับระยะการใช้งานจริง ไม่เข้มงวดเกินไป)
+  // ลงทะเบียน: 85px - 450px | สแกนห้องเรียน/แถว: 65px - 550px
+  const minFaceSize = options?.minFaceSize ?? (isScanner ? 65 : 85);
+  const maxFaceSize = options?.maxFaceSize ?? (isScanner ? 550 : 450);
+
   let sizeStatus: "too_small" | "too_large" | "optimal" = "optimal";
   let distanceFeedback = "ระยะห่างเหมาะสม";
 
-  if (w < 125 || h < 125) {
+  if (w < minFaceSize || h < minFaceSize) {
     sizeStatus = "too_small";
-    distanceFeedback = "ขยับหน้าเข้ามาใกล้กล้องอีกนิด (0.5 - 1.2 ม.)";
-  } else if (w > 320 || h > 320) {
+    distanceFeedback = isScanner
+      ? "กรุณาขยับเข้ามาใกล้กล้องอีกเล็กน้อย"
+      : "ขยับหน้าเข้ามาใกล้กล้องอีกนิด (0.5 - 1.2 ม.)";
+  } else if (w > maxFaceSize || h > maxFaceSize) {
     sizeStatus = "too_large";
     distanceFeedback = "ถอยห่างจากกล้องเล็กน้อย";
   }
 
   // 2. ตรวจสอบความสว่างและคอนทราสต์จากพิกเซลบนใบหน้า
-  let luminance = 128;
-  let contrast = 50;
+  let luminance = 120;
+  let contrast = 35;
   let luminanceStatus: "too_dark" | "too_bright" | "optimal" = "optimal";
   let lightingFeedback = "แสงสว่างพอดี";
   let contrastStatus: "low_contrast" | "optimal" = "optimal";
 
-  if (ctx && w > 20 && h > 20) {
+  if (source && w > 20 && h > 20) {
     try {
       // ตัดขอบเฉพาะพื้นที่ใบหน้าด้านใน (ลดการตรวจโดนฉากหลัง)
       const cropX = Math.max(0, Math.floor(box.x + w * 0.15));
       const cropY = Math.max(0, Math.floor(box.y + h * 0.15));
-      const cropW = Math.min(videoWidth - cropX, Math.floor(w * 0.7));
-      const cropH = Math.min(videoHeight - cropY, Math.floor(h * 0.7));
+      const cropW = Math.max(1, Math.min(videoWidth - cropX, Math.floor(w * 0.7)));
+      const cropH = Math.max(1, Math.min(videoHeight - cropY, Math.floor(h * 0.7)));
 
-      if (cropW > 10 && cropH > 10) {
-        const imgData = ctx.getImageData(cropX, cropY, cropW, cropH);
-        const data = imgData.data;
+      const sCtx = getSampleCtx();
+      let sampledData: Uint8ClampedArray | null = null;
+      let isTransparent = false;
+
+      if (sCtx) {
+        sCtx.clearRect(0, 0, 48, 48);
+
+        // แยกประเภทระหว่าง CanvasRenderingContext2D กับ CanvasImageSource (HTMLVideoElement, HTMLCanvasElement ฯลฯ)
+        if (typeof (source as any).getImageData === "function") {
+          const ctxSource = source as CanvasRenderingContext2D;
+          if (ctxSource.canvas) {
+            sCtx.drawImage(ctxSource.canvas, cropX, cropY, cropW, cropH, 0, 0, 48, 48);
+            sampledData = sCtx.getImageData(0, 0, 48, 48).data;
+          } else {
+            sampledData = ctxSource.getImageData(cropX, cropY, cropW, cropH).data;
+          }
+        } else {
+          sCtx.drawImage(source as unknown as CanvasImageSource, cropX, cropY, cropW, cropH, 0, 0, 48, 48);
+          sampledData = sCtx.getImageData(0, 0, 48, 48).data;
+        }
+
+        // ตรวจสอบว่าพิกเซลว่างเปล่าหรือโปร่งใสหรือไม่ (เช่น ส่ง overlay canvas ที่ถูก clearRect มา)
+        if (sampledData && sampledData.length > 0) {
+          let alphaSum = 0;
+          const step = Math.max(4, Math.floor(sampledData.length / 32) * 4);
+          let samples = 0;
+          for (let i = 3; i < sampledData.length; i += step) {
+            alphaSum += sampledData[i];
+            samples++;
+          }
+          if (samples > 0 && alphaSum / samples < 30) {
+            isTransparent = true;
+          }
+        }
+      }
+
+      if (sampledData && !isTransparent) {
         let sumLuminance = 0;
         let count = 0;
 
-        // คำนวณความสว่างเฉลี่ย (สุ่มก้าวทีละ 4 พิกเซลเพื่อความเร็ว)
-        for (let i = 0; i < data.length; i += 16) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
+        for (let i = 0; i < sampledData.length; i += 4) {
+          const r = sampledData[i];
+          const g = sampledData[i + 1];
+          const b = sampledData[i + 2];
           const lum = 0.299 * r + 0.587 * g + 0.114 * b;
           sumLuminance += lum;
           count++;
@@ -183,10 +254,10 @@ export function checkFaceQuality(
 
           // คำนวณ Standard Deviation (Contrast)
           let varianceSum = 0;
-          for (let i = 0; i < data.length; i += 16) {
-            const r = data[i];
-            const g = data[i + 1];
-            const b = data[i + 2];
+          for (let i = 0; i < sampledData.length; i += 4) {
+            const r = sampledData[i];
+            const g = sampledData[i + 1];
+            const b = sampledData[i + 2];
             const lum = 0.299 * r + 0.587 * g + 0.114 * b;
             varianceSum += Math.pow(lum - luminance, 2);
           }
@@ -194,21 +265,28 @@ export function checkFaceQuality(
         }
       }
     } catch {
-      // Fallback
+      // กรณีเกิดข้อผิดพลาดในการดึงภาพ ให้ใช้ค่า default ที่ผ่านเกณฑ์
+      luminance = 120;
+      contrast = 35;
     }
   }
 
-  // ประเมินผลแสงสว่าง
-  if (luminance < 60) {
+  // ประเมินผลแสงสว่าง (ผ่อนปรนให้เหมาะกับสภาพแสงในอาคาร/ห้องเรียนจริง)
+  // ปกติ: 35 - 235 | โหมดสแกน: 28 - 245
+  const minLuminance = options?.minLuminance ?? (isScanner ? 28 : 35);
+  const maxLuminance = options?.maxLuminance ?? (isScanner ? 245 : 235);
+  const minContrast = options?.minContrast ?? (isScanner ? 6 : 8);
+
+  if (luminance < minLuminance) {
     luminanceStatus = "too_dark";
-    lightingFeedback = "แสงน้อยเกินไป กรุณาเปิดไฟหรือไปยังจุดสว่าง";
-  } else if (luminance > 220) {
+    lightingFeedback = "แสงน้อยเกินไป กรุณาเปิดไฟหรือขยับมาจุดที่สว่าง";
+  } else if (luminance > maxLuminance) {
     luminanceStatus = "too_bright";
     lightingFeedback = "แสงจ้าหรือย้อนแสงเกินไป";
   }
 
-  // ประเมินคอนทราสต์ (ถ้าภาพแบนราบหรือเป็นจอมือถือสะท้อนแสงวาบ คอนทราสต์จะผิดปกติ)
-  if (contrast < 18) {
+  // ประเมินคอนทราสต์ (ป้องกันหน้าจอมือถือสะท้อนแสงวาบ หรือภาพขาวโพลน โดยไม่รบกวนผิวเรียบเนียน)
+  if (contrast < minContrast) {
     contrastStatus = "low_contrast";
   }
 
@@ -224,7 +302,7 @@ export function checkFaceQuality(
 
   return {
     passed,
-    score: passed ? 100 : sizeStatus === "optimal" ? 70 : 40,
+    score: passed ? 100 : sizeStatus === "optimal" ? 75 : 50,
     faceSize: { width: Math.round(w), height: Math.round(h) },
     sizeStatus,
     distanceFeedback,

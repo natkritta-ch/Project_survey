@@ -8,7 +8,7 @@ import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
 import { User, Calendar, Clock, BookOpen, GraduationCap, Menu, X, Settings, Camera } from "lucide-react";
-import { showError, showToast } from "@/lib/alerts";
+import { showError, showToast, showConfirm } from "@/lib/alerts";
 
 export default function StudentDashboardClient({
   session,
@@ -26,7 +26,18 @@ export default function StudentDashboardClient({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [parentLinks, setParentLinks] = useState(initialParentLinks || []);
 
-  const handleUpdateLinkStatus = async (linkId: string, status: string) => {
+  const handleUpdateLinkStatus = async (linkId: string, status: string, parentName?: string) => {
+    if (status === "REJECTED") {
+      const isConfirmed = await showConfirm({
+        title: "ยืนยันการยกเลิกการผูกบัญชี?",
+        text: `คุณแน่ใจหรือไม่ว่าต้องการยกเลิกการเชื่อมต่อกับผู้ปกครอง "${parentName || "ผู้ปกครอง"}"? บัญชีผู้ปกครองจะไม่สามารถดูข้อมูลการเรียนและประวัติการเข้าแถวของคุณได้อีก`,
+        confirmText: "ยืนยันยกเลิก",
+        cancelText: "กลับ",
+        isDanger: true,
+      });
+      if (!isConfirmed) return;
+    }
+
     try {
       const res = await fetch("/api/parent-links", {
         method: "PUT",
@@ -38,7 +49,12 @@ export default function StudentDashboardClient({
         setParentLinks((prev: any) => 
           prev.map((link: any) => link.id === linkId ? { ...link, status } : link)
         );
-        showToast(status === "APPROVED" ? "อนุมัติการเชื่อมต่อผู้ปกครองแล้ว" : "ปฏิเสธการเชื่อมต่อแล้ว", "success");
+        showToast(
+          status === "APPROVED" 
+            ? "อนุมัติการเชื่อมต่อผู้ปกครองแล้ว" 
+            : "ยกเลิกการเชื่อมต่อเรียบร้อยแล้ว", 
+          "success"
+        );
       } else {
         showError("เกิดข้อผิดพลาด", data.message);
       }
@@ -170,26 +186,31 @@ export default function StudentDashboardClient({
                       {parentLinks.map((link: any) => (
                         <div key={link.id} className="flex flex-col sm:flex-row justify-between items-center p-4 bg-background rounded-xl border border-border shadow-sm">
                           <div>
-                            <p className="font-semibold text-foreground">{link.parent.name}</p>
+                            <p className="font-semibold text-foreground">{link.parent?.name || "ผู้ปกครอง"}</p>
                             <p className="text-xs text-muted-foreground">สถานะ: 
                               <span className={`ml-1 font-bold ${link.status === "PENDING" ? "text-orange-500" : link.status === "APPROVED" ? "text-green-500" : "text-red-500"}`}>
-                                {link.status === "PENDING" ? "รออนุมัติ" : link.status === "APPROVED" ? "อนุมัติแล้ว" : "ถูกปฏิเสธ"}
+                                {link.status === "PENDING" ? "รออนุมัติ" : link.status === "APPROVED" ? "อนุมัติแล้ว" : "ยกเลิกแล้ว"}
                               </span>
                             </p>
                           </div>
                           {link.status === "PENDING" && (
                             <div className="flex gap-2 mt-3 sm:mt-0 w-full sm:w-auto">
-                              <button onClick={() => handleUpdateLinkStatus(link.id, "APPROVED")} className="flex-1 sm:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
+                              <button onClick={() => handleUpdateLinkStatus(link.id, "APPROVED", link.parent?.name)} className="flex-1 sm:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
                                 อนุมัติ
                               </button>
-                              <button onClick={() => handleUpdateLinkStatus(link.id, "REJECTED")} className="flex-1 sm:flex-none px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 text-sm font-bold rounded-lg shadow-sm transition-colors">
+                              <button onClick={() => handleUpdateLinkStatus(link.id, "REJECTED", link.parent?.name)} className="flex-1 sm:flex-none px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 text-sm font-bold rounded-lg shadow-sm transition-colors">
                                 ปฏิเสธ
                               </button>
                             </div>
                           )}
                           {link.status === "APPROVED" && (
-                            <button onClick={() => handleUpdateLinkStatus(link.id, "REJECTED")} className="mt-3 sm:mt-0 w-full sm:w-auto px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-sm font-bold rounded-lg transition-colors">
+                            <button onClick={() => handleUpdateLinkStatus(link.id, "REJECTED", link.parent?.name)} className="mt-3 sm:mt-0 w-full sm:w-auto px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-sm font-bold rounded-lg transition-colors">
                               ยกเลิกการเข้าถึง
+                            </button>
+                          )}
+                          {link.status === "REJECTED" && (
+                            <button onClick={() => handleUpdateLinkStatus(link.id, "APPROVED", link.parent?.name)} className="mt-3 sm:mt-0 w-full sm:w-auto px-4 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-sm font-bold rounded-lg transition-colors">
+                              อนุมัติการเข้าถึงอีกครั้ง
                             </button>
                           )}
                         </div>

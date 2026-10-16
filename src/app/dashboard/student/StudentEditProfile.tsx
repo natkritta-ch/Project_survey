@@ -122,14 +122,14 @@ export default function StudentEditProfile({ canEdit }: { canEdit: boolean }) {
 
       // 2. Process the frozen frame
       const detection = await faceapi
-        .detectSingleFace(freezeCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.85 }))
+        .detectSingleFace(freezeCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.60 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
         
       if (detection) {
         // Enforce face size & lighting constraints
         const box = detection.detection.box;
-        const quality = checkFaceQuality(freezeCtx, box, freezeCanvas.width, freezeCanvas.height);
+        const quality = checkFaceQuality(freezeCanvas, box, freezeCanvas.width, freezeCanvas.height);
         if (!quality.passed) {
           setMessage(`⚠️ ${quality.overallFeedback}`);
           setIsScanning(false);

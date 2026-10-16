@@ -453,16 +453,17 @@ export default function TeacherScannerClient({
             let allowedToLog = true;
             let rejectReason = "";
 
-            // 1. ตรวจสอบคุณภาพใบหน้า: ขนาด ระยะห่าง แสงสว่าง และคอนทราสต์
+            // 1. ตรวจสอบคุณภาพใบหน้า: ขนาด ระยะห่าง แสงสว่าง และคอนทราสต์ (ส่ง video เพื่ออ่านภาพสดจริง พร้อมใช้เกณฑ์สำหรับโหมดสแกนเนอร์)
             const faceBox = resizedDetections[i].detection.box;
             const quality = checkFaceQuality(
-              canvasRef.current.getContext('2d'),
+              videoRef.current,
               faceBox,
               displaySize.width,
-              displaySize.height
+              displaySize.height,
+              { isScanner: true }
             );
 
-            if (!quality.passed) {
+            if (antiSpoofMode && !quality.passed) {
               allowedToLog = false;
               rejectReason = quality.overallFeedback;
             } else if (scanType === "assembly" && assemblyLevel) {

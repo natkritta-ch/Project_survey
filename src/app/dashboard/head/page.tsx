@@ -20,13 +20,35 @@ export default async function HeadDashboard() {
     orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] 
   });
   const rawUsers = await prisma.user.findMany({ 
-    include: { student: true, attendances: true }, 
+    include: { 
+      student: true, 
+      attendances: true,
+      parentLinks: {
+        include: { student: true }
+      }
+    }, 
     orderBy: { username: 'asc' } 
   });
 
   const users = rawUsers.map(u => {
     const { faceDescriptor, ...rest } = u;
-    return rest;
+    
+    // คำนวณความสัมพันธ์บุตรหลานที่ได้รับการอนุมัติจริง (APPROVED)
+    const approvedLinks = rest.parentLinks?.filter((l: any) => l.status === "APPROVED") || [];
+    const hasRejectedCurrentStudent = rest.parentLinks?.some(
+      (l: any) => l.studentId === rest.studentId && l.status === "REJECTED"
+    );
+
+    // ถ้า studentId เดิมตรงกับ link ที่ถูก REJECTED ไปแล้ว ให้เคลียร์ออก
+    const effectiveStudent = hasRejectedCurrentStudent ? null : rest.student;
+    const effectiveStudentId = hasRejectedCurrentStudent ? null : rest.studentId;
+
+    return {
+      ...rest,
+      student: effectiveStudent,
+      studentId: effectiveStudentId,
+      approvedChildren: approvedLinks.map((l: any) => l.student).filter(Boolean)
+    };
   });
   const termConfigs = await prisma.termConfig.findMany({
     orderBy: [{ academicYear: 'desc' }, { term: 'desc' }]

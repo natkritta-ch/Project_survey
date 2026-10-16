@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   }
 }
 
-// อนุมัติ / ปฏิเสธ (สำหรับนักเรียน)
+// อนุมัติ / ปฏิเสธ / ยกเลิก (สำหรับนักเรียน)
 export async function PUT(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -53,13 +53,26 @@ export async function PUT(request: Request) {
       data: { status }
     });
 
+    // ซิงค์ฟิลด์ studentId ในตาราง user ของผู้ปกครองให้เชื่อมโยงกันทั้งระบบ
+    if (status === "REJECTED") {
+      await prisma.user.updateMany({
+        where: { id: link.parentId, studentId: link.studentId },
+        data: { studentId: null }
+      });
+    } else if (status === "APPROVED") {
+      await prisma.user.update({
+        where: { id: link.parentId },
+        data: { studentId: link.studentId }
+      });
+    }
+
     return NextResponse.json({ success: true, link: updated });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }
 
-// ผู้ปกครองขอเพิ่มบุตรหลานคนใหม่
+// ผู้ปกครองขอเพิ่มบุตรหลานคนใหม่ หรือ ส่งคำขอซ้ำหลังจากถูกยกเลิก
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -95,7 +108,22 @@ export async function POST(request: Request) {
     });
 
     if (existingLink) {
-      return NextResponse.json({ success: false, message: "คุณส่งคำขอหรือติดตามนักเรียนคนนี้ไปแล้ว" }, { status: 400 });
+      if (existingLink.status === "APPROVED") {
+        return NextResponse.json({ success: false, message: "คุณผูกบัญชีกับนักเรียนคนนี้อยู่แล้ว" }, { status: 400 });
+      }
+      if (existingLink.status === "PENDING") {
+        return NextResponse.json({ success: false, message: "คุณส่งคำขอติดตามนักเรียนคนนี้ไปแล้ว กรุณารอนักเรียนอนุมัติ" }, { status: 400 });
+      }
+      // กรณีถูกยกเลิกหรือปฏิเสธไปแล้ว (REJECTED): ให้เปลี่ยนสถานะกลับเป็น PENDING เพื่อให้นักเรียนอนุมัติใหม่ได้
+      const updatedLink = await prisma.parentStudentLink.update({
+        where: { id: existingLink.id },
+        data: { status: "PENDING" }
+      });
+      return NextResponse.json({ 
+        success: true, 
+        link: updatedLink, 
+        message: "ส่งคำขอผูกบัญชีใหม่อีกครั้งเรียบร้อยแล้ว กรุณารอนักเรียนกดยืนยัน" 
+      });
     }
 
     const newLink = await prisma.parentStudentLink.create({
@@ -109,5 +137,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, link: newLink });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: "เกิดข้อผิดพลาด: " + error.message }, { status: 500 });
+  }
+}
+
+// ลบรายการเชื่อมต่อ (ทั้งนักเรียนและผู้ปกครอง)
+export async function DELETE(request: Request) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+
+    const userId = (session.user as any)?.id;
+    const { searchParams } = new URL(request.url);
+    const linkId = searchParams.get("linkId");
+
+    if (!linkId) {
+      return NextResponse.json({ success: false, message: "Missing linkId" }, { status: 400 });
+    }
+
+    const link = await prisma.parentStudentLink.findUnique({ where: { id: linkId } });
+    if (!link || (link.studentId !== userId && link.parentId !== userId)) {
+      return NextResponse.json({ success: false, message: "Link not found or unauthorized" }, { status: 404 });
+    }
+
+    await prisma.parentStudentLink.delete({ where: { id: linkId } });
+
+    // ซิงค์เคลียร์ studentId ถ้าชี้ไปที่นักเรียนคนนี้
+    await prisma.user.updateMany({
+      where: { id: link.parentId, studentId: link.studentId },
+      data: { studentId: null }
+    });
+
+    return NextResponse.json({ success: true, message: "ลบการเชื่อมต่อเรียบร้อยแล้ว" });
+  } catch (error: any) {
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
 }

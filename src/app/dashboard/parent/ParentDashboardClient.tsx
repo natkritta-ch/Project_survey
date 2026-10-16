@@ -22,6 +22,7 @@ export default function ParentDashboardClient({
   
   const approvedChildren = childrenData?.filter((c: any) => c.linkStatus === "APPROVED") || [];
   const pendingChildren = childrenData?.filter((c: any) => c.linkStatus === "PENDING") || [];
+  const rejectedChildren = childrenData?.filter((c: any) => c.linkStatus === "REJECTED") || [];
   const [activeChildId, setActiveChildId] = useState(approvedChildren[0]?.id || null);
 
   const [addStudentUsername, setAddStudentUsername] = useState("");
@@ -78,7 +79,7 @@ export default function ParentDashboardClient({
       });
       const data = await res.json();
       if (data.success) {
-        await showSuccess("ส่งคำขอสำเร็จ", "กรุณารอให้นักเรียนกดยืนยันการผูกบัญชีจากหน้าจอของนักเรียน");
+        await showSuccess("ส่งคำขอสำเร็จ", data.message || "กรุณารอให้นักเรียนกดยืนยันการผูกบัญชีจากหน้าจอของนักเรียน");
         setAddStudentUsername("");
         setAddStudentNationalId("");
         window.location.reload(); // Refresh to show pending child
@@ -101,29 +102,6 @@ export default function ParentDashboardClient({
     setActiveTab(id);
     setIsMobileMenuOpen(false);
   };
-
-
-  if (approvedChildren.length === 0 && pendingChildren.length === 0) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col p-8 font-sans">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="text-[var(--text-3xl)] font-bold text-foreground mb-2">ข้อมูลสำหรับผู้ปกครอง</h1>
-          </div>
-          <div className="text-sm text-muted-foreground bg-card px-5 py-3 rounded-xl shadow-sm border border-border text-right">
-            <div>ผู้ใช้งาน: <span className="font-semibold text-primary text-base">{session?.user?.name}</span></div>
-            <div className="mt-1.5"><LogoutButton /></div>
-          </div>
-        </div>
-        <div className="bg-orange-50 dark:bg-orange-950/20 border-l-4 border-orange-400 p-4 rounded-xl shadow-sm max-w-2xl">
-          <p className="text-orange-800 dark:text-orange-200 font-medium">
-            ระบบตรวจพบว่าบัญชีของคุณยังไม่ได้ผูกกับรหัสนักเรียนใดๆ
-          </p>
-          <p className="text-orange-700 dark:text-orange-300 text-sm mt-2">โปรดติดต่อนักเรียนเพื่อขอ "รหัสผูกบัญชีผู้ปกครอง"</p>
-        </div>
-      </div>
-    );
-  }
 
   const activeChild = approvedChildren.find((c: any) => c.id === activeChildId);
   const attendances = activeChildId ? (allAttendances[activeChildId] || []) : [];
@@ -220,14 +198,66 @@ export default function ParentDashboardClient({
             </div>
           )}
 
+          {/* แจ้งเตือนกรณีถูกยกเลิกการผูกบัญชี */}
+          {rejectedChildren.length > 0 && (
+            <div className="bg-red-50 dark:bg-red-950/20 border-l-4 border-red-500 p-4 rounded-xl shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <p className="text-red-800 dark:text-red-200 font-bold flex items-center gap-2">
+                    <span>⚠️</span> การผูกบัญชีกับบุตรหลานถูกยกเลิก:
+                  </p>
+                  <ul className="mt-1 text-sm text-red-700 dark:text-red-300 list-disc list-inside">
+                    {rejectedChildren.map((child: any) => (
+                      <li key={child.id}>{child.name} ({child.username})</li>
+                    ))}
+                  </ul>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    หากนักเรียนเผลอยกเลิกผิดพลาดหรือต้องการเชื่อมต่อใหม่ สามารถกดปุ่มเพื่อส่งคำขอผูกใหม่อีกครั้งได้ทันที
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {rejectedChildren.map((child: any) => (
+                    <button
+                      key={child.id}
+                      type="button"
+                      onClick={() => {
+                        setAddStudentUsername(child.username);
+                        setSelectedStudentInfo(child);
+                      }}
+                      className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      ส่งคำขอผูกกับ {child.name} ใหม่
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* แจ้งเตือนกรณีผู้ปกครองใหม่ที่ยังไม่มีนักเรียนเลย */}
+          {approvedChildren.length === 0 && pendingChildren.length === 0 && rejectedChildren.length === 0 && (
+            <div className="bg-orange-50 dark:bg-orange-950/20 border-l-4 border-orange-400 p-4 rounded-xl shadow-sm">
+              <p className="text-orange-800 dark:text-orange-200 font-bold">
+                ระบบตรวจพบว่าบัญชีของคุณยังไม่ได้ผูกกับรหัสนักเรียนใดๆ
+              </p>
+              <p className="text-orange-700 dark:text-orange-300 text-sm mt-1">
+                โปรดค้นหาและเลือกชื่อนักเรียน หรือระบุรหัสนักเรียน และเลขบัตรประชาชน 4 ตัวท้ายในแบบฟอร์มด้านล่างเพื่อส่งคำขอผูกบัญชี
+              </p>
+            </div>
+          )}
+
           {pendingChildren.length > 0 && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 rounded-xl shadow-sm">
-              <p className="text-yellow-800 dark:text-yellow-200 font-medium">รอการอนุมัติการเข้าถึงข้อมูลจากนักเรียน:</p>
+              <p className="text-yellow-800 dark:text-yellow-200 font-bold">รอการอนุมัติการเข้าถึงข้อมูลจากนักเรียน:</p>
               <ul className="mt-2 text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside">
                 {pendingChildren.map((child: any) => (
                   <li key={child.id}>{child.name} (รหัส: {child.username})</li>
                 ))}
               </ul>
+              <p className="text-xs text-yellow-700/90 dark:text-yellow-400 mt-1">
+                (กรุณาแจ้งให้นักเรียนเข้าสู่ระบบบัญชีนักเรียนเพื่อกดปุ่ม &quot;อนุมัติ&quot;)
+              </p>
             </div>
           )}
 
@@ -345,8 +375,12 @@ export default function ParentDashboardClient({
           </div>
 
           {!activeChildId && approvedChildren.length === 0 ? (
-            <div className="text-center text-muted-foreground p-8 bg-card rounded-2xl border border-dashed border-border mt-8">
-              คุณยังไม่ได้รับการอนุมัติให้เข้าถึงข้อมูลนักเรียนคนใดเลย
+            <div className="text-center text-muted-foreground p-10 bg-card rounded-2xl border border-dashed border-border mt-8 shadow-sm">
+              <Users className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+              <p className="font-bold text-foreground text-base">ยังไม่มีข้อมูลนักเรียนที่ได้รับการอนุมัติ</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
+                เมื่อนักเรียนกดยืนยันอนุมัติคำขอ ข้อมูลส่วนตัว ผลการเรียน ประวัติการเข้าเรียน และตารางเรียนจะปรากฏที่หน้านี้โดยอัตโนมัติ
+              </p>
             </div>
           ) : activeChild && (
             <>
