@@ -7,8 +7,13 @@ export default function LogoutButton({ className }: { className?: string }) {
   const defaultClass = "inline-flex items-center text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-xs transition";
   return (
     <button
+      type="button"
       onClick={async () => {
-        await signOut({ redirect: false });
+        try {
+          await signOut({ redirect: false, callbackUrl: "/login" });
+        } catch (e) {
+          console.error("Logout error:", e);
+        }
         window.location.href = "/login";
       }}
       className={className || defaultClass}

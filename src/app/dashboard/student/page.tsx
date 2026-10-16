@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "../../../lib/prisma";
+import { getCurrentTermConfig } from "../../../lib/term";
 import Link from "next/link";
 import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
@@ -44,11 +45,6 @@ export default async function StudentDashboard() {
     redirect("/login");
   }
 
-  if (!myInfo) {
-    // Fix #5: ถ้าไม่พบ user ใน DB (อาจถูกลบไปแล้ว) ให้ redirect ออก
-    redirect("/login");
-  }
-
   if (!myInfo.isTwoFactorEnabled) {
     redirect("/dashboard/2fa?forced=true");
   }
@@ -77,10 +73,7 @@ export default async function StudentDashboard() {
   });
 
   // 1. หาเทอมปัจจุบันอัตโนมัติจากวันที่ปัจจุบัน
-  const today = new Date();
-  const currentTerm = await prisma.termConfig.findFirst({
-    where: { startDate: { lte: today }, endDate: { gte: today } }
-  });
+  const currentTerm = await getCurrentTermConfig();
 
   // 2. กรองเฉพาะตารางเรียนของชั้นปีตัวเอง และ ต้องอยู่ในเทอมปัจจุบัน (ถ้ามีข้อมูลเทอมกำหนดไว้)
   const mySchedules = schedules.filter(sc => {

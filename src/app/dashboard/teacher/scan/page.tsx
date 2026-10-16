@@ -45,39 +45,30 @@ export default async function TeacherScanPage({ searchParams }: { searchParams: 
   });
 
   // ดึงเฉพาะวิชาที่อาจารย์คนนี้รับผิดชอบสอน พร้อมตารางสอนและคลาสสอนชดเชย
-  let subjects: any[] = [];
-  try {
-    subjects = await prisma.subject.findMany({
-      where: { teacherId, deletedAt: null },
-      include: {
-        schedule: {
-          where: { deletedAt: null },
-          select: { id: true, dayOfWeek: true, startTime: true, endTime: true }
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const subjects = await prisma.subject.findMany({
+    where: { teacherId, deletedAt: null },
+    include: {
+      schedule: {
+        where: { deletedAt: null },
+        select: { id: true, dayOfWeek: true, startTime: true, endTime: true }
+      },
+      makeupClasses: {
+        where: {
+          date: {
+            gte: todayStart,
+            lte: todayEnd
+          }
         },
-        makeupClasses: {
-          where: {
-            date: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)),
-              lte: new Date(new Date().setHours(23, 59, 59, 999))
-            }
-          },
-          select: { id: true, date: true, startTime: true, endTime: true, remark: true }
-        }
-      },
-      orderBy: { name: 'asc' }
-    });
-  } catch (err) {
-    subjects = await prisma.subject.findMany({
-      where: { teacherId, deletedAt: null },
-      include: {
-        schedule: {
-          where: { deletedAt: null },
-          select: { id: true, dayOfWeek: true, startTime: true, endTime: true }
-        }
-      },
-      orderBy: { name: 'asc' }
-    });
-  }
+        select: { id: true, date: true, startTime: true, endTime: true, remark: true }
+      }
+    },
+    orderBy: { name: 'asc' }
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col p-8 dark:bg-gray-900">

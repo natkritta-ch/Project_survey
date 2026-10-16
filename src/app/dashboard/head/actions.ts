@@ -52,11 +52,7 @@ export async function hardDeleteSubject(id: string) {
   revalidatePath("/dashboard/head");
 }
 
-// Helper: แปลง "HH:MM" เป็นจำนวนนาทีจากเที่ยงคืน
-function timeToMinutes(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return h * 60 + m;
-}
+import { timeToMinutes, isOverlapping } from "../../../lib/timeUtils";
 
 // Helper: ตรวจสอบว่า 2 กลุ่มเรียนมีนักเรียนกลุ่มเดียวกันหรือไม่ (เช่น ก.1,2 ชนกับ ก.1)
 function doGroupsOverlap(g1?: string | null, g2?: string | null): boolean {
@@ -74,13 +70,6 @@ function doGroupsOverlap(g1?: string | null, g2?: string | null): boolean {
   const partsA = extractTokens(a);
   const partsB = extractTokens(b);
   return partsA.some(x => partsB.includes(x));
-}
-
-// Helper: ตรวจว่าช่วงเวลา 2 คู่ซ้อนทับกันหรือไม่
-function isOverlapping(aStart: string, aEnd: string, bStart: string, bEnd: string): boolean {
-  const aS = timeToMinutes(aStart), aE = timeToMinutes(aEnd);
-  const bS = timeToMinutes(bStart), bE = timeToMinutes(bEnd);
-  return aS < bE && aE > bS;
 }
 
 export async function createSchedule(data: { subjectId: string; dayOfWeek: number; startTime: string; endTime: string }) {

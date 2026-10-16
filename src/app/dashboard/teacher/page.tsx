@@ -3,6 +3,7 @@ import { authOptions } from "../../../lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import prisma from "../../../lib/prisma";
+import { getCurrentTermConfig } from "../../../lib/term";
 import TeacherDashboardClient from "./TeacherDashboardClient";
 import LogoutButton from "../../../components/LogoutButton";
 
@@ -35,10 +36,7 @@ export default async function TeacherDashboard() {
   const allLevels = Array.from(uniqueLevels).filter(Boolean) as string[];
 
   // หาเทอมปัจจุบันอัตโนมัติจากวันที่ปัจจุบัน
-  const today = new Date();
-  const currentTerm = await prisma.termConfig.findFirst({
-    where: { startDate: { lte: today }, endDate: { gte: today } }
-  });
+  const currentTerm = await getCurrentTermConfig();
 
   // เปรียบเทียบ TermConfig กับค่า term จริงที่อยู่ในตารางสอน
   let activeTermName = "ทั้งหมด";

@@ -20,6 +20,8 @@ model attendance {
 
   @@index([studentId], map: "Attendance_studentId_fkey")
   @@index([subjectId], map: "Attendance_subjectId_fkey")
+  @@index([timestamp])
+  @@index([type, timestamp])
 }
 
 model grade {
@@ -72,6 +74,7 @@ model schedule {
   subject   subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade, map: "Schedule_subjectId_fkey")
 
   @@index([subjectId], map: "Schedule_subjectId_fkey")
+  @@index([dayOfWeek, deletedAt])
 }
 
 model subject {
@@ -95,6 +98,7 @@ model subject {
 
   @@unique([code, academicYear, term, group, level])
   @@index([teacherId], map: "Subject_teacherId_fkey")
+  @@index([deletedAt])
 }
 
 model makeupClass {
@@ -161,6 +165,7 @@ model user {
   studentLinks       ParentStudentLink[] @relation("StudentLinks")
 
   @@index([studentId], map: "User_studentId_fkey")
+  @@index([role, deletedAt])
 }
 
 model ParentStudentLink {

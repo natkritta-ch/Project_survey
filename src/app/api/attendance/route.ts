@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "../../../lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
+import { parseTimeToMinutes } from "../../../lib/timeUtils";
 
 export async function POST(request: Request) {
   try {
@@ -62,11 +63,6 @@ export async function POST(request: Request) {
 
     // 💡 ระบบตรวจสอบช่วงเวลาเข้าแถว (Assembly with 30-min buffer: 07:10 - 08:30 น.)
     if (isAssembly) {
-      const parseTimeToMinutes = (timeStr: string) => {
-        const [h, m] = timeStr.split(":").map(Number);
-        return h * 60 + m;
-      };
-
       const now = new Date();
       const thaiTimeStr = new Intl.DateTimeFormat('en-GB', {
         timeZone: 'Asia/Bangkok',
@@ -92,11 +88,6 @@ export async function POST(request: Request) {
       // เข้าแถวมีสถานะเดียวคือมา (PRESENT) ไม่มีสถานะมาสาย
       computedStatus = "PRESENT";
     } else if (subjectId) {
-      const parseTimeToMinutes = (timeStr: string) => {
-        const [h, m] = timeStr.split(":").map(Number);
-        return h * 60 + m;
-      };
-
       const now = new Date();
       const thaiDateStr = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Bangkok',

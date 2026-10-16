@@ -122,6 +122,16 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return url;
+      try {
+        const urlObj = new URL(url);
+        if (urlObj.hostname === "localhost" || urlObj.hostname === "127.0.0.1") {
+          return urlObj.pathname + urlObj.search;
+        }
+      } catch {}
+      return baseUrl;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

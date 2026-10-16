@@ -2,6 +2,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "../../../lib/prisma";
+import { getCurrentTermConfig } from "../../../lib/term";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
@@ -40,10 +41,7 @@ export default async function ParentDashboard() {
   let allSchedules: any = {};
 
   if (approvedChildren.length > 0) {
-    const today = new Date();
-    const currentTerm = await prisma.termConfig.findFirst({
-      where: { startDate: { lte: today }, endDate: { gte: today } }
-    });
+    const currentTerm = await getCurrentTermConfig();
 
     const schedules = await prisma.schedule.findMany({
       where: { deletedAt: null },

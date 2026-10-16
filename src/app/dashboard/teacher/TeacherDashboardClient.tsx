@@ -214,7 +214,15 @@ export default function TeacherDashboardClient({
 
         <div className="p-4 border-t border-indigo-800/50">
           <button 
-            onClick={() => signOut({ callbackUrl: '/login' })}
+            type="button"
+            onClick={async () => {
+              try {
+                await signOut({ redirect: false, callbackUrl: '/login' });
+              } catch (e) {
+                console.error("Logout error:", e);
+              }
+              window.location.href = "/login";
+            }}
             className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-300 hover:bg-red-900/30 hover:text-red-200 transition-all font-medium text-sm"
           >
             <LogOut className="w-5 h-5" /> ออกจากระบบ

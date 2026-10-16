@@ -20,7 +20,30 @@ export default async function HeadDashboard() {
     orderBy: [{ dayOfWeek: 'asc' }, { startTime: 'asc' }] 
   });
   const rawUsers = await prisma.user.findMany({ 
-    include: { 
+    select: { 
+      id: true,
+      name: true,
+      username: true,
+      role: true,
+      level: true,
+      nickname: true,
+      gender: true,
+      bloodType: true,
+      phone: true,
+      address: true,
+      email: true,
+      nationalId: true,
+      canEditProfile: true,
+      canSubmitGrades: true,
+      isTwin: true,
+      twinNote: true,
+      twinVerified: true,
+      profilePicture: true,
+      studentId: true,
+      deletedAt: true,
+      createdAt: true,
+      updatedAt: true,
+      isTwoFactorEnabled: true,
       student: true, 
       attendances: true,
       parentLinks: {
@@ -31,20 +54,18 @@ export default async function HeadDashboard() {
   });
 
   const users = rawUsers.map(u => {
-    const { faceDescriptor, ...rest } = u;
-    
     // คำนวณความสัมพันธ์บุตรหลานที่ได้รับการอนุมัติจริง (APPROVED)
-    const approvedLinks = rest.parentLinks?.filter((l: any) => l.status === "APPROVED") || [];
-    const hasRejectedCurrentStudent = rest.parentLinks?.some(
-      (l: any) => l.studentId === rest.studentId && l.status === "REJECTED"
+    const approvedLinks = u.parentLinks?.filter((l: any) => l.status === "APPROVED") || [];
+    const hasRejectedCurrentStudent = u.parentLinks?.some(
+      (l: any) => l.studentId === u.studentId && l.status === "REJECTED"
     );
 
     // ถ้า studentId เดิมตรงกับ link ที่ถูก REJECTED ไปแล้ว ให้เคลียร์ออก
-    const effectiveStudent = hasRejectedCurrentStudent ? null : rest.student;
-    const effectiveStudentId = hasRejectedCurrentStudent ? null : rest.studentId;
+    const effectiveStudent = hasRejectedCurrentStudent ? null : u.student;
+    const effectiveStudentId = hasRejectedCurrentStudent ? null : u.studentId;
 
     return {
-      ...rest,
+      ...u,
       student: effectiveStudent,
       studentId: effectiveStudentId,
       approvedChildren: approvedLinks.map((l: any) => l.student).filter(Boolean)
