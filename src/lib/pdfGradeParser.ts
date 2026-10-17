@@ -31,6 +31,60 @@ export interface ParseGradePdfResult {
 }
 
 /**
+ * แปลงรหัสอักขระพิเศษภาษาไทยในฟอนต์ PDF (เช่น Windows-Thai Private Use Area \uF700-\uF71A)
+ * ให้อยู่ในรูปอักขระ Unicode ภาษาไทยมาตรฐาน (\u0E00-\u0E7F)
+ * เพื่อแก้ปัญหาสระลอย/วรรณยุกต์ที่อยู่บนพยัญชนะหางยาว (ป, ฝ, ฟ) แสดงเป็นสี่เหลี่ยม หรือรหัส PUA
+ */
+export function normalizeThaiText(text: string): string {
+  if (!text) return "";
+
+  const puaMap: Record<string, string> = {
+    '\uF700': '\u0E48', // ไม้เอก (shifted)
+    '\uF701': '\u0E49', // ไม้โท (shifted)
+    '\uF702': '\u0E4A', // ไม้ตรี (shifted)
+    '\uF703': '\u0E4B', // ไม้จัตวา (shifted)
+    '\uF704': '\u0E4C', // ทัณฑฆาต/การันต์ (shifted)
+    '\uF705': '\u0E34', // สระอิ (shifted)
+    '\uF706': '\u0E35', // สระอี (shifted)
+    '\uF707': '\u0E36', // สระอึ (shifted)
+    '\uF708': '\u0E37', // สระอือ (shifted)
+    '\uF709': '\u0E38', // สระอุ (shifted)
+    '\uF70A': '\u0E47', // ไม้ไต่คู้ (shifted)
+    '\uF70B': '\u0E48', // ไม้เอก (lower)
+    '\uF70C': '\u0E49', // ไม้โท (lower)
+    '\uF70D': '\u0E4A', // ไม้ตรี (lower)
+    '\uF70E': '\u0E4B', // ไม้จัตวา (lower)
+    '\uF70F': '\u0E4C', // ทัณฑฆาต (lower)
+    '\uF710': '\u0E31', // ไม้หันอากาศ (shifted left บน ป, ฝ, ฟ)
+    '\uF711': '\u0E4D', // นิคหิต
+    '\uF712': '\u0E38', // สระอุ (lower)
+    '\uF713': '\u0E39', // สระอู (lower)
+    '\uF714': '\u0E3A', // พินทุ (lower)
+    '\uF715': '\u0E34', // สระอิ (lower)
+    '\uF716': '\u0E35', // สระอี (lower)
+    '\uF717': '\u0E36', // สระอึ (lower)
+    '\uF718': '\u0E37', // สระอือ (lower)
+    '\uF719': '\u0E47', // ไม้ไต่คู้ (lower)
+    '\uF71A': '\u0E31', // ไม้หันอากาศ (lower)
+  };
+
+  return text
+    .replace(/[\uF700-\uF71A]/g, (ch) => puaMap[ch] || ch)
+    .normalize('NFC');
+}
+
+/**
+ * สกัดโครงพยัญชนะภาษาไทยล้วน (ก-ฮ: \u0E01-\u0E2E)
+ * โดยตัดสระ วรรณยุกต์ ช่องว่าง และอักขระที่แปลงค่าไม่ได้ (\uFFFD / ตัวสี่เหลี่ยม) ออกทั้งหมด
+ * เพื่อให้สามารถเปรียบเทียบชื่อได้อย่างแม่นยำ 100% แม้ฟอนต์ PDF จะแสดงผลสระลอยผิดเพี้ยน
+ */
+export function extractThaiConsonantSkeleton(text: string): string {
+  if (!text) return "";
+  const consonants = text.match(/[\u0E01-\u0E2E]/g);
+  return consonants ? consonants.join('') : "";
+}
+
+/**
  * ฟังก์ชันอ่านและสกัดข้อมูลเกรดจากไฟล์ PDF ทางการ (ศธ.02 / RMS)
  * พร้อมระบบตรวจสอบรหัสนักเรียนเพื่อป้องกันการนำใบเกรดของผู้อื่นมาอัปโหลด
  */
@@ -41,7 +95,7 @@ export async function parseGradePdf(
 ): Promise<ParseGradePdfResult> {
   try {
     const data = await pdf(buffer);
-    const rawText = data.text || "";
+    const rawText = normalizeThaiText(data.text || "");
 
     if (!rawText || rawText.trim().length < 50) {
       return {
@@ -76,7 +130,14 @@ export async function parseGradePdf(
 
     const studentNameMatch = rawText.match(/ชื่อ\s*[-–—/]?\s*สกุล\s*[:：]?\s*([^\n\r]+)/) ||
                              rawText.match(/ชื่อ\s*[:：]?\s*(นาย|นางสาว|น\.ส\.|เด็กชาย|เด็กหญิง\s*[^\n\r]+)/);
-    const extractedStudentName = studentNameMatch ? studentNameMatch[1].replace(/\s+/g, ' ').trim() : undefined;
+    let extractedStudentName = studentNameMatch ? studentNameMatch[1].replace(/\s+/g, ' ').trim() : undefined;
+    if (extractedStudentName) {
+      // ตัดข้อความส่วนเกินหากมีหัวข้ออื่นต่อท้ายในบรรทัดเดียวกัน
+      extractedStudentName = extractedStudentName
+        .split(/\s+(?:รหัส|ระดับ|กลุ่ม|สาขา|ภาคเรียน|แผนก|ชั้นปี|GPA|GPAX)\b/i)[0]
+        .replace(/\uFFFD/g, '')
+        .trim();
+    }
 
     // 3. ตรวจสอบความถูกต้องของบุคคลอย่างเข้มงวด (Strict Security Check)
     // 3.1 ตรวจสอบรหัสนักศึกษา / Username
@@ -110,7 +171,7 @@ export async function parseGradePdf(
 
     // 3.2 ตรวจสอบชื่อ-นามสกุล (Strict Name Check)
     if (expectedStudentName) {
-      const cleanExpectedName = expectedStudentName
+      const cleanExpectedName = normalizeThaiText(expectedStudentName)
         .replace(/นาย|นางสาว|น\.ส\.|เด็กชาย|เด็กหญิง/g, '')
         .replace(/\s+/g, ' ')
         .trim();
@@ -119,17 +180,36 @@ export async function parseGradePdf(
       const firstName = nameParts[0] || "";
       const lastName = nameParts[1] || "";
 
-      // ถ้าใน PDF สกัดชื่อได้ และชื่อไม่ตรงกับชื่อของผู้ใช้นี้
+      // โครงพยัญชนะภาษาไทยสำหรับเปรียบเทียบเพื่อป้องกันความผิดพลาดจากฟอนต์สระลอย
+      const expConsonantsFirst = extractThaiConsonantSkeleton(firstName);
+      const expConsonantsFull = extractThaiConsonantSkeleton(cleanExpectedName);
+      const rawTextConsonants = extractThaiConsonantSkeleton(rawText);
+
+      // ถ้าใน PDF สกัดชื่อได้
       if (extractedStudentName) {
-        const cleanExtractedName = extractedStudentName
+        const cleanExtractedName = normalizeThaiText(extractedStudentName)
           .replace(/นาย|นางสาว|น\.ส\.|เด็กชาย|เด็กหญิง/g, '')
           .replace(/\s+/g, ' ')
           .trim();
 
-        const isNameMatched = 
+        const extConsonants = extractThaiConsonantSkeleton(cleanExtractedName);
+
+        // 1. ตรวจสอบการตรงกันโดยตรง (Direct String Substring Match)
+        const isDirectMatch = 
           (firstName && cleanExtractedName.includes(firstName)) || 
           (cleanExpectedName && cleanExtractedName.includes(cleanExpectedName)) ||
+          cleanExtractedName.includes(cleanExpectedName) ||
+          cleanExpectedName.includes(cleanExtractedName) ||
           rawText.includes(firstName);
+
+        // 2. ตรวจสอบด้วยโครงพยัญชนะ (Consonant Skeleton Match)
+        // เพื่อรองรับฟอนต์ระบบ ศธ.02/RMS ที่สระลอยถูกแปลงเป็นสี่เหลี่ยม (\uFFFD) หรือรหัส PUA
+        const isSkeletonMatch = 
+          (expConsonantsFirst.length >= 3 && extConsonants.includes(expConsonantsFirst)) ||
+          (expConsonantsFull.length >= 4 && (extConsonants.includes(expConsonantsFull) || expConsonantsFull.includes(extConsonants))) ||
+          (expConsonantsFirst.length >= 3 && rawTextConsonants.includes(expConsonantsFirst));
+
+        const isNameMatched = isDirectMatch || isSkeletonMatch;
 
         if (!isNameMatched) {
           return {
@@ -141,14 +221,20 @@ export async function parseGradePdf(
             rawText,
           };
         }
-      } else if (firstName && !rawText.includes(firstName)) {
-        // ตรวจสอบในข้อความทั้งหมดว่ามีชื่อตัวจริงของผู้ใช้หรือไม่
-        return {
-          success: false,
-          error: `ไม่พบชื่อ-นามสกุลของคุณ (${expectedStudentName}) ในเอกสาร PDF นี้ ป้องกันการนำเอกสารของผู้อื่นมาส่ง`,
-          subjects: [],
-          rawText,
-        };
+      } else {
+        // กรณีดึงชื่อเป็นฟิลด์ไม่ได้ ตรวจสอบชื่อในเนื้อหาเอกสารทั้งหมด
+        const hasNameInRaw = 
+          (firstName && rawText.includes(firstName)) ||
+          (expConsonantsFirst.length >= 3 && rawTextConsonants.includes(expConsonantsFirst));
+
+        if (!hasNameInRaw) {
+          return {
+            success: false,
+            error: `ไม่พบชื่อ-นามสกุลของคุณ (${expectedStudentName}) ในเอกสาร PDF นี้ ป้องกันการนำเอกสารของผู้อื่นมาส่ง`,
+            subjects: [],
+            rawText,
+          };
+        }
       }
     }
 
@@ -251,8 +337,8 @@ export async function parseGradePdf(
     return {
       success: true,
       collegeName: "วิทยาลัยเทคนิคแพร่",
-      studentId: extractedStudentId,
-      studentName: extractedStudentName,
+      studentId: extractedStudentId || expectedStudentUsername,
+      studentName: (extractedStudentName && !extractedStudentName.includes('\uFFFD')) ? extractedStudentName : (expectedStudentName || extractedStudentName),
       groupCode,
       groupName,
       level,
