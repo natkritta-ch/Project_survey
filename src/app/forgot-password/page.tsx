@@ -36,18 +36,19 @@ export default function ForgotPasswordPage() {
         setMaskedEmail(res.displayEmail);
         setStep(2);
         if (res.mockOtp) {
+          setOtpCode(res.mockOtp);
           setTimeout(() => {
             showInfo(
-              "รหัส OTP (ระบบทดสอบ)",
-              `รหัส OTP 6 หลักของคุณคือ: ${res.mockOtp}\n(มีอายุการใช้งาน 5 นาที)`
+              "รหัส OTP สำหรับตั้งรหัสผ่านใหม่",
+              `${res.warning ? res.warning + "\n\n" : ""}รหัส OTP ของคุณคือ: ${res.mockOtp}\n(ระบบกรอกให้โดยอัตโนมัติแล้ว)`
             );
           }, 300);
         }
       } else {
         setError(res.error || "ไม่สามารถส่ง OTP ได้");
       }
-    } catch (err) {
-      setError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+    } catch (err: any) {
+      setError(err?.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
     } finally {
       setIsLoading(false);
     }
@@ -65,8 +66,8 @@ export default function ForgotPasswordPage() {
       } else {
         setError(res.error || "รหัส OTP ไม่ถูกต้อง");
       }
-    } catch (err) {
-      setError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+    } catch (err: any) {
+      setError(err?.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
     } finally {
       setIsLoading(false);
     }
@@ -82,19 +83,18 @@ export default function ForgotPasswordPage() {
     setError("");
 
     try {
-      // Pass username instead of verifiedUserId
       const res = await updatePassword(username.trim(), newPassword);
       if (res.success) {
-        setSuccessMsg("เปลี่ยนรหัสผ่านสำเร็จแล้ว! กรุณากลับไปเข้าสู่ระบบ");
-        setStep(3); // Show Success UI
+        setSuccessMsg("เปลี่ยนรหัสผ่านสำเร็จแล้ว! กำลังพากลับไปหน้าเข้าสู่ระบบ...");
+        setStep(4);
         setTimeout(() => {
           router.push("/login");
         }, 3000);
       } else {
         setError(res.error || "เกิดข้อผิดพลาด ไม่สามารถเปลี่ยนรหัสผ่านได้");
       }
-    } catch (err) {
-      setError("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+    } catch (err: any) {
+      setError(err?.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
     } finally {
       setIsLoading(false);
     }
