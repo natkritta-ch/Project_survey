@@ -92,6 +92,7 @@ export async function GET(request: Request) {
     const totalStudents = allStudents.length;
     const submittedCount = submissions.length;
     const approvedCount = submissions.filter((s: any) => s.status === "APPROVED").length;
+    const teacherApprovedCount = submissions.filter((s: any) => s.status === "TEACHER_APPROVED").length;
     const pendingCount = submissions.filter((s: any) => s.status === "SUBMITTED").length;
     const rejectedCount = submissions.filter((s: any) => s.status === "REJECTED").length;
 
@@ -102,6 +103,7 @@ export async function GET(request: Request) {
         totalStudents,
         submittedCount,
         approvedCount,
+        teacherApprovedCount,
         pendingCount,
         rejectedCount,
         percent: totalStudents > 0 ? Math.round((submittedCount / totalStudents) * 100) : 0,

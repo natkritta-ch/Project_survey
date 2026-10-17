@@ -78,6 +78,15 @@ export async function POST(request: Request) {
     }
 
     if (action === "APPROVE") {
+      const isHead = userRole === "HEAD";
+      const targetStatus = isHead ? "APPROVED" : "TEACHER_APPROVED";
+      
+      const finalApprovedBy = isHead
+        ? (submission.approvedBy && !submission.approvedBy.includes("หัวหน้าแผนก") 
+            ? `${submission.approvedBy} (อาจารย์) / ${userName} (หัวหน้าแผนก)` 
+            : `${userName} (หัวหน้าแผนก)`)
+        : userName;
+
       // 1. ดึงรายการวิชาจาก editedSubjects (หากอาจารย์แก้หน้าจอ) หรือจาก extractedData เดิม
       let subjectsList: any[] = [];
       if (editedSubjects && Array.isArray(editedSubjects)) {
@@ -90,66 +99,68 @@ export async function POST(request: Request) {
         }
       }
 
-      // 2. บันทึก / ซิงก์เกรดรายวิชาลงในตาราง grade จริงในฐานข้อมูล
+      // 2. ถ้าเป็นหัวหน้าแผนก (Final Approval) ให้บันทึก / ซิงก์เกรดรายวิชาลงในตาราง grade จริงในฐานข้อมูล
       let syncedCount = 0;
-      for (const sub of subjectsList) {
-        if (!sub.code) continue;
+      if (isHead) {
+        for (const sub of subjectsList) {
+          if (!sub.code) continue;
 
-        // ค้นหาวิชาในระบบตามรหัสวิชา code (เช่น 30000-1101)
-        let subjectRecord = await prisma.subject.findFirst({
-          where: {
-            code: sub.code,
-            deletedAt: null
-          }
-        });
-
-        // หากยังไม่มีวิชาในระบบ ให้สร้างวิชาให้อัตโนมัติตามข้อมูลในใบรายงานผลการศึกษา
-        if (!subjectRecord) {
-          subjectRecord = await prisma.subject.create({
-            data: {
-              code: sub.code,
-              name: sub.name || sub.code,
-              credit: sub.credits || 3,
-              academicYear: submission.academicYear,
-              term: submission.term,
-              level: submission.student?.level || "-",
-              group: "ก.1,2"
-            }
-          });
-        }
-
-        // ถ้าวิชามีเกรดที่เป็นตัวเลข (เช่น 4.0, 3.5, 3.0 ...) หรือค่า gradeValue
-        const numGrade = sub.gradeValue !== undefined && sub.gradeValue !== null ? sub.gradeValue : parseFloat(sub.grade);
-        if (!isNaN(numGrade)) {
-          await prisma.grade.upsert({
+          // ค้นหาวิชาในระบบตามรหัสวิชา code (เช่น 30000-1101)
+          let subjectRecord = await prisma.subject.findFirst({
             where: {
-              studentId_subjectId: {
-                studentId: submission.studentId,
-                subjectId: subjectRecord.id
-              }
-            },
-            update: {
-              grade: numGrade,
-              updatedAt: new Date()
-            },
-            create: {
-              id: crypto.randomUUID(),
-              studentId: submission.studentId,
-              subjectId: subjectRecord.id,
-              grade: numGrade,
-              updatedAt: new Date()
+              code: sub.code,
+              deletedAt: null
             }
           });
-          syncedCount++;
+
+          // หากยังไม่มีวิชาในระบบ ให้สร้างวิชาให้อัตโนมัติตามข้อมูลในใบรายงานผลการศึกษา
+          if (!subjectRecord) {
+            subjectRecord = await prisma.subject.create({
+              data: {
+                code: sub.code,
+                name: sub.name || sub.code,
+                credit: sub.credits || 3,
+                academicYear: submission.academicYear,
+                term: submission.term,
+                level: submission.student?.level || "-",
+                group: "ก.1,2"
+              }
+            });
+          }
+
+          // ถ้าวิชามีเกรดที่เป็นตัวเลข (เช่น 4.0, 3.5, 3.0 ...) หรือค่า gradeValue
+          const numGrade = sub.gradeValue !== undefined && sub.gradeValue !== null ? sub.gradeValue : parseFloat(sub.grade);
+          if (!isNaN(numGrade)) {
+            await prisma.grade.upsert({
+              where: {
+                studentId_subjectId: {
+                  studentId: submission.studentId,
+                  subjectId: subjectRecord.id
+                }
+              },
+              update: {
+                grade: numGrade,
+                updatedAt: new Date()
+              },
+              create: {
+                id: crypto.randomUUID(),
+                studentId: submission.studentId,
+                subjectId: subjectRecord.id,
+                grade: numGrade,
+                updatedAt: new Date()
+              }
+            });
+            syncedCount++;
+          }
         }
       }
 
-      // 3. ปรับสถานะใบเกรดเป็น APPROVED
+      // 3. ปรับสถานะใบเกรดตามบทบาท (TEACHER_APPROVED หรือ APPROVED)
       const updated = await (prisma as any).gradeSubmission.update({
         where: { id: submissionId },
         data: {
-          status: "APPROVED",
-          approvedBy: userName,
+          status: targetStatus,
+          approvedBy: finalApprovedBy,
           approvedAt: new Date(),
           rejectReason: null,
           extractedData: JSON.stringify(subjectsList),
@@ -159,9 +170,13 @@ export async function POST(request: Request) {
         }
       });
 
+      const successMessage = isHead
+        ? `หัวหน้าแผนกรับรองผลการเรียนของ ${submission.student?.name} สมบูรณ์แล้ว (บันทึกเกรดรายวิชา ${syncedCount} วิชา)`
+        : `อาจารย์ประจำชั้นตรวจอนุมัติใบเกรดของ ${submission.student?.name} เรียบร้อยแล้ว (ส่งต่อให้หัวหน้าแผนกรับรอง)`;
+
       return NextResponse.json({
         success: true,
-        message: `อนุมัติผลการเรียนของ ${submission.student?.name} สำเร็จ บันทึกเกรดรายวิชาแล้ว ${syncedCount} วิชา ผู้ปกครองและนักเรียนสามารถดูได้ทันที`,
+        message: successMessage,
         submission: updated,
         syncedCount
       });

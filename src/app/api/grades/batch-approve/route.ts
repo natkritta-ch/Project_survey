@@ -29,11 +29,14 @@ export async function POST(request: Request) {
       studentWhere.level = level;
     }
 
+    const isHead = userRole === "HEAD";
+    const statusQuery = isHead ? { in: ["TEACHER_APPROVED", "SUBMITTED"] } : "SUBMITTED";
+
     const pendingSubmissions = await (prisma as any).gradeSubmission.findMany({
       where: {
         academicYear,
         term,
-        status: "SUBMITTED",
+        status: statusQuery,
         student: studentWhere
       },
       include: {
@@ -47,7 +50,9 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         count: 0,
-        message: "ไม่มีใบเกรดที่รออนุมัติในกลุ่มนี้"
+        message: isHead 
+          ? "ไม่มีใบเกรดที่รอรับรองในกลุ่มนี้" 
+          : "ไม่มีใบเกรดที่รออาจารย์ตรวจสอบในกลุ่มนี้"
       });
     }
 
@@ -64,53 +69,63 @@ export async function POST(request: Request) {
         }
       }
 
-      for (const sub of subjectsList) {
-        if (!sub.code) continue;
-        let subjectRecord = await prisma.subject.findFirst({
-          where: { code: sub.code, deletedAt: null }
-        });
-
-        if (!subjectRecord) {
-          subjectRecord = await prisma.subject.create({
-            data: {
-              code: sub.code,
-              name: sub.name || sub.code,
-              credit: sub.credits || 3,
-              academicYear: submission.academicYear,
-              term: submission.term,
-              level: submission.student?.level || "-",
-              group: "ก.1,2"
-            }
+      // ถ้าเป็นหัวหน้าแผนกรับรอง ให้ซิงก์วิชาและเกรด
+      if (isHead) {
+        for (const sub of subjectsList) {
+          if (!sub.code) continue;
+          let subjectRecord = await prisma.subject.findFirst({
+            where: { code: sub.code, deletedAt: null }
           });
-        }
 
-        const numGrade = sub.gradeValue !== undefined && sub.gradeValue !== null ? sub.gradeValue : parseFloat(sub.grade);
-        if (!isNaN(numGrade)) {
-          await prisma.grade.upsert({
-            where: {
-              studentId_subjectId: {
-                studentId: submission.studentId,
-                subjectId: subjectRecord.id
+          if (!subjectRecord) {
+            subjectRecord = await prisma.subject.create({
+              data: {
+                code: sub.code,
+                name: sub.name || sub.code,
+                credit: sub.credits || 3,
+                academicYear: submission.academicYear,
+                term: submission.term,
+                level: submission.student?.level || "-",
+                group: "ก.1,2"
               }
-            },
-            update: { grade: numGrade, updatedAt: new Date() },
-            create: {
-              id: crypto.randomUUID(),
-              studentId: submission.studentId,
-              subjectId: subjectRecord.id,
-              grade: numGrade,
-              updatedAt: new Date()
-            }
-          });
-          totalSyncedGrades++;
+            });
+          }
+
+          const numGrade = sub.gradeValue !== undefined && sub.gradeValue !== null ? sub.gradeValue : parseFloat(sub.grade);
+          if (!isNaN(numGrade)) {
+            await prisma.grade.upsert({
+              where: {
+                studentId_subjectId: {
+                  studentId: submission.studentId,
+                  subjectId: subjectRecord.id
+                }
+              },
+              update: { grade: numGrade, updatedAt: new Date() },
+              create: {
+                id: crypto.randomUUID(),
+                studentId: submission.studentId,
+                subjectId: subjectRecord.id,
+                grade: numGrade,
+                updatedAt: new Date()
+              }
+            });
+            totalSyncedGrades++;
+          }
         }
       }
+
+      const targetStatus = isHead ? "APPROVED" : "TEACHER_APPROVED";
+      const finalApprovedBy = isHead
+        ? (submission.approvedBy && !submission.approvedBy.includes("หัวหน้าแผนก") 
+            ? `${submission.approvedBy} (อาจารย์) / ${userName} (หัวหน้าแผนก)` 
+            : `${userName} (หัวหน้าแผนก)`)
+        : userName;
 
       await (prisma as any).gradeSubmission.update({
         where: { id: submission.id },
         data: {
-          status: "APPROVED",
-          approvedBy: userName,
+          status: targetStatus,
+          approvedBy: finalApprovedBy,
           approvedAt: new Date(),
           rejectReason: null,
           updatedAt: new Date()

@@ -94,6 +94,7 @@ export default function StudentGrades({
   ) || submissions[0] || null;
 
   const isApproved = currentSubmission?.status === "APPROVED";
+  const isTeacherApproved = currentSubmission?.status === "TEACHER_APPROVED";
   const isSubmitted = currentSubmission?.status === "SUBMITTED";
   const isRejected = currentSubmission?.status === "REJECTED";
 
@@ -305,6 +306,46 @@ export default function StudentGrades({
               >
                 <Eye className="w-4 h-4" />
                 ดูเอกสาร PDF ฉบับเต็ม
+              </button>
+            )}
+          </div>
+        ) : isTeacherApproved ? (
+          <div className="p-5 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="p-2 rounded-xl bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300 shrink-0 mt-0.5">
+                <Clock className="w-6 h-6 animate-pulse" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-base text-blue-900 dark:text-blue-200">
+                  อาจารย์ประจำชั้นตรวจผ่านแล้ว — อยู่ระหว่างรอหัวหน้าแผนกรับรองขั้นสุดท้าย (Stage 2)
+                </h4>
+                <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 mt-0.5">
+                  ตรวจผ่านโดย: <strong>{currentSubmission.approvedBy || "อาจารย์ประจำชั้น"}</strong> เมื่อ {new Date(currentSubmission.approvedAt || currentSubmission.updatedAt).toLocaleDateString("th-TH")}
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="px-3 py-1 rounded-lg text-xs font-bold bg-blue-200/60 dark:bg-blue-800/60 text-blue-900 dark:text-blue-100">
+                    เกรดเฉลี่ย (GPA): {currentSubmission.gpa !== null ? Number(currentSubmission.gpa).toFixed(2) : "-"}
+                  </span>
+                  {currentSubmission.gpax && (
+                    <span className="px-3 py-1 rounded-lg text-xs font-medium bg-white dark:bg-gray-800 text-blue-800 dark:text-blue-200 border border-blue-300">
+                      GPAX: {Number(currentSubmission.gpax).toFixed(2)}
+                    </span>
+                  )}
+                  {currentSubmission.totalCredits && (
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                      หน่วยกิต: {currentSubmission.totalCredits} น.ก.
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            {currentSubmission.fileData && (
+              <button
+                onClick={() => setPreviewPdfUrl(currentSubmission.fileData)}
+                className="px-4 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 border border-blue-300 text-blue-800 dark:text-blue-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm shrink-0"
+              >
+                <Eye className="w-4 h-4" />
+                ดูเอกสารที่ส่ง
               </button>
             )}
           </div>

@@ -366,9 +366,10 @@ export default function HeadGradesManagement({ users = [] }: { users: any[] }) {
                   className="bg-transparent font-bold text-gray-700 dark:text-gray-200 focus:outline-none"
                 >
                   <option value="all">ทุกสถานะ</option>
-                  <option value="SUBMITTED">รอการตรวจสอบ</option>
-                  <option value="APPROVED">อนุมัติแล้ว</option>
-                  <option value="REJECTED">ให้ส่งใหม่</option>
+                  <option value="TEACHER_APPROVED">⭐ รอรับรอง (ผ่านอาจารย์แล้ว)</option>
+                  <option value="SUBMITTED">⏳ รออาจารย์ตรวจ</option>
+                  <option value="APPROVED">✓ รับรองสมบูรณ์แล้ว</option>
+                  <option value="REJECTED">✕ ให้ส่งใหม่</option>
                 </select>
               </div>
 
@@ -431,7 +432,11 @@ export default function HeadGradesManagement({ users = [] }: { users: any[] }) {
                       </span>
                       {sub.status === "APPROVED" ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full">
-                          <CheckCircle2 className="w-3 h-3" /> อนุมัติแล้ว
+                          <CheckCircle2 className="w-3 h-3" /> รับรองแล้ว
+                        </span>
+                      ) : sub.status === "TEACHER_APPROVED" ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/60 px-2 py-0.5 rounded-full">
+                          <Clock className="w-3 h-3 animate-pulse text-blue-600" /> รอรับรอง (ผ่านอาจารย์แล้ว)
                         </span>
                       ) : sub.status === "REJECTED" ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/60 px-2 py-0.5 rounded-full">
@@ -439,7 +444,7 @@ export default function HeadGradesManagement({ users = [] }: { users: any[] }) {
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-[11px] font-extrabold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 px-2 py-0.5 rounded-full">
-                          <Clock className="w-3 h-3 animate-pulse" /> รอตรวจ
+                          <Clock className="w-3 h-3" /> รออาจารย์ตรวจ
                         </span>
                       )}
                     </div>
@@ -849,7 +854,12 @@ export default function HeadGradesManagement({ users = [] }: { users: any[] }) {
                     {selectedSubmission.status === "APPROVED" ? (
                       <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5">
                         <CheckCircle2 className="w-4 h-4" />
-                        อนุมัติแล้วโดย {selectedSubmission.approvedBy || "อาจารย์"}
+                        รับรองสมบูรณ์แล้วโดย {selectedSubmission.approvedBy || "หัวหน้าแผนก"}
+                      </span>
+                    ) : selectedSubmission.status === "TEACHER_APPROVED" ? (
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4 text-blue-500" />
+                        ผ่านอาจารย์แล้วโดย {selectedSubmission.approvedBy || "อาจารย์"} (รอ Head รับรอง)
                       </span>
                     ) : selectedSubmission.status === "REJECTED" ? (
                       <span className="text-xs text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5">
@@ -859,7 +869,7 @@ export default function HeadGradesManagement({ users = [] }: { users: any[] }) {
                     ) : (
                       <span className="text-xs text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5">
                         <Clock className="w-4 h-4" />
-                        รอการตรวจสอบและอนุมัติ
+                        รออาจารย์ประจำชั้นตรวจสอบขั้นต้น
                       </span>
                     )}
                   </div>
@@ -872,7 +882,7 @@ export default function HeadGradesManagement({ users = [] }: { users: any[] }) {
                         className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
                       >
                         <RotateCcw className="w-4 h-4" />
-                        ยกเลิกการอนุมัติ (ปลดล็อก)
+                        ยกเลิกการรับรอง (ปลดล็อก)
                       </button>
                     ) : (
                       <>
@@ -882,15 +892,15 @@ export default function HeadGradesManagement({ users = [] }: { users: any[] }) {
                           className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:hover:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
                         >
                           <X className="w-4 h-4" />
-                          ปฏิเสธ / ให้ส่งใหม่
+                          ส่งกลับให้แก้ไข
                         </button>
                         <button
                           onClick={() => handleVerify("APPROVE")}
                           disabled={isVerifying}
-                          className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
+                          className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
                         >
                           {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                          อนุมัติ (Approve)
+                          {selectedSubmission.status === "TEACHER_APPROVED" ? "รับรองผลการเรียน (Endorse)" : "อนุมัติรับรองทันที"}
                         </button>
                       </>
                     )}

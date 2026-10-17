@@ -319,9 +319,10 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
               className="border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-1.5 text-sm bg-white dark:bg-gray-700 dark:text-white font-medium"
             >
               <option value="all">ทุกสถานะ</option>
-              <option value="SUBMITTED">⏳ รอตรวจสอบ (Pending)</option>
-              <option value="APPROVED">✓ อนุมัติแล้ว (Approved)</option>
-              <option value="REJECTED">✕ ให้ส่งใหม่ (Rejected)</option>
+              <option value="SUBMITTED">⏳ รออาจารย์ตรวจ</option>
+              <option value="TEACHER_APPROVED">🔹 ตรวจผ่านแล้ว (รอ Head)</option>
+              <option value="APPROVED">✓ รับรองสมบูรณ์แล้ว</option>
+              <option value="REJECTED">✕ ให้ส่งใหม่</option>
             </select>
           </div>
 
@@ -377,6 +378,7 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredSubmissions.map((sub: any) => {
             const isApproved = sub.status === "APPROVED";
+            const isTeacherApproved = sub.status === "TEACHER_APPROVED";
             const isRejected = sub.status === "REJECTED";
             const isPending = sub.status === "SUBMITTED";
 
@@ -402,13 +404,19 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
                     {isApproved && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        อนุมัติแล้ว
+                        รับรองแล้ว
+                      </span>
+                    )}
+                    {isTeacherApproved && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        ตรวจแล้ว (รอ Head)
                       </span>
                     )}
                     {isPending && (
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 animate-pulse">
                         <Clock className="w-3.5 h-3.5" />
-                        รอตรวจสอบ
+                        รอตรวจ
                       </span>
                     )}
                     {isRejected && (
@@ -597,7 +605,12 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
                     {selectedSubmission.status === "APPROVED" ? (
                       <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1.5">
                         <CheckCircle2 className="w-4 h-4" />
-                        อนุมัติแล้วโดย {selectedSubmission.approvedBy || "อาจารย์"}
+                        รับรองสมบูรณ์แล้วโดย {selectedSubmission.approvedBy || "หัวหน้าแผนก"}
+                      </span>
+                    ) : selectedSubmission.status === "TEACHER_APPROVED" ? (
+                      <span className="text-xs text-blue-600 dark:text-blue-400 font-bold flex items-center gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                        ตรวจผ่านแล้วโดย {selectedSubmission.approvedBy || "อาจารย์"} (รอ Head รับรอง)
                       </span>
                     ) : selectedSubmission.status === "REJECTED" ? (
                       <span className="text-xs text-rose-600 dark:text-rose-400 font-bold flex items-center gap-1.5">
@@ -607,20 +620,22 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
                     ) : (
                       <span className="text-xs text-amber-600 dark:text-amber-400 font-bold flex items-center gap-1.5">
                         <Clock className="w-4 h-4" />
-                        รอการตรวจสอบและอนุมัติ
+                        รออาจารย์ตรวจสอบขั้นต้น
                       </span>
                     )}
                   </div>
 
                   <div className="flex items-center gap-2">
                     {selectedSubmission.status === "APPROVED" ? (
+                      <span className="text-xs text-gray-500 font-medium">ได้รับการรับรองขั้นสุดท้ายแล้ว</span>
+                    ) : selectedSubmission.status === "TEACHER_APPROVED" ? (
                       <button
                         onClick={() => handleVerify("REVOKE")}
                         disabled={isVerifying}
                         className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
                       >
                         <RotateCcw className="w-4 h-4" />
-                        ยกเลิกการอนุมัติ (ปลดล็อก)
+                        ยกเลิกการตรวจ (ปลดล็อก)
                       </button>
                     ) : (
                       <>
@@ -635,10 +650,10 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
                         <button
                           onClick={() => handleVerify("APPROVE")}
                           disabled={isVerifying}
-                          className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
+                          className="px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
                         >
                           {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                          อนุมัติ (Approve)
+                          อนุมัติตรวจสอบ (ส่งต่อ Head)
                         </button>
                       </>
                     )}
