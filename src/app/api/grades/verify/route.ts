@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { submissionId, action, rejectReason, editedSubjects } = body;
+    const { submissionId, action, rejectReason, editedSubjects, gpa, gpax } = body;
 
     if (!submissionId || !action) {
       return NextResponse.json({ success: false, message: "ข้อมูลไม่ครบถ้วน (ต้องการ submissionId และ action)" }, { status: 400 });
@@ -153,6 +153,8 @@ export async function POST(request: Request) {
           approvedAt: new Date(),
           rejectReason: null,
           extractedData: JSON.stringify(subjectsList),
+          ...(gpa !== undefined && gpa !== null && gpa !== "" && !isNaN(parseFloat(gpa)) ? { gpa: parseFloat(gpa) } : {}),
+          ...(gpax !== undefined && gpax !== null && gpax !== "" && !isNaN(parseFloat(gpax)) ? { gpax: parseFloat(gpax) } : {}),
           updatedAt: new Date()
         }
       });

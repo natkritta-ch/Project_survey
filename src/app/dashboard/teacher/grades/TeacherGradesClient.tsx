@@ -20,7 +20,9 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  Lock,
+  Unlock
 } from "lucide-react";
 import { showSuccess, showError, showWarning, showInfo, showConfirm, showToast } from "@/lib/alerts";
 
@@ -44,6 +46,9 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
 
   // Editable subjects in verification modal
   const [modalSubjects, setModalSubjects] = useState<any[]>([]);
+  const [editGpa, setEditGpa] = useState<string>("");
+  const [editGpax, setEditGpax] = useState<string>("");
+  const [exemptingStudentId, setExemptingStudentId] = useState<string | null>(null);
 
   const levels = ["ปวช.1", "ปวช.2", "ปวช.3", "ปวส.1", "ปวส.2", "ปวส.1(ม.6)", "ปวส.2(ม.6)"];
 
@@ -77,11 +82,46 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
   const openVerifyModal = (sub: any) => {
     setSelectedSubmission(sub);
     setRejectReason(sub.rejectReason || "");
+    setEditGpa(sub.gpa !== null && sub.gpa !== undefined ? String(sub.gpa) : "");
+    setEditGpax(sub.gpax !== null && sub.gpax !== undefined ? String(sub.gpax) : "");
     try {
       const parsed = sub.extractedData ? JSON.parse(sub.extractedData) : [];
       setModalSubjects(parsed);
     } catch (e) {
       setModalSubjects([]);
+    }
+  };
+
+  const handleToggleExemption = async (studentId: string, currentExempt: boolean) => {
+    setExemptingStudentId(studentId);
+    try {
+      const res = await fetch("/api/grades/exempt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId,
+          canSubmitGrades: !currentExempt
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, "success");
+        setProgress((prev: any) => {
+          if (!prev?.unsubmittedStudents) return prev;
+          return {
+            ...prev,
+            unsubmittedStudents: prev.unsubmittedStudents.map((st: any) =>
+              st.id === studentId ? { ...st, canSubmitGrades: !currentExempt } : st
+            )
+          };
+        });
+      } else {
+        showError("เกิดข้อผิดพลาด", data.error);
+      }
+    } catch {
+      showError("เกิดข้อผิดพลาด", "ไม่สามารถเปลี่ยนสถานะได้");
+    } finally {
+      setExemptingStudentId(null);
     }
   };
 
@@ -117,7 +157,9 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
           submissionId: selectedSubmission.id,
           action,
           rejectReason: action === "REJECT" ? rejectReason : undefined,
-          editedSubjects: modalSubjects
+          editedSubjects: modalSubjects,
+          gpa: editGpa,
+          gpax: editGpax
         })
       });
 
@@ -515,32 +557,61 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
                   {/* Summary GPA Card */}
                   <div className="grid grid-cols-3 gap-3">
                     <div className="bg-indigo-50 dark:bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
-                      <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 block mb-0.5">
+                      <label className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 block mb-1">
                         เกรดเฉลี่ย (GPA)
-                      </span>
-                      <span className="text-2xl font-black text-indigo-700 dark:text-indigo-300">
-                        {selectedSubmission.gpa !== null ? Number(selectedSubmission.gpa).toFixed(2) : "-"}
-                      </span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="4"
+                        value={editGpa}
+                        onChange={e => setEditGpa(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full text-xl font-black text-indigo-700 dark:text-indigo-300 bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-800 rounded-lg px-2 py-1 focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
                     </div>
 
                     <div className="bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <span className="text-[11px] font-bold text-slate-500 block mb-0.5">
+                      <label className="text-[11px] font-bold text-slate-500 block mb-1">
                         เกรดเฉลี่ยสะสม (GPAX)
-                      </span>
-                      <span className="text-2xl font-black text-slate-700 dark:text-slate-200">
-                        {selectedSubmission.gpax !== null ? Number(selectedSubmission.gpax).toFixed(2) : "-"}
-                      </span>
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="4"
+                        value={editGpax}
+                        onChange={e => setEditGpax(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full text-xl font-black text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 focus:ring-2 focus:ring-slate-500 outline-none"
+                      />
                     </div>
 
                     <div className="bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <span className="text-[11px] font-bold text-slate-500 block mb-0.5">
+                      <span className="text-[11px] font-bold text-slate-500 block mb-1">
                         หน่วยกิตรวม
                       </span>
-                      <span className="text-2xl font-black text-slate-700 dark:text-slate-200">
-                        {selectedSubmission.totalCredits || modalSubjects.reduce((acc, s) => acc + (s.credits || 0), 0)}
-                      </span>
+                      <div className="text-xl font-black text-slate-700 dark:text-slate-200 py-1 px-2">
+                        {selectedSubmission.totalCredits || (modalSubjects.length > 0 ? modalSubjects.reduce((acc, s) => acc + (s.credits || 0), 0) : "-")}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Direct PDF Verified Note or Subjects Table */}
+                  {modalSubjects.length === 0 ? (
+                    <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 p-4 rounded-xl flex items-start gap-3">
+                      <FileCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                      <div>
+                        <h5 className="font-bold text-xs text-emerald-900 dark:text-emerald-200">
+                          เอกสารต้นฉบับทางการ (PDF Direct Verification)
+                        </h5>
+                        <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 leading-relaxed">
+                          นักเรียนยืนยันเกรดตามเอกสารรายงานผลการเรียนทางการโดยตรง ท่านสามารถตรวจความถูกต้องกับไฟล์ PDF ที่เปิดแสดงทางซ้ายมือ และกดอนุมัติ (Approve) ได้ทันที
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {/* Extracted Subjects Table */}
                   <div>
@@ -700,17 +771,43 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
 
             <div className="max-h-80 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-xl">
               {progress.unsubmittedStudents.map((st: any, idx: number) => (
-                <div key={st.id} className="p-3 flex items-center justify-between text-xs hover:bg-gray-50 dark:hover:bg-gray-750 transition">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-gray-400 w-6">{idx + 1}.</span>
-                    <div>
-                      <p className="font-bold text-gray-900 dark:text-white">{st.name}</p>
+                <div key={st.id} className="p-3 flex items-center justify-between text-xs hover:bg-gray-50 dark:hover:bg-gray-750 transition gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-mono text-gray-400 w-6 shrink-0">{idx + 1}.</span>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900 dark:text-white truncate">{st.name}</p>
                       <p className="font-mono text-[11px] text-gray-500">{st.username}</p>
                     </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                    {st.level || "-"}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                      {st.level || "-"}
+                    </span>
+                    <button
+                      onClick={() => handleToggleExemption(st.id, !!st.canSubmitGrades)}
+                      disabled={exemptingStudentId === st.id}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 shrink-0 ${
+                        st.canSubmitGrades
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300"
+                          : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300"
+                      }`}
+                      title={st.canSubmitGrades ? "ปลดล็อกเช็คชื่อแล้ว (คลิกเพื่อระงับ)" : "คลิกเพื่อปลดล็อกให้เช็คชื่อได้"}
+                    >
+                      {exemptingStudentId === st.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : st.canSubmitGrades ? (
+                        <>
+                          <Unlock className="w-3 h-3 text-emerald-600" />
+                          <span>ปลดล็อกแล้ว</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3 h-3 text-amber-600" />
+                          <span>ปลดล็อกชั่วคราว</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

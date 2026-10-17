@@ -5,6 +5,7 @@ import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restor
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import TranscriptView from "../../../components/TranscriptView";
 import HeadAdminOverview from "./HeadAdminOverview";
+import HeadGradesManagement from "./HeadGradesManagement";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -398,6 +399,10 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         <button onClick={() => {setActiveTab("subjects"); resetSubjectForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'subjects' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>จัดการวิชา</button>
         <button onClick={() => {setActiveTab("schedules"); resetScheduleForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'schedules' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>ตารางเรียน</button>
         <button onClick={() => {setActiveTab("users"); resetUserForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'users' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>จัดการผู้ใช้งาน</button>
+        <button onClick={() => {setActiveTab("grades");}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${activeTab === 'grades' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
+          <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+          ผลการเรียนและใบเกรด
+        </button>
         <button onClick={() => {setActiveTab("trash");}} className={`ml-auto px-6 py-3 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${activeTab === 'trash' ? 'border-b-2 border-red-500 text-red-600' : 'text-red-400 hover:text-red-600'}`}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           ถังขยะ
@@ -1722,6 +1727,11 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
             </div>
             
           </div>
+        )}
+
+        {/* ================= Grades & Deadlines Tab ================= */}
+        {activeTab === "grades" && (
+          <HeadGradesManagement users={users} />
         )}
       </div>
 

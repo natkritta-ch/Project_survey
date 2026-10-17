@@ -69,31 +69,93 @@ export async function parseGradePdf(
 
     // 2. ดึงข้อมูลนักศึกษา
     const studentIdMatch = rawText.match(/รหัสนักศึกษา\s*[:：]?\s*([0-9A-Za-z]+)/i) ||
-                           rawText.match(/รหัสประจำตัว\s*[:：]?\s*([0-9A-Za-z]+)/i);
+                           rawText.match(/รหัสประจำตัว\s*[:：]?\s*([0-9A-Za-z]+)/i) ||
+                           rawText.match(/รหัส\s*[:：]?\s*([0-9]{10,12})/i) ||
+                           rawText.match(/\b([0-9]{11})\b/);
     const extractedStudentId = studentIdMatch ? studentIdMatch[1].trim() : undefined;
 
-    const studentNameMatch = rawText.match(/ชื่อ\s*[-–—]?\s*สกุล\s*[:：]?\s*([^\n\r]+)/);
+    const studentNameMatch = rawText.match(/ชื่อ\s*[-–—/]?\s*สกุล\s*[:：]?\s*([^\n\r]+)/) ||
+                             rawText.match(/ชื่อ\s*[:：]?\s*(นาย|นางสาว|น\.ส\.|เด็กชาย|เด็กหญิง\s*[^\n\r]+)/);
     const extractedStudentName = studentNameMatch ? studentNameMatch[1].replace(/\s+/g, ' ').trim() : undefined;
 
-    // 3. ตรวจสอบความถูกต้องของบุคคล (Security Check)
-    if (expectedStudentUsername && extractedStudentId) {
-      const cleanExpected = expectedStudentUsername.replace(/[^0-9A-Za-z]/g, '').toLowerCase();
-      const cleanExtracted = extractedStudentId.replace(/[^0-9A-Za-z]/g, '').toLowerCase();
+    // 3. ตรวจสอบความถูกต้องของบุคคลอย่างเข้มงวด (Strict Security Check)
+    // 3.1 ตรวจสอบรหัสนักศึกษา / Username
+    if (expectedStudentUsername) {
+      const cleanExpectedUser = expectedStudentUsername.replace(/[^0-9A-Za-z]/g, '').toLowerCase();
+      const cleanRaw = rawText.replace(/[^0-9A-Za-z]/g, '').toLowerCase();
 
-      if (cleanExpected !== cleanExtracted) {
+      // ถ้าระบบแกะรหัสในเอกสารได้ แล้วรหัสไม่ตรงกับบัญชี
+      if (extractedStudentId) {
+        const cleanExtracted = extractedStudentId.replace(/[^0-9A-Za-z]/g, '').toLowerCase();
+        if (cleanExpectedUser !== cleanExtracted && !cleanRaw.includes(cleanExpectedUser)) {
+          return {
+            success: false,
+            error: `เอกสารนี้ไม่ใช่ของคุณ! รหัสนักศึกษาในเอกสาร (${extractedStudentId}) ไม่ตรงกับรหัสประจำตัวของคุณ (${expectedStudentUsername}) ป้องกันการนำใบเกรดของผู้อื่นมาส่ง`,
+            studentId: extractedStudentId,
+            studentName: extractedStudentName,
+            subjects: [],
+            rawText,
+          };
+        }
+      } else if (!cleanRaw.includes(cleanExpectedUser)) {
+        // หากในเนื้อหาเอกสารทั้งหมด ไม่มีเลขรหัสนักศึกษาของผู้ใช้นี้เลย
         return {
           success: false,
-          error: `เอกสารนี้ไม่ใช่ของคุณ! รหัสนักศึกษาในเอกสาร (${extractedStudentId}) ไม่ตรงกับรหัสประจำตัวของคุณ (${expectedStudentUsername}) ป้องกันการนำใบเกรดของผู้อื่นมาส่ง`,
-          studentId: extractedStudentId,
-          studentName: extractedStudentName,
+          error: `ไม่พบรหัสประจำตัวของคุณ (${expectedStudentUsername}) ในเอกสาร PDF นี้ กรุณาตรวจสอบว่าแนบไฟล์เอกสารของตนเองถูกต้องหรือไม่`,
           subjects: [],
           rawText,
         };
       }
     }
 
-    // 4. ดึงภาคเรียนและปีการศึกษา เช่น "ภาคเรียนที่ 1/2569"
-    const termMatch = rawText.match(/ภาคเรียนที่\s*([1-3])\s*[/／]\s*(\d{4})/);
+    // 3.2 ตรวจสอบชื่อ-นามสกุล (Strict Name Check)
+    if (expectedStudentName) {
+      const cleanExpectedName = expectedStudentName
+        .replace(/นาย|นางสาว|น\.ส\.|เด็กชาย|เด็กหญิง/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      const nameParts = cleanExpectedName.split(' ').filter(p => p.length >= 2);
+      const firstName = nameParts[0] || "";
+      const lastName = nameParts[1] || "";
+
+      // ถ้าใน PDF สกัดชื่อได้ และชื่อไม่ตรงกับชื่อของผู้ใช้นี้
+      if (extractedStudentName) {
+        const cleanExtractedName = extractedStudentName
+          .replace(/นาย|นางสาว|น\.ส\.|เด็กชาย|เด็กหญิง/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        const isNameMatched = 
+          (firstName && cleanExtractedName.includes(firstName)) || 
+          (cleanExpectedName && cleanExtractedName.includes(cleanExpectedName)) ||
+          rawText.includes(firstName);
+
+        if (!isNameMatched) {
+          return {
+            success: false,
+            error: `เอกสารนี้ไม่ใช่ของคุณ! ตรวจพบชื่อในเอกสารเป็น "${extractedStudentName}" ซึ่งไม่ตรงกับชื่อบัญชีของคุณ (${expectedStudentName}) ป้องกันการส่งใบเกรดของผู้อื่น`,
+            studentId: extractedStudentId,
+            studentName: extractedStudentName,
+            subjects: [],
+            rawText,
+          };
+        }
+      } else if (firstName && !rawText.includes(firstName)) {
+        // ตรวจสอบในข้อความทั้งหมดว่ามีชื่อตัวจริงของผู้ใช้หรือไม่
+        return {
+          success: false,
+          error: `ไม่พบชื่อ-นามสกุลของคุณ (${expectedStudentName}) ในเอกสาร PDF นี้ ป้องกันการนำเอกสารของผู้อื่นมาส่ง`,
+          subjects: [],
+          rawText,
+        };
+      }
+    }
+
+    // 4. ดึงภาคเรียนและปีการศึกษา เช่น "ภาคเรียนที่ 1/2569" หรือ "1/2569"
+    const termMatch = rawText.match(/ภาคเรียนที่\s*([1-3])\s*[/／]\s*(\d{4})/) ||
+                      rawText.match(/ภาคเรียน\s*[:：]?\s*([1-3])\s*[/／]\s*(\d{4})/) ||
+                      rawText.match(/([1-3])\s*[/／]\s*(25\d{2})/);
     const term = termMatch ? termMatch[1] : undefined;
     const academicYear = termMatch ? termMatch[2] : undefined;
 
@@ -107,14 +169,18 @@ export async function parseGradePdf(
     const groupCodeMatch = rawText.match(/รหัสกลุ่มเรียน\s*[:：]?\s*([0-9A-Za-z]+)/);
     const groupCode = groupCodeMatch ? groupCodeMatch[1].trim() : undefined;
 
-    // 6. ดึงเกรดเฉลี่ย GPA และ GPAX
-    const gpaMatch = rawText.match(/เกรดเฉลี่ยประจำภาค\s*[:：]?\s*([0-4](?:\.\d+)?)/);
+    // 6. ดึงเกรดเฉลี่ย GPA และ GPAX (ค้นหาหลายรูปแบบรวมทั้งมีวรรคหรือเว้นบรรทัด)
+    const gpaMatch = rawText.match(/เกรดเฉลี่ยประจำภาค\s*[:：]?\s*([0-4](?:\.\d+)?)/) ||
+                     rawText.match(/เกรดเฉลี่ย\s*[:：]?\s*([0-4](?:\.\d+)?)/) ||
+                     rawText.match(/GPA\s*[:：]?\s*([0-4](?:\.\d+)?)/i);
     const gpa = gpaMatch ? parseFloat(gpaMatch[1]) : undefined;
 
-    const gpaxMatch = rawText.match(/เกรดเฉลี่ยสะสม\s*[:：]?\s*([0-4](?:\.\d+)?)/);
+    const gpaxMatch = rawText.match(/เกรดเฉลี่ยสะสม\s*[:：]?\s*([0-4](?:\.\d+)?)/) ||
+                      rawText.match(/GPAX\s*[:：]?\s*([0-4](?:\.\d+)?)/i);
     const gpax = gpaxMatch ? parseFloat(gpaxMatch[1]) : undefined;
 
-    const termCreditsMatch = rawText.match(/หน่วยกิตประจำภาค\s*[:：]?\s*(\d+(?:\.\d+)?)/);
+    const termCreditsMatch = rawText.match(/หน่วยกิตประจำภาค\s*[:：]?\s*(\d+(?:\.\d+)?)/) ||
+                             rawText.match(/หน่วยกิต\s*[:：]?\s*(\d+(?:\.\d+)?)/);
     const termCredits = termCreditsMatch ? parseFloat(termCreditsMatch[1]) : undefined;
 
     const cumulativeCreditsMatch = rawText.match(/หน่วยกิตสะสม\s*[:：]?\s*(\d+(?:\.\d+)?)/);

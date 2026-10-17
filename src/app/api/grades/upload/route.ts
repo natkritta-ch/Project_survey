@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // อ่านและสกัดข้อมูลด้วย PDF Parser
+    // อ่านและสกัดข้อมูลด้วย PDF Parser พร้อมตรวจสอบความปลอดภัย
     const parseResult = await parseGradePdf(buffer, expectedUsername, expectedName);
 
     if (!parseResult.success) {
@@ -70,8 +70,17 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const academicYear = parseResult.academicYear || "2569";
-    const term = parseResult.term || "1";
+    const inputTerm = formData.get("term") as string | null;
+    const inputYear = formData.get("academicYear") as string | null;
+    const inputGpa = formData.get("gpa") as string | null;
+    const inputGpax = formData.get("gpax") as string | null;
+    const inputCredits = formData.get("totalCredits") as string | null;
+
+    const academicYear = inputYear || parseResult.academicYear || "2569";
+    const term = inputTerm || parseResult.term || "1";
+    const finalGpa = inputGpa !== null && inputGpa !== "" ? parseFloat(inputGpa) : (parseResult.gpa ?? null);
+    const finalGpax = inputGpax !== null && inputGpax !== "" ? parseFloat(inputGpax) : (parseResult.gpax ?? null);
+    const finalCredits = inputCredits !== null && inputCredits !== "" ? parseFloat(inputCredits) : (parseResult.termCredits ?? parseResult.cumulativeCredits ?? null);
 
     // ตรวจสอบสถานะการส่งเดิม
     const existing = await (prisma as any).gradeSubmission.findUnique({
@@ -105,10 +114,10 @@ export async function POST(request: Request) {
       update: {
         fileData: base64Data,
         fileName: file.name,
-        gpa: parseResult.gpa ?? null,
-        gpax: parseResult.gpax ?? null,
-        totalCredits: parseResult.termCredits ?? parseResult.cumulativeCredits ?? null,
-        extractedData: JSON.stringify(parseResult.subjects),
+        gpa: finalGpa,
+        gpax: finalGpax,
+        totalCredits: finalCredits,
+        extractedData: JSON.stringify(parseResult.subjects || []),
         status: "SUBMITTED",
         rejectReason: null,
         updatedAt: new Date()
@@ -119,10 +128,10 @@ export async function POST(request: Request) {
         term,
         fileData: base64Data,
         fileName: file.name,
-        gpa: parseResult.gpa ?? null,
-        gpax: parseResult.gpax ?? null,
-        totalCredits: parseResult.termCredits ?? parseResult.cumulativeCredits ?? null,
-        extractedData: JSON.stringify(parseResult.subjects),
+        gpa: finalGpa,
+        gpax: finalGpax,
+        totalCredits: finalCredits,
+        extractedData: JSON.stringify(parseResult.subjects || []),
         status: "SUBMITTED",
         rejectReason: null
       }

@@ -3,6 +3,7 @@ import prisma from "../../../lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
 import { parseTimeToMinutes } from "../../../lib/timeUtils";
+import { checkStudentGradeSubmissionStatus } from "../../../lib/gradePeriodConfig";
 
 export async function POST(request: Request) {
   try {
@@ -31,6 +32,16 @@ export async function POST(request: Request) {
 
     if (!student) {
       return NextResponse.json({ success: false, message: "ไม่พบข้อมูลนักเรียน" }, { status: 404 });
+    }
+
+    // 💡 ตรวจสอบการระงับสิทธิ์เช็คชื่อเนื่องจากค้างส่งใบเกรดเกินระยะผ่อนผัน
+    const gradeStatus = await checkStudentGradeSubmissionStatus(studentId);
+    if (gradeStatus.isSuspended) {
+      return NextResponse.json({
+        success: false,
+        isSuspended: true,
+        message: gradeStatus.reason || "ระงับสิทธิ์เช็คชื่อชั่วคราว: เลยกำหนดส่งใบรายงานผลการศึกษา กรุณาอัปโหลดใบเกรดเพื่อดำเนินการต่อ"
+      }, { status: 403 });
     }
 
     if (subjectId && type !== "assembly") {
