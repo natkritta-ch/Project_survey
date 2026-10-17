@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { UserPlus, Loader2, Users, Search, ChevronDown, CheckCircle2, Sparkles } from "lucide-react";
+import { UserPlus, Loader2, Users, Search, ChevronDown, CheckCircle2, Sparkles, Eye, EyeOff } from "lucide-react";
 import { showSuccess, showError } from "@/lib/alerts";
 
 export default function ParentRegisterPage() {
@@ -16,6 +16,7 @@ export default function ParentRegisterPage() {
     studentNationalId: "",
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Student Searchable Select
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
@@ -119,15 +120,23 @@ export default function ParentRegisterPage() {
                 onChange={(e) => setFormData({...formData, username: e.target.value})}
               />
             </div>
-            <div>
+            <div className="relative">
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
-                className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-lg relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
                 placeholder="รหัสผ่าน"
                 value={formData.password}
                 onChange={(e) => setFormData({...formData, password: e.target.value})}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors z-20"
+                title={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+              >
+                {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              </button>
             </div>
             <div>
                <input

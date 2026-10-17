@@ -6,6 +6,7 @@ import AttendanceHistory from "../../../components/AttendanceHistory";
 import TranscriptView from "../../../components/TranscriptView";
 import HeadAdminOverview from "./HeadAdminOverview";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function HeadAdminClient({ subjects, schedules, users, termConfigs = [] }: { subjects: any[], schedules: any[], users: any[], termConfigs?: any[] }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -61,6 +62,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [userName, setUserName] = useState("");
   const [userUsername, setUserUsername] = useState("");
   const [userPassword, setUserPassword] = useState("");
+  const [showUserPassword, setShowUserPassword] = useState(false);
+  const [showEditUserPassword, setShowEditUserPassword] = useState(false);
   const [userRole, setUserRole] = useState("TEACHER");
   const [userLevel, setUserLevel] = useState("ปวช.1");
   const [userNickname, setUserNickname] = useState("");
@@ -260,6 +263,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setUserStudentId(u.approvedChildren?.[0]?.id || u.studentId || "");
     setIsStudentDropdownOpen(false);
     setStudentSearchQuery("");
+    setShowEditUserPassword(false);
     setIsEditUserModalOpen(true);
   };
 
@@ -268,6 +272,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setUserName(""); 
     setUserUsername(""); 
     setUserPassword(""); 
+    setShowUserPassword(false);
+    setShowEditUserPassword(false);
     setUserRole("TEACHER"); 
     setUserLevel("ปวช.1"); 
     setUserNickname("");
@@ -1092,7 +1098,23 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
-                <input type="text" value={userPassword} onChange={e => setUserPassword(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border" placeholder="" />
+                <div className="relative mt-1">
+                  <input 
+                    type={showUserPassword ? "text" : "password"} 
+                    value={userPassword} 
+                    onChange={e => setUserPassword(e.target.value)} 
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-10 border dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
+                    placeholder="••••••••" 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUserPassword(!showUserPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                    title={showUserPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                  >
+                    {showUserPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">เบอร์โทร</label>
@@ -2149,7 +2171,23 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Password (เว้นว่างไว้หากไม่เปลี่ยน)</label>
-                <input type="text" value={userPassword} onChange={e => setUserPassword(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border" placeholder="********" />
+                <div className="relative mt-1">
+                  <input 
+                    type={showEditUserPassword ? "text" : "password"} 
+                    value={userPassword} 
+                    onChange={e => setUserPassword(e.target.value)} 
+                    className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-10 border dark:bg-gray-800 dark:border-gray-600 dark:text-white" 
+                    placeholder="••••••••" 
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditUserPassword(!showEditUserPassword)}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                    title={showEditUserPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                  >
+                    {showEditUserPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">สิทธิ์</label>

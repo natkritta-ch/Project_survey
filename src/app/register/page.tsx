@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import * as faceapi from "face-api.js";
-import { Camera, UserPlus, FileJson, Loader2, MapPin, Phone, Droplets, User, ChevronRight, Check, Database, Search, Sparkles, CheckCircle2, AlertCircle, ShieldCheck, Eye, Sun } from "lucide-react";
+import { Camera, UserPlus, FileJson, Loader2, MapPin, Phone, Droplets, User, ChevronRight, Check, Database, Search, Sparkles, CheckCircle2, AlertCircle, ShieldCheck, Eye, EyeOff, Sun } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { checkFaceQuality, getAverageEAR } from "@/lib/faceLiveness";
 
@@ -21,6 +21,7 @@ export default function RegisterPage() {
   const [scanError, setScanError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Student Live Search Suggestions
   const [studentSuggestions, setStudentSuggestions] = useState<any[]>([]);
@@ -625,12 +626,24 @@ export default function RegisterPage() {
 
                 <div>
                   <label className={labelClass}>รหัสผ่าน <span className="text-destructive">*</span></label>
-                  <input
-                    type="password" required className={inputClass}
-                    placeholder="รหัสผ่าน"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  />
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"} 
+                      required 
+                      className={`${inputClass} pr-10`}
+                      placeholder="รหัสผ่าน"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground transition-colors"
+                      title={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                    >
+                      {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="md:col-span-2">

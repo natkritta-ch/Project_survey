@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, Save, Loader2, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Save, Loader2, User as UserIcon, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { updateUser } from "../actions";
 
@@ -19,6 +19,7 @@ export default function ProfileClient({ user }: { user: any }) {
   });
 
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -91,7 +92,24 @@ export default function ProfileClient({ user }: { user: any }) {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">รหัสผ่านใหม่ (เว้นว่างไว้หากไม่เปลี่ยน)</label>
-              <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" className="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-4 py-2 border dark:bg-slate-900 dark:border-slate-600 dark:text-white" />
+              <div className="relative">
+                <input 
+                  type={showPassword ? "text" : "password"} 
+                  name="password" 
+                  value={formData.password} 
+                  onChange={handleChange} 
+                  placeholder="••••••••" 
+                  className="w-full rounded-lg border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 px-4 py-2 pr-10 border dark:bg-slate-900 dark:border-slate-600 dark:text-white" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  title={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                >
+                  {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">เบอร์โทรศัพท์</label>
