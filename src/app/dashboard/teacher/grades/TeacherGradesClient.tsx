@@ -44,10 +44,6 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
   const [rejectReason, setRejectReason] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
 
-  // Editable subjects in verification modal
-  const [modalSubjects, setModalSubjects] = useState<any[]>([]);
-  const [editGpa, setEditGpa] = useState<string>("");
-  const [editGpax, setEditGpax] = useState<string>("");
   const [exemptingStudentId, setExemptingStudentId] = useState<string | null>(null);
 
   const levels = ["ปวช.1", "ปวช.2", "ปวช.3", "ปวส.1", "ปวส.2", "ปวส.1(ม.6)", "ปวส.2(ม.6)"];
@@ -82,14 +78,11 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
   const openVerifyModal = (sub: any) => {
     setSelectedSubmission(sub);
     setRejectReason(sub.rejectReason || "");
-    setEditGpa(sub.gpa !== null && sub.gpa !== undefined ? String(sub.gpa) : "");
-    setEditGpax(sub.gpax !== null && sub.gpax !== undefined ? String(sub.gpax) : "");
-    try {
-      const parsed = sub.extractedData ? JSON.parse(sub.extractedData) : [];
-      setModalSubjects(parsed);
-    } catch (e) {
-      setModalSubjects([]);
-    }
+  };
+
+  const closeVerifyModal = () => {
+    setSelectedSubmission(null);
+    setRejectReason("");
   };
 
   const handleToggleExemption = async (studentId: string, currentExempt: boolean) => {
@@ -125,12 +118,6 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
     }
   };
 
-  const closeVerifyModal = () => {
-    setSelectedSubmission(null);
-    setModalSubjects([]);
-    setRejectReason("");
-  };
-
   const handleVerify = async (action: "APPROVE" | "REJECT" | "REVOKE") => {
     if (!selectedSubmission) return;
 
@@ -141,7 +128,7 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
     if (action === "APPROVE") {
       const ok = await showConfirm({
         title: "ยืนยันการอนุมัติผลการเรียน?",
-        text: `คุณกำลังจะอนุมัติใบเกรดของ ${selectedSubmission.student?.name} ข้อมูลรายวิชาและ GPA จะถูกบันทึกเข้าระบบจริงทันที`,
+        text: `คุณกำลังจะอนุมัติใบเกรดของ ${selectedSubmission.student?.name} (GPA: ${selectedSubmission.gpa !== null ? Number(selectedSubmission.gpa).toFixed(2) : "-"}) ข้อมูลจะได้รับการรับรองทางการทันที`,
         confirmText: "อนุมัติทางการ",
         cancelText: "ยกเลิก"
       });
@@ -156,10 +143,7 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
         body: JSON.stringify({
           submissionId: selectedSubmission.id,
           action,
-          rejectReason: action === "REJECT" ? rejectReason : undefined,
-          editedSubjects: modalSubjects,
-          gpa: editGpa,
-          gpax: editGpax
+          rejectReason: action === "REJECT" ? rejectReason : undefined
         })
       });
 
@@ -516,170 +500,93 @@ export default function TeacherGradesClient({ sessionUser }: { sessionUser: any 
                 )}
                 <button
                   onClick={closeVerifyModal}
-                  className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-sm font-semibold flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" /> ปิดหน้าต่าง
                 </button>
               </div>
             </div>
 
-            {/* Split Screen Body */}
+            {/* Split Screen Content */}
             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-              {/* Left Screen: PDF Viewer (50%) */}
-              <div className="w-full lg:w-1/2 h-1/2 lg:h-full bg-slate-900 p-2 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-800 flex flex-col">
-                <div className="flex items-center justify-between text-xs text-slate-300 px-3 py-1.5 bg-slate-800/80 rounded-t-xl">
-                  <span className="font-semibold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    เอกสารต้นฉบับ (PDF ทางการ)
+              {/* Left Side: Official PDF Document Viewer (60%) */}
+              <div className="w-full lg:w-3/5 h-1/2 lg:h-full bg-slate-900 border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-800 flex flex-col">
+                <div className="p-2 px-4 bg-slate-950 text-slate-300 text-xs font-semibold flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    เอกสารต้นฉบับ (PDF ทางการจาก ศธ.02/RMS)
                   </span>
-                  <span className="text-[11px] text-slate-400 font-mono truncate max-w-[200px]">
-                    {selectedSubmission.fileName || "document.pdf"}
+                  <span className="font-mono text-[11px] text-slate-400 truncate max-w-[200px]">
+                    {selectedSubmission.fileName || "StudentGradeReport.pdf"}
                   </span>
                 </div>
-                <div className="flex-1 bg-slate-800 rounded-b-xl overflow-hidden relative">
+                <div className="flex-1 w-full h-full">
                   {selectedSubmission.fileData ? (
                     <iframe
                       src={`${selectedSubmission.fileData}#toolbar=0`}
                       className="w-full h-full border-0"
-                      title="PDF Preview"
+                      title="Grade Verification PDF"
                     />
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                      <p>ไม่มีไฟล์ PDF แนบมา</p>
+                    <div className="flex items-center justify-center h-full text-slate-500 text-xs">
+                      ไม่พบไฟล์ PDF
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Right Screen: Extracted Data & Action Panel (50%) */}
-              <div className="w-full lg:w-1/2 h-1/2 lg:h-full flex flex-col bg-white dark:bg-gray-900 overflow-y-auto">
-                <div className="p-6 flex-1 space-y-5">
-                  {/* Summary GPA Card */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-indigo-50 dark:bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
-                      <label className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 block mb-1">
-                        เกรดเฉลี่ย (GPA)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="4"
-                        value={editGpa}
-                        onChange={e => setEditGpa(e.target.value)}
-                        placeholder="0.00"
-                        className="w-full text-xl font-black text-indigo-700 dark:text-indigo-300 bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-800 rounded-lg px-2 py-1 focus:ring-2 focus:ring-indigo-500 outline-none"
-                      />
+              {/* Right Side: Direct Verification Controls (40%) */}
+              <div className="w-full lg:w-2/5 h-1/2 lg:h-full flex flex-col bg-white dark:bg-gray-900 overflow-y-auto">
+                <div className="p-6 space-y-6 flex-1">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-4 bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl border border-indigo-200 dark:border-indigo-800">
+                      <span className="text-xs text-indigo-600 dark:text-indigo-400 font-bold">เกรดเฉลี่ย (GPA)</span>
+                      <p className="text-2xl font-extrabold text-indigo-900 dark:text-indigo-100 mt-1">
+                        {selectedSubmission.gpa !== null ? Number(selectedSubmission.gpa).toFixed(2) : "-"}
+                      </p>
                     </div>
-
-                    <div className="bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <label className="text-[11px] font-bold text-slate-500 block mb-1">
-                        เกรดเฉลี่ยสะสม (GPAX)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="4"
-                        value={editGpax}
-                        onChange={e => setEditGpax(e.target.value)}
-                        placeholder="0.00"
-                        className="w-full text-xl font-black text-slate-700 dark:text-slate-200 bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 focus:ring-2 focus:ring-slate-500 outline-none"
-                      />
-                    </div>
-
-                    <div className="bg-slate-50 dark:bg-slate-800 p-3.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <span className="text-[11px] font-bold text-slate-500 block mb-1">
-                        หน่วยกิตรวม
-                      </span>
-                      <div className="text-xl font-black text-slate-700 dark:text-slate-200 py-1 px-2">
-                        {selectedSubmission.totalCredits || (modalSubjects.length > 0 ? modalSubjects.reduce((acc, s) => acc + (s.credits || 0), 0) : "-")}
-                      </div>
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-bold">เกรดสะสม (GPAX)</span>
+                      <p className="text-2xl font-extrabold text-slate-800 dark:text-slate-100 mt-1">
+                        {selectedSubmission.gpax !== null ? Number(selectedSubmission.gpax).toFixed(2) : "-"}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Direct PDF Verified Note or Subjects Table */}
-                  {modalSubjects.length === 0 ? (
-                    <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 p-4 rounded-xl flex items-start gap-3">
-                      <FileCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-                      <div>
-                        <h5 className="font-bold text-xs text-emerald-900 dark:text-emerald-200">
-                          เอกสารต้นฉบับทางการ (PDF Direct Verification)
-                        </h5>
-                        <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-1 leading-relaxed">
-                          นักเรียนยืนยันเกรดตามเอกสารรายงานผลการเรียนทางการโดยตรง ท่านสามารถตรวจความถูกต้องกับไฟล์ PDF ที่เปิดแสดงทางซ้ายมือ และกดอนุมัติ (Approve) ได้ทันที
-                        </p>
+                  {/* Verification Info Box */}
+                  <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-200 dark:border-gray-700 text-xs space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">รหัสนักศึกษา:</span>
+                      <span className="font-mono font-bold text-gray-900 dark:text-white">{selectedSubmission.student?.username}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">ชื่อ-นามสกุล:</span>
+                      <span className="font-bold text-gray-900 dark:text-white">{selectedSubmission.student?.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">ภาคเรียน/ปี:</span>
+                      <span className="font-semibold text-gray-800 dark:text-gray-200">{selectedSubmission.term}/{selectedSubmission.academicYear}</span>
+                    </div>
+                    {selectedSubmission.totalCredits && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">หน่วยกิต:</span>
+                        <span className="font-semibold text-gray-800 dark:text-gray-200">{selectedSubmission.totalCredits} น.ก.</span>
                       </div>
-                    </div>
-                  ) : null}
-
-                  {/* Extracted Subjects Table */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-indigo-500" />
-                        รายวิชาที่อ่านได้จากเอกสาร ({modalSubjects.length} วิชา)
-                      </h4>
-                      <span className="text-[11px] text-gray-400">
-                        *สามารถคลิกแก้ไขตัวเลขเกรดได้หากมีจุดคลาดเคลื่อน
-                      </span>
-                    </div>
-
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-inner">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-bold border-b border-gray-200 dark:border-gray-700">
-                          <tr>
-                            <th className="p-2.5">รหัสวิชา</th>
-                            <th className="p-2.5">ชื่อวิชา</th>
-                            <th className="p-2.5 text-center">น.ก.</th>
-                            <th className="p-2.5 text-center w-20">เกรด</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                          {modalSubjects.map((sub, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/50 transition">
-                              <td className="p-2.5 font-mono font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
-                                {sub.code}
-                              </td>
-                              <td className="p-2.5 text-gray-800 dark:text-gray-200">
-                                {sub.name}
-                              </td>
-                              <td className="p-2.5 text-center font-semibold text-gray-500">
-                                {sub.credits || "-"}
-                              </td>
-                              <td className="p-2.5 text-center">
-                                <input
-                                  type="text"
-                                  value={sub.grade}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    const updated = [...modalSubjects];
-                                    updated[idx].grade = val;
-                                    const numVal = parseFloat(val);
-                                    updated[idx].gradeValue = !isNaN(numVal) ? numVal : null;
-                                    setModalSubjects(updated);
-                                  }}
-                                  className="w-16 p-1 text-center font-bold text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-1 focus:ring-indigo-500"
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Reject Reason input if rejected or planning to reject */}
+                  {/* Reject Reason input */}
                   <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-xl border border-gray-200 dark:border-gray-700 space-y-2">
                     <label className="block text-xs font-bold text-gray-700 dark:text-gray-300">
                       หมายเหตุ / ข้อความแจ้งเตือนนักเรียน (กรณีปฏิเสธให้ส่งใหม่):
                     </label>
                     <input
                       type="text"
-                      placeholder="เช่น แนบไฟล์ผิดภาคเรียน, เอกสารไม่ชัดเจน..."
+                      placeholder="เช่น แนบไฟล์ผิดภาคเรียน, เกรดไม่ตรงกับเอกสาร, เอกสารไม่ชัดเจน..."
                       value={rejectReason}
                       onChange={e => setRejectReason(e.target.value)}
-                      className="w-full text-xs p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-1 focus:ring-rose-500"
+                      className="w-full text-xs p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-1 focus:ring-rose-500"
                     />
                   </div>
                 </div>
