@@ -301,7 +301,13 @@ export default function StudentDashboardClient({
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
               <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-6 no-print">ระเบียนแสดงผลการเรียน (Transcript)</h2>
               <div className="bg-card p-4 sm:p-8 rounded-2xl shadow-sm border border-border print:shadow-none print:border-none print:bg-transparent print:p-0">
-                <TranscriptView grades={myGrades} submissions={mySubmissions} studentName={myInfo?.name} />
+                <TranscriptView 
+                  grades={myGrades} 
+                  submissions={mySubmissions} 
+                  studentName={myInfo?.name} 
+                  studentUsername={myInfo?.username} 
+                  studentLevel={myInfo?.level} 
+                />
               </div>
             </div>
           )}

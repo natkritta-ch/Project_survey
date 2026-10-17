@@ -459,7 +459,13 @@ export default function ParentDashboardClient({
                     <p className="text-muted-foreground">ผลการเรียนรวมของ {activeChild.name}</p>
                   </div>
                   <div className="bg-card p-4 sm:p-8 rounded-2xl shadow-sm border border-border print:shadow-none print:border-none print:bg-transparent print:p-0">
-                    <TranscriptView grades={childGrades} submissions={childSubmissions} studentName={activeChild?.name} />
+                    <TranscriptView 
+                      grades={childGrades} 
+                      submissions={childSubmissions} 
+                      studentName={activeChild?.name} 
+                      studentUsername={activeChild?.username} 
+                      studentLevel={activeChild?.level} 
+                    />
                   </div>
                 </div>
               )}

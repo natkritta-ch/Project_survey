@@ -25,6 +25,14 @@ export default async function HeadTranscriptPage({ params }: { params: { id: str
     }
   });
 
+  const submissions = await (prisma as any).gradeSubmission.findMany({
+    where: { 
+      studentId: studentId,
+      status: { in: ["APPROVED", "TEACHER_APPROVED"] }
+    },
+    orderBy: [{ academicYear: 'desc' }, { term: 'desc' }]
+  });
+
   if (!student) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-8">
@@ -66,7 +74,14 @@ export default async function HeadTranscriptPage({ params }: { params: { id: str
           </div>
           
           <div className="p-6 md:p-8">
-            <TranscriptView grades={student.grades} showPrintButton={true} />
+            <TranscriptView 
+              grades={student.grades} 
+              submissions={JSON.parse(JSON.stringify(submissions))}
+              studentName={student.name}
+              studentUsername={student.username}
+              studentLevel={student.level || ""}
+              showPrintButton={true} 
+            />
           </div>
         </div>
       </div>
