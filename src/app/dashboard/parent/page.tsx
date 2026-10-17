@@ -39,6 +39,7 @@ export default async function ParentDashboard() {
   let allGrades: any = {};
   let allSubjects: any = {};
   let allSchedules: any = {};
+  let allSubmissions: any = {};
 
   if (approvedChildren.length > 0) {
     const currentTerm = await getCurrentTermConfig();
@@ -60,6 +61,16 @@ export default async function ParentDashboard() {
         where: { studentId: childId },
         include: { subject: true }
       });
+
+      // ดึงข้อมูลใบรายงานผลการศึกษาทางการที่ผ่านการอนุมัติแล้วของบุตรหลาน
+      const subs = await (prisma as any).gradeSubmission.findMany({
+        where: { 
+          studentId: childId,
+          status: { in: ["APPROVED", "TEACHER_APPROVED"] }
+        },
+        orderBy: [{ academicYear: 'desc' }, { term: 'desc' }]
+      });
+      allSubmissions[childId] = JSON.parse(JSON.stringify(subs));
 
       const childSchedules = schedules.filter((sc: any) => {
         const subj = sc.subject;
@@ -94,6 +105,7 @@ export default async function ParentDashboard() {
       allSubjects={allSubjects}
       allSchedules={allSchedules}
       allGrades={allGrades}
+      allSubmissions={allSubmissions}
     />
   );
 }

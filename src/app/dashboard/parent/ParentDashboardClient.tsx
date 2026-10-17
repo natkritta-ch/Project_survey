@@ -15,7 +15,8 @@ export default function ParentDashboardClient({
   allAttendances,
   allSubjects,
   allSchedules,
-  allGrades
+  allGrades,
+  allSubmissions = {}
 }: any) {
   const [activeTab, setActiveTab] = useState("overview"); // overview, attendance, transcript
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -108,6 +109,7 @@ export default function ParentDashboardClient({
   const childSubjects = activeChildId ? (allSubjects[activeChildId] || []) : [];
   const childSchedules = activeChildId ? (allSchedules[activeChildId] || []) : [];
   const childGrades = activeChildId ? (allGrades[activeChildId] || []) : [];
+  const childSubmissions = activeChildId ? (allSubmissions[activeChildId] || []) : [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans">
@@ -457,7 +459,7 @@ export default function ParentDashboardClient({
                     <p className="text-muted-foreground">ผลการเรียนรวมของ {activeChild.name}</p>
                   </div>
                   <div className="bg-card p-4 sm:p-8 rounded-2xl shadow-sm border border-border print:shadow-none print:border-none print:bg-transparent print:p-0">
-                    <TranscriptView grades={childGrades} />
+                    <TranscriptView grades={childGrades} submissions={childSubmissions} studentName={activeChild?.name} />
                   </div>
                 </div>
               )}

@@ -92,6 +92,15 @@ export default async function StudentDashboard() {
     orderBy: [{ subject: { academicYear: 'desc' } }, { subject: { term: 'desc' } }]
   });
 
+  // ดึงข้อมูลใบรายงานผลการศึกษาทางการที่ผ่านการอนุมัติแล้ว (APPROVED หรือ TEACHER_APPROVED)
+  const mySubmissions = await (prisma as any).gradeSubmission.findMany({
+    where: { 
+      studentId: userId,
+      status: { in: ["APPROVED", "TEACHER_APPROVED"] }
+    },
+    orderBy: [{ academicYear: 'desc' }, { term: 'desc' }]
+  });
+
   // 3. (แก้ปัญหาที่ 2) ดึงรายชื่อวิชาทั้งหมดที่เคยเช็คชื่อไว้ หรือมีเกรด มาใส่ใน Dropdown
   const uniqueSubjectsMap = new Map();
   mySchedules.forEach(sc => {
@@ -138,6 +147,7 @@ export default async function StudentDashboard() {
       mySubjects={mySubjects}
       mySchedules={mySchedules}
       myGrades={myGrades}
+      mySubmissions={JSON.parse(JSON.stringify(mySubmissions))}
       groupedSchedules={groupedSchedules}
       dayColors={dayColors}
       daysMap={daysMap}
