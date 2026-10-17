@@ -18,7 +18,9 @@ import {
   Sparkles,
   ExternalLink,
   ShieldAlert,
-  ShieldCheck
+  ShieldCheck,
+  Lock,
+  Unlock
 } from "lucide-react";
 import { showSuccess, showError, showWarning, showToast } from "@/lib/alerts";
 
@@ -37,6 +39,11 @@ export default function StudentGrades({
   const [selectedTerm, setSelectedTerm] = useState("1");
   const [selectedYear, setSelectedYear] = useState("2569");
   const [gradeStatus, setGradeStatus] = useState<any>(null);
+  const [canSubmit, setCanSubmit] = useState<boolean>(canSubmitGrades);
+
+  useEffect(() => {
+    setCanSubmit(canSubmitGrades);
+  }, [canSubmitGrades]);
 
   // Upload Form Modal
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -69,6 +76,9 @@ export default function StudentGrades({
       const data = await res.json();
       if (data.success) {
         setGradeStatus(data);
+        if (data.canSubmitGrades !== undefined) {
+          setCanSubmit(data.canSubmitGrades === true);
+        }
       }
     } catch (e) {
       console.error("Fetch grade status error", e);
@@ -96,6 +106,14 @@ export default function StudentGrades({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!canSubmit) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return showWarning(
+        "สิทธิ์ถูกปิดอยู่",
+        "สิทธิ์การอัปโหลดใบเกรดของคุณถูกปิดอยู่ กรุณาติดต่ออาจารย์ประจำชั้นหรือหัวหน้าแผนกเพื่อขอเปิดสิทธิ์กรอกเกรด"
+      );
+    }
+
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       return showError("ไฟล์ไม่ถูกต้อง", "ระบบรองรับเฉพาะไฟล์รายงานผลการศึกษาทางการในรูปแบบ .pdf เท่านั้น");
     }
@@ -108,6 +126,12 @@ export default function StudentGrades({
   const handleConfirmUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return;
+
+    if (!canSubmit) {
+      showError("ไม่สามารถอัปโหลดได้", "สิทธิ์การอัปโหลดใบเกรดของคุณถูกปิดอยู่ กรุณาติดต่ออาจารย์หรือหัวหน้าแผนก");
+      setShowUploadModal(false);
+      return;
+    }
 
     if (!formGpa || isNaN(parseFloat(formGpa)) || parseFloat(formGpa) < 0 || parseFloat(formGpa) > 4.0) {
       return showWarning("เกรดเฉลี่ยไม่ถูกต้อง", "กรุณาระบุเกรดเฉลี่ยประจำภาค (GPA) เป็นตัวเลขระหว่าง 0.00 - 4.00");
@@ -154,6 +178,23 @@ export default function StudentGrades({
 
   return (
     <div className="space-y-6">
+      {/* แถบแจ้งเตือนเมื่อสิทธิ์กรอกเกรดถูกปิด (canSubmitGrades is false) */}
+      {!canSubmit && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700 shadow-sm flex items-start gap-3.5 animate-in fade-in">
+          <div className="p-2 rounded-xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5">
+            <Lock className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-extrabold text-sm text-amber-900 dark:text-amber-200">
+              🔒 สิทธิ์การส่ง/อัปโหลดใบเกรดถูกปิดอยู่
+            </h4>
+            <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 leading-relaxed">
+              บัญชีของคุณยังไม่ได้รับอนุญาตให้อัปโหลดหรือแก้ไขใบรายงานผลการศึกษาในขณะนี้ (สิทธิ์กรอกเกรดถูกปิดโดยอาจารย์หรือหัวหน้าแผนก) หากมีความจำเป็นต้องส่งเอกสาร กรุณาติดต่ออาจารย์ประจำชั้นหรือหัวหน้าแผนกเพื่อขอเปิดสิทธิ์
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* แจ้งเตือนสถานะการระงับสิทธิ์ / เลยกำหนดส่ง (Grace Period Alert Banner) */}
       {gradeStatus?.status === "SUSPENDED" && (
         <div className="p-4 sm:p-5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border-2 border-rose-300 dark:border-rose-800 shadow-md flex items-start gap-3.5 animate-in fade-in slide-in-from-top-2">
@@ -340,11 +381,21 @@ export default function StudentGrades({
               </div>
             </div>
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shrink-0 shadow-sm flex items-center justify-center gap-1.5"
+              disabled={!canSubmit}
+              onClick={() => {
+                if (!canSubmit) {
+                  return showWarning("สิทธิ์ถูกปิดอยู่", "สิทธิ์การอัปโหลดใบเกรดของคุณถูกปิดอยู่ กรุณาติดต่ออาจารย์ประจำชั้นหรือหัวหน้าแผนก");
+                }
+                fileInputRef.current?.click();
+              }}
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 shadow-sm flex items-center justify-center gap-1.5 ${
+                canSubmit
+                  ? "bg-rose-600 hover:bg-rose-700 text-white"
+                  : "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
+              }`}
             >
-              <Upload className="w-4 h-4" />
-              อัปโหลดเอกสารใหม่
+              {canSubmit ? <Upload className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+              {canSubmit ? "อัปโหลดเอกสารใหม่" : "สิทธิ์กรอกเกรดถูกปิด"}
             </button>
           </div>
         ) : (
@@ -375,26 +426,42 @@ export default function StudentGrades({
         {/* Upload Dropzone (แสดงเมื่อยังไม่ได้ส่ง หรือถูกส่งกลับให้แก้ไข) */}
         {(!currentSubmission || isRejected) && (
           <div className="mt-6">
-            <div
-              onClick={() => !uploading && fileInputRef.current?.click()}
-              className="border-2 border-dashed border-indigo-200 dark:border-indigo-800/60 hover:border-indigo-400 dark:hover:border-indigo-500 rounded-2xl p-8 text-center cursor-pointer bg-indigo-50/30 dark:bg-indigo-950/10 hover:bg-indigo-50/60 transition group"
-            >
-              <div className="flex flex-col items-center justify-center">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-sm">
-                  <Upload className="w-7 h-7" />
+            {!canSubmit ? (
+              <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-2xl p-8 text-center bg-gray-50/60 dark:bg-gray-800/40 cursor-not-allowed">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="w-14 h-14 rounded-2xl bg-gray-200 dark:bg-gray-700 text-gray-400 flex items-center justify-center mb-3">
+                    <Lock className="w-7 h-7" />
+                  </div>
+                  <h4 className="font-extrabold text-base text-gray-600 dark:text-gray-300 mb-1">
+                    ระบบปิดรับการส่งใบเกรดสำหรับบัญชีนี้
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
+                    สิทธิ์การกรอกเกรดถูกปิดอยู่โดยอาจารย์หรือหัวหน้าแผนก กรุณาติดต่อผู้ดูแลระบบหากต้องการส่งเอกสาร
+                  </p>
                 </div>
-                <h4 className="font-extrabold text-base text-gray-900 dark:text-white mb-1">
-                  คลิกเพื่อเลือกไฟล์ PDF รายงานผลการเรียน (ศธ.02 / RMS)
-                </h4>
-                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
-                  ต้องเป็นไฟล์ PDF ทางการที่มีชื่อและรหัสนักศึกษาตรงกับบัญชีของคุณ ระบบจะตรวจสอบความถูกต้องของบุคคลก่อนส่งให้อาจารย์ตรวจรับรอง
-                </p>
-                <span className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 shadow-xs">
-                  <FileText className="w-3.5 h-3.5" />
-                  รองรับเอกสารดิจิทัล PDF ทางการ
-                </span>
               </div>
-            </div>
+            ) : (
+              <div
+                onClick={() => !uploading && fileInputRef.current?.click()}
+                className="border-2 border-dashed border-indigo-200 dark:border-indigo-800/60 hover:border-indigo-400 dark:hover:border-indigo-500 rounded-2xl p-8 text-center cursor-pointer bg-indigo-50/30 dark:bg-indigo-950/10 hover:bg-indigo-50/60 transition group"
+              >
+                <div className="flex flex-col items-center justify-center">
+                  <div className="w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform shadow-sm">
+                    <Upload className="w-7 h-7" />
+                  </div>
+                  <h4 className="font-extrabold text-base text-gray-900 dark:text-white mb-1">
+                    คลิกเพื่อเลือกไฟล์ PDF รายงานผลการเรียน (ศธ.02 / RMS)
+                  </h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
+                    ต้องเป็นไฟล์ PDF ทางการที่มีชื่อและรหัสนักศึกษาตรงกับบัญชีของคุณ ระบบจะตรวจสอบความถูกต้องของบุคคลก่อนส่งให้อาจารย์ตรวจรับรอง
+                  </p>
+                  <span className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700 shadow-xs">
+                    <FileText className="w-3.5 h-3.5" />
+                    รองรับเอกสารดิจิทัล PDF ทางการ
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

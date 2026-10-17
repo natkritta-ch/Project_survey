@@ -52,7 +52,20 @@ export async function POST(request: Request) {
         expectedUsername = targetStudent.username;
         expectedName = targetStudent.name;
       }
-    } else if (userRole !== "STUDENT") {
+    } else if (userRole === "STUDENT") {
+      // ตรวจสอบสิทธิ์การกรอก/อัปโหลดเกรด (canSubmitGrades) ของนักเรียน
+      const studentRecord = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, canSubmitGrades: true, name: true }
+      });
+
+      if (!studentRecord || studentRecord.canSubmitGrades !== true) {
+        return NextResponse.json({
+          success: false,
+          message: "สิทธิ์การอัปโหลดใบเกรดของคุณถูกปิดอยู่ (กรุณาให้อาจารย์ประจำชั้นหรือหัวหน้าแผนกเปิดสิทธิ์กรอกเกรดในระบบก่อนดำเนินการ)"
+        }, { status: 403 });
+      }
+    } else {
       return NextResponse.json({ success: false, message: "เฉพาะนักเรียนหรืออาจารย์เท่านั้นที่สามารถอัปโหลดได้" }, { status: 403 });
     }
 

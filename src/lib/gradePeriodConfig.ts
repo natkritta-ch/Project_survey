@@ -144,6 +144,7 @@ export interface StudentGradeCheckResult {
   config: GradePeriodConfig | null;
   daysOverdue: number;
   graceDaysRemaining: number;
+  canSubmitGrades: boolean;
 }
 
 /**
@@ -168,7 +169,8 @@ export async function checkStudentGradeSubmissionStatus(
       isSuspended: false,
       config: null,
       daysOverdue: 0,
-      graceDaysRemaining: 0
+      graceDaysRemaining: 0,
+      canSubmitGrades: false
     };
   }
 
@@ -198,7 +200,8 @@ export async function checkStudentGradeSubmissionStatus(
       isSuspended: false,
       config: null,
       daysOverdue: 0,
-      graceDaysRemaining: 0
+      graceDaysRemaining: 0,
+      canSubmitGrades: isExempt
     };
   }
 
@@ -212,7 +215,8 @@ export async function checkStudentGradeSubmissionStatus(
       isSuspended: false,
       config: null,
       daysOverdue: 0,
-      graceDaysRemaining: 0
+      graceDaysRemaining: 0,
+      canSubmitGrades: isExempt
     };
   }
 
@@ -238,7 +242,8 @@ export async function checkStudentGradeSubmissionStatus(
       reason: "อาจารย์ประจำชั้นหรือหัวหน้าแผนกได้ปลดล็อกผ่อนผันให้เป็นกรณีพิเศษ",
       config,
       daysOverdue,
-      graceDaysRemaining
+      graceDaysRemaining,
+      canSubmitGrades: true
     };
   }
 
@@ -251,7 +256,8 @@ export async function checkStudentGradeSubmissionStatus(
       reason: `ระงับสิทธิ์เช็คชื่อเข้าเรียนชั่วคราว: เลยกำหนดส่งใบรายงานผลการศึกษา (สิ้นสุดเมื่อ ${config.endDate} และพ้นระยะผ่อนผัน ${graceDays} วันแล้ว) กรุณาอัปโหลดใบเกรดเพื่อดำเนินการต่อ`,
       config,
       daysOverdue,
-      graceDaysRemaining: 0
+      graceDaysRemaining: 0,
+      canSubmitGrades: false
     };
   }
 
@@ -264,7 +270,8 @@ export async function checkStudentGradeSubmissionStatus(
       reason: `เลยกำหนดส่งใบเกรดแล้ว (${config.endDate}) ขณะนี้อยู่ในระยะผ่อนผัน คงเหลืออีก ${graceDaysRemaining} วัน ก่อนระบบจะระงับสิทธิ์เช็คชื่อ`,
       config,
       daysOverdue,
-      graceDaysRemaining
+      graceDaysRemaining,
+      canSubmitGrades: isExempt
     };
   }
 
@@ -275,6 +282,7 @@ export async function checkStudentGradeSubmissionStatus(
     isSuspended: false,
     config,
     daysOverdue: 0,
-    graceDaysRemaining
+    graceDaysRemaining,
+    canSubmitGrades: isExempt
   };
 }
