@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../../lib/auth";
 import prisma from "../../../../lib/prisma";
 import { parseGradePdf } from "../../../../lib/pdfGradeParser";
+import { checkStudentGradeSubmissionStatus } from "../../../../lib/gradePeriodConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -53,16 +54,12 @@ export async function POST(request: Request) {
         expectedName = targetStudent.name;
       }
     } else if (userRole === "STUDENT") {
-      // ตรวจสอบสิทธิ์การกรอก/อัปโหลดเกรด (canSubmitGrades) ของนักเรียน
-      const studentRecord = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, canSubmitGrades: true, name: true }
-      });
-
-      if (!studentRecord || studentRecord.canSubmitGrades !== true) {
+      // ตรวจสอบสถานะระยะเวลาการส่งใบเกรดและสิทธิ์ปลดล็อกกรณีพิเศษ
+      const statusCheck = await checkStudentGradeSubmissionStatus(userId);
+      if (statusCheck.isSuspended && !statusCheck.canSubmitGrades) {
         return NextResponse.json({
           success: false,
-          message: "สิทธิ์การอัปโหลดใบเกรดของคุณถูกปิดอยู่ (กรุณาให้อาจารย์ประจำชั้นหรือหัวหน้าแผนกเปิดสิทธิ์กรอกเกรดในระบบก่อนดำเนินการ)"
+          message: statusCheck.reason || "หมดเวลาส่งใบรายงานผลการศึกษาสำหรับภาคเรียนนี้แล้ว (พ้นระยะเวลาผ่อนผันแล้ว) กรุณาติดต่ออาจารย์ประจำชั้นหรือหัวหน้าแผนกเพื่อขอปลดล็อกกรณีพิเศษ"
         }, { status: 403 });
       }
     } else {

@@ -338,7 +338,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   });
 
   const activeStudents = activeUsers.filter(u => u.role === "STUDENT");
-  const isAllStudentsGradesUnlocked = activeStudents.length > 0 && activeStudents.every(u => u.canSubmitGrades);
 
   const handlePromoteStudents = async () => {
     const confirmed = await showConfirm({
@@ -1239,34 +1238,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               <div className="flex flex-col items-end gap-3">
                 {filterUserRole === "STUDENT" && (
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    <div className="flex items-center gap-3 bg-white dark:bg-gray-800 px-4 py-2 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm">
-                      <span className="text-sm font-bold text-gray-700 dark:text-gray-300">สิทธิ์กรอกเกรดทั้งหมด:</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[11px] font-bold ${isAllStudentsGradesUnlocked ? 'text-green-600' : 'text-red-500'}`}>
-                          {isAllStudentsGradesUnlocked ? "เปิดอนุญาต" : "ล็อคแล้ว"}
-                        </span>
-                        <button 
-                          disabled={isLoading}
-                          onClick={async () => { 
-                            const ok = await showConfirm({
-                              title: isAllStudentsGradesUnlocked ? "ยืนยันปิดสิทธิ์การกรอกเกรด?" : "ยืนยันเปิดสิทธิ์การกรอกเกรด?",
-                              text: isAllStudentsGradesUnlocked ? "ต้องการปิดสิทธิ์การกรอกเกรดสำหรับนักเรียนทุกคนใช่หรือไม่?" : "ต้องการเปิดสิทธิ์ให้นักเรียนทุกคนสามารถกรอกเกรดได้ใช่หรือไม่?",
-                              confirmText: isAllStudentsGradesUnlocked ? "ปิดสิทธิ์" : "เปิดสิทธิ์",
-                              isDanger: isAllStudentsGradesUnlocked,
-                            });
-                            if (ok) { 
-                              setIsLoading(true); 
-                              await toggleAllStudentsGradeSubmission(!isAllStudentsGradesUnlocked); 
-                              setIsLoading(false); 
-                              showToast(isAllStudentsGradesUnlocked ? "ปิดสิทธิ์การกรอกเกรดแล้ว" : "เปิดสิทธิ์การกรอกเกรดแล้ว", "success");
-                            } 
-                          }}
-                          className={`w-9 h-5 rounded-full relative transition-colors ${isAllStudentsGradesUnlocked ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'}`}
-                        >
-                          <span className={`absolute top-0.5 rounded-full bg-white w-4 h-4 transition-transform shadow-sm ${isAllStudentsGradesUnlocked ? 'left-4' : 'left-1'}`}></span>
-                        </button>
-                      </div>
-                    </div>
                     <button disabled={isLoading} onClick={handlePromoteStudents} className="bg-amber-500 text-white px-3 py-2 rounded-md hover:bg-amber-600 disabled:opacity-50 text-sm font-semibold flex items-center shadow-sm">
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" /></svg>
                       เลื่อนชั้นปีนักเรียนทั้งหมด
@@ -1476,7 +1447,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สิทธิ์</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชั้นปี</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สิทธิ์แก้ไขโปรไฟล์</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-purple-500 uppercase tracking-wider">สิทธิ์กรอกเกรด</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
                     </tr>
                   </thead>
@@ -1538,19 +1508,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                               className={`px-3 py-1 text-xs font-semibold rounded-full transition ${u.canEditProfile ? 'bg-green-100 text-green-800 hover:bg-red-100 hover:text-red-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-500 hover:bg-green-100 hover:text-green-800 dark:bg-gray-700 dark:text-gray-400'}`}
                             >
                               {u.canEditProfile ? "✓ เปิดอยู่ (กดเพื่อปิด)" : "✗ ปิดอยู่ (กดเพื่อเปิด)"}
-                            </button>
-                          ) : (
-                            <span className="text-xs text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {u.role === "STUDENT" ? (
-                            <button
-                              disabled={isLoading}
-                              onClick={async () => { setIsLoading(true); await toggleGradeSubmission(u.id, !u.canSubmitGrades); setIsLoading(false); }}
-                              className={`px-3 py-1 text-xs font-semibold rounded-full transition ${u.canSubmitGrades ? 'bg-purple-100 text-purple-800 hover:bg-red-100 hover:text-red-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-gray-100 text-gray-500 hover:bg-purple-100 hover:text-purple-800 dark:bg-gray-700 dark:text-gray-400'}`}
-                            >
-                              {u.canSubmitGrades ? "✓ เปิดอยู่ (กดเพื่อปิด)" : "✗ ปิดอยู่ (กดเพื่อเปิด)"}
                             </button>
                           ) : (
                             <span className="text-xs text-gray-400">-</span>
