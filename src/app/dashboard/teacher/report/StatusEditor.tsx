@@ -241,8 +241,8 @@ export default function StatusEditor({
             {/* Anti-Fraud Security Notice Banner */}
             <div className="mx-4 sm:mx-5 mt-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2.5">
               <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
-                <span className="font-bold">นโยบายป้องกันการทุจริต:</span> สถานะ <strong>&ldquo;มาเรียน&rdquo;</strong> และ <strong>&ldquo;มาสาย&rdquo;</strong> ต้องผ่านการสแกนใบหน้าเท่านั้น ระบบนี้อนุญาตให้บันทึกเฉพาะ <strong>การลา</strong> หรือ <strong>ยกเลิกการลา</strong> ที่มีเอกสารอ้างอิง
+              <div className="flex-1 min-w-0 text-xs text-amber-800 dark:text-amber-300 leading-relaxed break-words">
+                <span className="font-bold">นโยบายป้องกันการทุจริต:</span> สถานะ <strong>&ldquo;มาเรียน&rdquo;</strong> และ <strong>&ldquo;มาสาย&rdquo;</strong> ต้องผ่านการสแกนใบหน้าเท่านั้น ระบบนี้อนุญาตเฉพาะ <strong>การลา</strong> หรือ <strong>ยกเลิกการลา</strong>
               </div>
             </div>
 
@@ -311,20 +311,20 @@ export default function StatusEditor({
                             : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center border ${cfg.colorClass}`}>
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center border shrink-0 ${cfg.colorClass}`}>
                             <IconComponent className="w-4 h-4" />
                           </span>
-                          <div>
+                          <div className="min-w-0 flex-1">
                             <div className="font-bold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                              {cfg.label}
+                              <span>{cfg.label}</span>
                               {key === status && (
-                                <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                                <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400 shrink-0">
                                   สถานะเดิม
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                            <div className="text-[11px] text-slate-500 dark:text-slate-400 break-words">
                               {cfg.desc}
                             </div>
                           </div>
