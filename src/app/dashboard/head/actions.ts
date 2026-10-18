@@ -347,6 +347,11 @@ export async function clearOldTrash() {
   await prisma.subject.deleteMany({ where: { deletedAt: { lt: sevenDaysAgo } } });
   await prisma.schedule.deleteMany({ where: { deletedAt: { lt: sevenDaysAgo } } });
   await prisma.user.deleteMany({ where: { deletedAt: { lt: sevenDaysAgo } } });
+  try {
+    await (prisma as any).makeupClass.deleteMany({ where: { deletedAt: { lt: sevenDaysAgo } } });
+  } catch (e) {
+    // Ignore if table/column not available
+  }
 }
 
 export async function resetAllFaces() {

@@ -62,7 +62,8 @@ export default async function TeacherScanPage({ searchParams }: { searchParams: 
           date: {
             gte: todayStart,
             lte: todayEnd
-          }
+          },
+          deletedAt: null
         },
         select: { id: true, date: true, startTime: true, endTime: true, remark: true }
       }

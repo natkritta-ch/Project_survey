@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import prisma from "../../../../lib/prisma";
 import Link from "next/link";
 import StatusEditor from "./StatusEditor";
+import { getAttendanceRemarks } from "../../../../lib/attendanceRemarks";
 import ClientSearchBox from "./ClientSearchBox";
 import { CheckCircle2, AlertTriangle, XCircle, Users, BarChart3, ListChecks } from "lucide-react";
 
@@ -277,6 +278,9 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
       }
     }
   }
+
+  // ดึงข้อมูลหมายเหตุการลา
+  const remarksMap = await getAttendanceRemarks();
 
   function findMakeupForLog(log: any, makeups: any[]) {
     if (!log.subjectId || !makeups || makeups.length === 0) return null;
@@ -620,6 +624,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
                           <StatusEditor 
                             id={log.id} 
                             initialStatus={log.status} 
+                            initialRemark={remarksMap[log.id]?.remark || ""}
                             studentName={log.student?.name}
                             studentCode={log.student?.username}
                             subjectName={log.subject ? `[${log.subject.code || ''}] ${log.subject.name}` : 'เข้าแถวรวม'}

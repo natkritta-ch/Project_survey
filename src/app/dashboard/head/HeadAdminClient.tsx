@@ -9,10 +9,11 @@ import HeadGradesManagement from "./HeadGradesManagement";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
 import { Eye, EyeOff } from "lucide-react";
 
-export default function HeadAdminClient({ subjects, schedules, users, termConfigs = [] }: { subjects: any[], schedules: any[], users: any[], termConfigs?: any[] }) {
+export default function HeadAdminClient({ subjects, schedules, users, termConfigs = [], makeupClasses = [] }: { subjects: any[], schedules: any[], users: any[], termConfigs?: any[], makeupClasses?: any[] }) {
   const [activeTab, setActiveTab] = useState("overview");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [makeupClassesList, setMakeupClassesList] = useState<any[]>(makeupClasses || []);
 
   // ---------- Subjects State ----------
   const [subjId, setSubjId] = useState("");
@@ -314,6 +315,103 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const trashedSchedules = schedules.filter(s => !!s.deletedAt);
   const activeUsers = users.filter(u => !u.deletedAt);
   const trashedUsers = users.filter(u => !!u.deletedAt);
+  const trashedMakeupClasses = makeupClassesList.filter(m => !!m.deletedAt);
+
+  const handleRestoreMakeupHead = async (id: string, name?: string) => {
+    const ok = await showConfirm({
+      title: "ยืนยันกู้คืนคลาสสอนชดเชย?",
+      text: `ต้องการกู้คืนคลาส "${name || ''}" กลับสู่ตารางการสอนใช่หรือไม่?`,
+      confirmText: "กู้คืน",
+      icon: "question"
+    });
+    if (!ok) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/makeup-classes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'restore' })
+      });
+      if (res.ok) {
+        setMakeupClassesList(prev => prev.map(m => m.id === id ? { ...m, deletedAt: null } : m));
+        showToast("กู้คืนคลาสสอนชดเชยสำเร็จ", "success");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleHardDeleteMakeupHead = async (id: string, name?: string) => {
+    const ok = await showConfirm({
+      title: "⚠️ ยืนยันลบถาวร?",
+      text: `ต้องการลบคลาส "${name || ''}" ถาวรใช่หรือไม่?\n(ไม่สามารถกู้คืนได้)`,
+      confirmText: "ลบถาวร",
+      isDanger: true
+    });
+    if (!ok) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/makeup-classes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, permanent: true })
+      });
+      if (res.ok) {
+        setMakeupClassesList(prev => prev.filter(m => m.id !== id));
+        showToast("ลบคลาสสอนชดเชยถาวรแล้ว", "success");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRestoreAllMakeupHead = async () => {
+    const ok = await showConfirm({
+      title: "ยืนยันกู้คืนคลาสสอนชดเชยทั้งหมด?",
+      text: `ต้องการกู้คืนคลาสสอนชดเชยทั้งหมด ${trashedMakeupClasses.length} รายการใช่หรือไม่?`,
+      confirmText: "กู้คืนทั้งหมด",
+      icon: "question"
+    });
+    if (!ok) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/makeup-classes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore-all' })
+      });
+      if (res.ok) {
+        setMakeupClassesList(prev => prev.map(m => ({ ...m, deletedAt: null })));
+        showToast("กู้คืนคลาสสอนชดเชยทั้งหมดแล้ว", "success");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleHardDeleteAllMakeupHead = async () => {
+    const ok = await showConfirm({
+      title: "⚠️ ยืนยันลบถาวรคลาสชดเชยทั้งหมด?",
+      text: `คุณแน่ใจหรือไม่ที่จะลบถาวรคลาสสอนชดเชยทั้งหมด ${trashedMakeupClasses.length} รายการ?\n(ไม่สามารถกู้คืนได้!)`,
+      confirmText: "ลบถาวรทั้งหมด",
+      isDanger: true
+    });
+    if (!ok) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/makeup-classes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk-delete-permanent' })
+      });
+      if (res.ok) {
+        setMakeupClassesList(prev => prev.filter(m => !m.deletedAt));
+        showToast("ลบคลาสสอนชดเชยถาวรทั้งหมดแล้ว", "success");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const displaySubjects = filterLevel === "ทั้งหมด" ? activeSubjects : activeSubjects.filter(s => s.level === filterLevel);
   const displaySchedules = activeSchedules.filter(sc => {
@@ -1675,6 +1773,50 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                           <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันกู้คืนผู้ใช้?", text: `ต้องการกู้คืนผู้ใช้ "${u.name}" กลับสู่ระบบใช่หรือไม่?`, confirmText: "กู้คืน", icon: "question" }); if(ok) { setIsLoading(true); await restoreUser(u.id); setIsLoading(false); showToast("กู้คืนผู้ใช้สำเร็จ", "success"); } }} className="text-green-600 hover:text-green-900 mr-4 font-medium">กู้คืน</button>
                           <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบถาวร?", text: `ต้องการลบข้อมูลผู้ใช้ "${u.name}" ออกจากระบบถาวรใช่หรือไม่?\n(ไม่สามารถกู้คืนได้)`, confirmText: "ลบถาวร", isDanger: true }); if(ok) { setIsLoading(true); await hardDeleteUser(u.id); setIsLoading(false); showToast("ลบข้อมูลผู้ใช้ถาวรแล้ว", "success"); } }} className="text-red-600 hover:text-red-900 font-medium">ลบถาวร</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Trashed Makeup Classes Section */}
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                  <span className="bg-gray-200 dark:bg-gray-700 w-8 h-8 flex items-center justify-center rounded-full text-sm">{trashedMakeupClasses.length}</span>
+                  คลาสสอนชดเชยที่ถูกลบ
+                </h4>
+                {trashedMakeupClasses.length > 0 && (
+                  <div className="flex gap-2">
+                    <button disabled={isLoading} onClick={handleRestoreAllMakeupHead} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800 transition disabled:opacity-50">กู้คืนทั้งหมด</button>
+                    <button disabled={isLoading} onClick={handleHardDeleteAllMakeupHead} className="text-xs font-semibold px-3 py-1.5 rounded-md bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800 transition disabled:opacity-50">ลบถาวรทั้งหมด</button>
+                  </div>
+                )}
+              </div>
+              <div className="overflow-x-auto overflow-y-auto max-h-[70vh] bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">วิชา (รหัส)</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">วัน / เวลาชดเชย</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">วันที่ลบ</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {trashedMakeupClasses.length === 0 && <tr><td colSpan={4} className="px-6 py-4 text-center text-gray-400">ไม่มีข้อมูล</td></tr>}
+                    {trashedMakeupClasses.map((mc: any) => (
+                      <tr key={mc.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{mc.subject?.name} <span className="text-gray-400 font-normal">({mc.subject?.code})</span></td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
+                          {new Date(mc.date).toLocaleDateString('th-TH')} ({mc.startTime} - {mc.endTime} น.)
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-red-500 text-right">{mc.deletedAt ? new Date(mc.deletedAt).toLocaleDateString('th-TH') : "-"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                          <button disabled={isLoading} onClick={() => handleRestoreMakeupHead(mc.id, mc.subject?.name)} className="text-green-600 hover:text-green-900 mr-4 font-medium">กู้คืน</button>
+                          <button disabled={isLoading} onClick={() => handleHardDeleteMakeupHead(mc.id, mc.subject?.name)} className="text-red-600 hover:text-red-900 font-medium">ลบถาวร</button>
                         </td>
                       </tr>
                     ))}

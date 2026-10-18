@@ -283,10 +283,15 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
                   {new Date(record.timestamp).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
                 </span>
               </div>
-              <div className="self-start sm:self-auto">
+              <div className="self-start sm:self-auto flex flex-col sm:items-end gap-0.5">
                 <span className={`inline-block px-3 py-1.5 rounded-md text-xs font-bold shadow-sm ${STATUS_MAP[record.status]?.bg || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'}`}>
                   {STATUS_MAP[record.status]?.label || record.status}
                 </span>
+                {(record.leaveRemark || record.remark) && (
+                  <span className="text-[11px] text-gray-500 dark:text-gray-400 italic">
+                    ({record.leaveRemark || record.remark})
+                  </span>
+                )}
               </div>
             </div>
           ))

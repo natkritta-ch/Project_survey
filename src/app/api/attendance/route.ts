@@ -138,11 +138,23 @@ export async function POST(request: Request) {
         makeupClassesToday = await (prisma as any).makeupClass.findMany({
           where: {
             subjectId,
-            date: { gte: todayStart, lte: todayEnd }
+            date: { gte: todayStart, lte: todayEnd },
+            deletedAt: null
           }
         });
       } catch (err) {
-        makeupClassesToday = [];
+        try {
+          const todayStart = new Date(`${thaiDateStr}T00:00:00.000Z`);
+          const todayEnd = new Date(`${thaiDateStr}T23:59:59.999Z`);
+          makeupClassesToday = await (prisma as any).makeupClass.findMany({
+            where: {
+              subjectId,
+              date: { gte: todayStart, lte: todayEnd }
+            }
+          });
+        } catch {
+          makeupClassesToday = [];
+        }
       }
 
       // รวม session ทั้งหมดที่จัดขึ้นวันนี้

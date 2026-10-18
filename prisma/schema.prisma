@@ -102,16 +102,18 @@ model subject {
 }
 
 model makeupClass {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   subjectId String
-  date      DateTime @db.Date // วันที่สอนชดเชย
-  startTime String   // e.g. "09:00"
-  endTime   String   // e.g. "11:00"
-  remark    String?  // หมายเหตุ เช่น สอนชดเชยคาบวันหยุด
-  createdAt DateTime @default(now())
-  subject   subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade, map: "MakeupClass_subjectId_fkey")
+  date      DateTime  @db.Date // วันที่สอนชดเชย
+  startTime String    // e.g. "09:00"
+  endTime   String    // e.g. "11:00"
+  remark    String?   // หมายเหตุ เช่น สอนชดเชยคาบวันหยุด
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  subject   subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade, map: "MakeupClass_subjectId_fkey")
 
   @@index([subjectId], map: "MakeupClass_subjectId_fkey")
+  @@index([deletedAt])
   @@map("makeup_class")
 }
 

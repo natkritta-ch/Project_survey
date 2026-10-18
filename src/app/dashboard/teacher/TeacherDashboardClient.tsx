@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck } from "lucide-react";
+import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck, RotateCcw, AlertTriangle, RefreshCw } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm, showPromptNumber } from "@/lib/alerts";
 
@@ -14,7 +14,8 @@ export default function TeacherDashboardClient({
   studentsWithParents, 
   weeklyStats,
   subjects = [],
-  initialMakeupClasses = []
+  initialMakeupClasses = [],
+  initialTrashedMakeupClasses = []
 }: any) {
   const [activeTab, setActiveTab] = useState("overview");
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
@@ -23,6 +24,8 @@ export default function TeacherDashboardClient({
 
   // State สำหรับคลาสสอนชดเชย
   const [makeupClasses, setMakeupClasses] = useState<any[]>(initialMakeupClasses || []);
+  const [trashedMakeupClasses, setTrashedMakeupClasses] = useState<any[]>(initialTrashedMakeupClasses || []);
+  const [isTrashLoading, setIsTrashLoading] = useState(false);
   const [isMakeupModalOpen, setIsMakeupModalOpen] = useState(false);
   const [makeupSubjectId, setMakeupSubjectId] = useState(subjects[0]?.id || "");
   const [isMakeupSubjectDropdownOpen, setIsMakeupSubjectDropdownOpen] = useState(false);
@@ -80,11 +83,26 @@ export default function TeacherDashboardClient({
     }
   };
 
-  const handleDeleteMakeup = async (id: string) => {
+  const fetchTrashedMakeupClasses = async () => {
+    try {
+      setIsTrashLoading(true);
+      const res = await fetch('/api/makeup-classes?trashed=true');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTrashedMakeupClasses(data.makeupClasses || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch trashed makeup classes", e);
+    } finally {
+      setIsTrashLoading(false);
+    }
+  };
+
+  const handleDeleteMakeup = async (id: string, name?: string) => {
     const ok = await showConfirm({
-      title: "ยืนยันการลบคลาสชดเชย?",
-      text: "คุณต้องการลบคลาสสอนชดเชยนี้ใช่หรือไม่?",
-      confirmText: "ลบคลาส",
+      title: "ย้ายคลาสสอนชดเชยไปที่ถังขยะ?",
+      text: `ต้องการย้ายคลาส "${name || 'นี้'}" ไปเก็บในถังขยะใช่หรือไม่? (สามารถกู้คืนได้ภายใน 7 วัน)`,
+      confirmText: "ย้ายไปถังขยะ",
       cancelText: "ยกเลิก",
       isDanger: true,
     });
@@ -95,15 +113,154 @@ export default function TeacherDashboardClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
       });
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const target = makeupClasses.find(m => m.id === id);
         setMakeupClasses(prev => prev.filter(m => m.id !== id));
-        showToast("ลบคลาสสอนชดเชยเรียบร้อยแล้ว", "success");
+        if (target) {
+          setTrashedMakeupClasses(prev => [
+            { ...target, deletedAt: new Date().toISOString(), daysRemaining: 7 },
+            ...prev
+          ]);
+        }
+        showToast("ย้ายคลาสสอนชดเชยไปที่ถังขยะเรียบร้อย (กู้คืนได้ใน 7 วัน)", "success");
       } else {
-        const data = await res.json();
-        showError("เกิดข้อผิดพลาด", data.message);
+        showError("เกิดข้อผิดพลาด", data.message || "ไม่สามารถลบคลาสได้");
       }
     } catch (err: any) {
-      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ");
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ", err.message);
+    }
+  };
+
+  const handleRestoreMakeup = async (id: string, name?: string) => {
+    const ok = await showConfirm({
+      title: "ยืนยันกู้คืนคลาสสอนชดเชย?",
+      text: `ต้องการกู้คืนคลาส "${name || ''}" กลับสู่ตารางการสอนใช่หรือไม่?`,
+      confirmText: "กู้คืน",
+      icon: "question"
+    });
+    if (!ok) return;
+
+    setIsTrashLoading(true);
+    try {
+      const res = await fetch('/api/makeup-classes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action: 'restore' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTrashedMakeupClasses(prev => prev.filter(m => m.id !== id));
+        if (data.makeupClass) {
+          setMakeupClasses(prev => [data.makeupClass, ...prev]);
+        }
+        showToast("กู้คืนคลาสสอนชดเชยสำเร็จ", "success");
+      } else {
+        showError("เกิดข้อผิดพลาด", data.message || "ไม่สามารถกู้คืนได้");
+      }
+    } catch (err: any) {
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ", err.message);
+    } finally {
+      setIsTrashLoading(false);
+    }
+  };
+
+  const handlePermanentDeleteMakeup = async (id: string, name?: string) => {
+    const ok = await showConfirm({
+      title: "⚠️ ยืนยันลบถาวร?",
+      text: `คุณแน่ใจหรือไม่ที่จะลบคลาส "${name || ''}" อย่างถาวร?\n(ข้อมูลจะถูกลบออกจากระบบและไม่สามารถกู้คืนได้!)`,
+      confirmText: "ลบถาวร",
+      cancelText: "ยกเลิก",
+      isDanger: true
+    });
+    if (!ok) return;
+
+    setIsTrashLoading(true);
+    try {
+      const res = await fetch('/api/makeup-classes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, permanent: true })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTrashedMakeupClasses(prev => prev.filter(m => m.id !== id));
+        showToast("ลบคลาสสอนชดเชยถาวรแล้ว", "success");
+      } else {
+        showError("เกิดข้อผิดพลาด", data.message || "ไม่สามารถลบถาวรได้");
+      }
+    } catch (err: any) {
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ", err.message);
+    } finally {
+      setIsTrashLoading(false);
+    }
+  };
+
+  const handleRestoreAllMakeup = async () => {
+    if (trashedMakeupClasses.length === 0) return;
+    const ok = await showConfirm({
+      title: "ยืนยันกู้คืนทั้งหมด?",
+      text: `ต้องการกู้คืนคลาสสอนชดเชยทั้งหมด ${trashedMakeupClasses.length} รายการกลับสู่ตารางการสอนใช่หรือไม่?`,
+      confirmText: "กู้คืนทั้งหมด",
+      icon: "question"
+    });
+    if (!ok) return;
+
+    setIsTrashLoading(true);
+    try {
+      const res = await fetch('/api/makeup-classes', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore-all' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const activeRes = await fetch('/api/makeup-classes');
+        const activeData = await activeRes.json();
+        if (activeData.success) {
+          setMakeupClasses(activeData.makeupClasses || []);
+        }
+        setTrashedMakeupClasses([]);
+        showToast("กู้คืนคลาสสอนชดเชยทั้งหมดสำเร็จ", "success");
+      } else {
+        showError("เกิดข้อผิดพลาด", data.message || "ไม่สามารถกู้คืนทั้งหมดได้");
+      }
+    } catch (err: any) {
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ", err.message);
+    } finally {
+      setIsTrashLoading(false);
+    }
+  };
+
+  const handleClearAllTrashMakeup = async () => {
+    if (trashedMakeupClasses.length === 0) return;
+    const ok = await showConfirm({
+      title: "⚠️ ล้างถังขยะคลาสชดเชยทั้งหมด?",
+      text: `คุณแน่ใจหรือไม่ที่จะลบถาวรทุกรายการในถังขยะ (${trashedMakeupClasses.length} รายการ)?\nการกระทำนี้ไม่สามารถย้อนกลับหรือกู้คืนได้!`,
+      confirmText: "ลบถาวรทั้งหมด",
+      cancelText: "ยกเลิก",
+      isDanger: true
+    });
+    if (!ok) return;
+
+    setIsTrashLoading(true);
+    try {
+      const res = await fetch('/api/makeup-classes', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk-delete-permanent' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setTrashedMakeupClasses([]);
+        showToast("ล้างถังขยะเรียบร้อยแล้ว", "success");
+      } else {
+        showError("เกิดข้อผิดพลาด", data.message || "ไม่สามารถล้างถังขยะได้");
+      }
+    } catch (err: any) {
+      showError("เกิดข้อผิดพลาดในการเชื่อมต่อ", err.message);
+    } finally {
+      setIsTrashLoading(false);
     }
   };
 
@@ -154,7 +311,13 @@ export default function TeacherDashboardClient({
   const tabs = [
     { id: "overview", label: "ภาพรวมวันนี้", icon: <Home className="w-5 h-5" /> },
     { id: "schedule", label: "ตารางสอนทั้งหมด", icon: <Calendar className="w-5 h-5" /> },
-    { id: "students", label: "รายชื่อนักเรียนและผู้ปกครอง", icon: <Users className="w-5 h-5" /> }
+    { id: "students", label: "รายชื่อนักเรียนและผู้ปกครอง", icon: <Users className="w-5 h-5" /> },
+    { 
+      id: "trash", 
+      label: "ถังขยะคลาสชดเชย", 
+      icon: <Trash2 className="w-5 h-5" />,
+      badge: trashedMakeupClasses.length > 0 ? trashedMakeupClasses.length : null
+    }
   ];
 
   const handleTabClick = (id: string) => {
@@ -194,14 +357,24 @@ export default function TeacherDashboardClient({
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium text-sm text-left
+              onClick={() => {
+                handleTabClick(tab.id);
+                if (tab.id === "trash") fetchTrashedMakeupClasses();
+              }}
+              className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm text-left
                 ${activeTab === tab.id 
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
                   : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
                 }`}
             >
-              {tab.icon} {tab.label}
+              <div className="flex items-center gap-3">
+                {tab.icon} {tab.label}
+              </div>
+              {tab.badge && (
+                <span className="bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full leading-none">
+                  {tab.badge}
+                </span>
+              )}
             </button>
           ))}
           
@@ -499,18 +672,35 @@ export default function TeacherDashboardClient({
 
             {/* รายการคลาสสอนชดเชยทั้งหมด */}
             <div className="mt-8 bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <CalendarPlus className="w-5 h-5 text-amber-500" />
-                  รายการคลาสสอนชดเชยทั้งหมด
+                  รายการคลาสสอนชดเชยทั้งหมด ({makeupClasses.length})
                 </h3>
-                <button
-                  onClick={() => openMakeupModal()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition"
-                >
-                  <CalendarPlus className="w-4 h-4" />
-                  เพิ่มคลาสสอนชดเชย
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setActiveTab("trash");
+                      fetchTrashedMakeupClasses();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700/70 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold transition border border-gray-200 dark:border-gray-600"
+                    title="เปิดหน้าถังขยะคลาสสอนชดเชย"
+                  >
+                    <Trash2 className="w-4 h-4 text-rose-500" />
+                    ถังขยะ {trashedMakeupClasses.length > 0 && (
+                      <span className="bg-rose-500 text-white rounded-full px-1.5 py-0.5 text-[10px] font-mono leading-none">
+                        {trashedMakeupClasses.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => openMakeupModal()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-sm transition"
+                  >
+                    <CalendarPlus className="w-4 h-4" />
+                    เพิ่มคลาสสอนชดเชย
+                  </button>
+                </div>
               </div>
 
               {makeupClasses.length === 0 ? (
@@ -557,9 +747,9 @@ export default function TeacherDashboardClient({
                             สแกน
                           </Link>
                           <button
-                            onClick={() => handleDeleteMakeup(mc.id)}
+                            onClick={() => handleDeleteMakeup(mc.id, mc.subject?.name)}
                             className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition"
-                            title="ลบคลาสนี้"
+                            title="ย้ายไปถังขยะ (กู้คืนได้ภายใน 7 วัน)"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -625,6 +815,200 @@ export default function TeacherDashboardClient({
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Tab 4: Trashed Makeup Classes */}
+        {activeTab === "trash" && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
+                  <span className="p-2 rounded-xl bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400">
+                    <Trash2 className="w-6 h-6" />
+                  </span>
+                  ถังขยะคลาสสอนชดเชย
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  คลาสสอนชดเชยที่ถูกลบ สามารถตรวจสอบ กู้คืนกลับสู่ตารางสอน หรือลบถาวรได้
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={fetchTrashedMakeupClasses}
+                  disabled={isTrashLoading}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold shadow-sm transition disabled:opacity-50"
+                  title="รีเฟรชข้อมูล"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isTrashLoading ? 'animate-spin text-indigo-500' : ''}`} />
+                  รีเฟรช
+                </button>
+                {trashedMakeupClasses.length > 0 && (
+                  <>
+                    <button
+                      onClick={handleRestoreAllMakeup}
+                      disabled={isTrashLoading}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      กู้คืนทั้งหมด ({trashedMakeupClasses.length})
+                    </button>
+                    <button
+                      onClick={handleClearAllTrashMakeup}
+                      disabled={isTrashLoading}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800 rounded-xl text-xs font-bold transition disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      ล้างถังขยะทั้งหมด
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Warning Alert Banner (7 Days Auto Cleanup) */}
+            <div className="bg-amber-50 dark:bg-amber-950/30 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 mt-0.5">
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                    ระบบถังขยะอัตโนมัติ (เก็บข้อมูล 7 วัน)
+                  </h3>
+                  <div className="mt-1 text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                    <p>
+                      คลาสสอนชดเชยที่ถูกลบจะถูกพักไว้ในถังขยะเป็นเวลา <strong className="font-semibold underline">7 วัน</strong> หากเลยกำหนดเวลาระบบจะลบข้อมูลออกจากฐานข้อมูลโดยอัตโนมัติอย่างถาวร หากต้องการนำคลาสกลับมาใช้สอน สามารถกดปุ่ม <strong className="text-emerald-700 dark:text-emerald-400 font-semibold">&ldquo;กู้คืน&rdquo;</strong> ได้ตลอดเวลา
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Content List */}
+            {trashedMakeupClasses.length === 0 ? (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl p-12 text-center border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700/50 rounded-full flex items-center justify-center text-gray-400">
+                  <Trash2 className="w-8 h-8" />
+                </div>
+                <h3 className="text-base font-bold text-gray-800 dark:text-white mb-1">
+                  ไม่มีคลาสสอนชดเชยในถังขยะ
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+                  เมื่อคุณลบคลาสสอนชดเชยจากหน้าหลัก รายการจะถูกย้ายมาพักไว้ที่นี่เพื่อให้คุณสามารถกู้คืนได้ภายใน 7 วัน
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-900/50">
+                      <tr>
+                        <th className="px-6 py-3.5 text-left font-bold text-gray-500 uppercase tracking-wider text-xs">วิชา</th>
+                        <th className="px-6 py-3.5 text-left font-bold text-gray-500 uppercase tracking-wider text-xs">วันที่และเวลาสอน</th>
+                        <th className="px-6 py-3.5 text-left font-bold text-gray-500 uppercase tracking-wider text-xs">หมายเหตุ</th>
+                        <th className="px-6 py-3.5 text-center font-bold text-gray-500 uppercase tracking-wider text-xs">สถานะถังขยะ</th>
+                        <th className="px-6 py-3.5 text-right font-bold text-gray-500 uppercase tracking-wider text-xs">จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {trashedMakeupClasses.map((mc: any) => {
+                        const dateFormatted = new Date(mc.date).toLocaleDateString('th-TH', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        });
+                        const deletedDateFormatted = mc.deletedAt 
+                          ? new Date(mc.deletedAt).toLocaleDateString('th-TH', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })
+                          : "-";
+
+                        const daysLeft = mc.daysRemaining !== undefined ? mc.daysRemaining : 7;
+                        const isExpiringSoon = daysLeft <= 2;
+
+                        return (
+                          <tr key={mc.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/80 transition">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-xs bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded">
+                                  {mc.subject?.code}
+                                </span>
+                                <div>
+                                  <div className="font-semibold text-gray-900 dark:text-white">
+                                    {mc.subject?.name}
+                                  </div>
+                                  <div className="text-xs text-gray-400">
+                                    ระดับชั้น: {mc.subject?.level || "-"}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="font-medium text-gray-900 dark:text-gray-200">
+                                {dateFormatted}
+                              </div>
+                              <div className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 font-mono font-semibold">
+                                <Clock className="w-3 h-3" />
+                                {mc.startTime} - {mc.endTime} น.
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                {mc.remark || "-"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center whitespace-nowrap">
+                              <div className="flex flex-col items-center gap-1">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                                  isExpiringSoon
+                                    ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 animate-pulse'
+                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                }`}>
+                                  <Clock className="w-3 h-3" />
+                                  {daysLeft <= 0 ? 'หมดเวลาวันนี้' : `เหลือกู้คืนอีก ${daysLeft} วัน`}
+                                </span>
+                                <span className="text-[10px] text-gray-400">
+                                  ลบเมื่อ: {deletedDateFormatted}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => handleRestoreMakeup(mc.id, mc.subject?.name)}
+                                  disabled={isTrashLoading}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 text-xs font-bold transition disabled:opacity-50"
+                                  title="กู้คืนกลับสู่ตารางสอน"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" />
+                                  กู้คืน
+                                </button>
+                                <button
+                                  onClick={() => handlePermanentDeleteMakeup(mc.id, mc.subject?.name)}
+                                  disabled={isTrashLoading}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-xs font-bold transition disabled:opacity-50"
+                                  title="ลบถาวร ไม่สามารถกู้คืนได้"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  ลบถาวร
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

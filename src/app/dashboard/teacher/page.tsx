@@ -114,12 +114,16 @@ export default async function TeacherDashboard() {
     leaves: weeklyAttendances.filter(a => a.status === "LEAVE_PERSONAL" || a.status === "LEAVE_SICK").length
   };
 
-  // 7. ดึงคลาสสอนชดเชยของอาจารย์
+  // 7. ดึงคลาสสอนชดเชยของอาจารย์ (แยกคลาสปกติและถังขยะ)
   let makeupClasses: any[] = [];
+  let trashedMakeupClasses: any[] = [];
+  const msInDay = 24 * 60 * 60 * 1000;
+
   try {
     makeupClasses = await (prisma as any).makeupClass.findMany({
       where: {
-        subjectId: { in: subjectIds }
+        subjectId: { in: subjectIds },
+        deletedAt: null
       },
       include: {
         subject: {
@@ -128,8 +132,40 @@ export default async function TeacherDashboard() {
       },
       orderBy: [{ date: 'desc' }, { startTime: 'asc' }]
     });
+
+    const rawTrashed = await (prisma as any).makeupClass.findMany({
+      where: {
+        subjectId: { in: subjectIds },
+        deletedAt: { not: null }
+      },
+      include: {
+        subject: {
+          select: { id: true, name: true, code: true, level: true, room: true }
+        }
+      },
+      orderBy: [{ deletedAt: 'desc' }]
+    });
+
+    trashedMakeupClasses = rawTrashed.map((mc: any) => {
+      const deletedTime = new Date(mc.deletedAt).getTime();
+      const expiryTime = deletedTime + (7 * msInDay);
+      const daysRemaining = Math.max(0, Math.ceil((expiryTime - Date.now()) / msInDay));
+      return {
+        ...mc,
+        daysRemaining
+      };
+    });
   } catch (err) {
-    makeupClasses = [];
+    try {
+      makeupClasses = await (prisma as any).makeupClass.findMany({
+        where: { subjectId: { in: subjectIds } },
+        include: { subject: { select: { id: true, name: true, code: true, level: true, room: true } } },
+        orderBy: [{ date: 'desc' }, { startTime: 'asc' }]
+      });
+    } catch {
+      makeupClasses = [];
+    }
+    trashedMakeupClasses = [];
   }
 
   // เตรียมรายชื่อวิชาสำหรับ Modal สร้างคลาสสอนชดเชย
@@ -152,6 +188,7 @@ export default async function TeacherDashboard() {
         weeklyStats={weeklyStats}
         subjects={simpleSubjects}
         initialMakeupClasses={makeupClasses}
+        initialTrashedMakeupClasses={trashedMakeupClasses}
       />
     </div>
   );

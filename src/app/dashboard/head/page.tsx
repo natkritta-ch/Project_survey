@@ -78,6 +78,20 @@ export default async function HeadDashboard() {
     orderBy: [{ academicYear: 'desc' }, { term: 'desc' }]
   });
 
+  let makeupClasses: any[] = [];
+  try {
+    makeupClasses = await (prisma as any).makeupClass.findMany({
+      include: {
+        subject: {
+          select: { id: true, name: true, code: true, level: true, room: true }
+        }
+      },
+      orderBy: [{ date: 'desc' }, { startTime: 'asc' }]
+    });
+  } catch (e) {
+    makeupClasses = [];
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col py-8 px-4 sm:px-6 lg:px-8 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto w-full">
@@ -111,6 +125,7 @@ export default async function HeadDashboard() {
           schedules={schedules} 
           users={users} 
           termConfigs={termConfigs}
+          makeupClasses={makeupClasses}
         />
       </div>
     </div>
