@@ -64,8 +64,10 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
         where: { type: "assembly", subjectId: null, ...(hasDateFilter ? { timestamp: assemblyDateFilter } : {}) },
         select: { timestamp: true }
       });
-      // นับว่ามีกี่วัน (ตัดเวลาทิ้ง เอาแต่วันที่)
-      const uniqueDates = new Set(rawAssemblyLogs.map(log => new Date(log.timestamp).toISOString().split('T')[0]));
+      // นับว่ามีกี่วัน (ตัดเวลาทิ้ง เอาแต่วันที่ในเวลาไทย)
+      const uniqueDates = new Set(rawAssemblyLogs.map(log => 
+        new Date(log.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+      ));
       totalAssemblyDays = uniqueDates.size;
 
       // 2. ดึงนักเรียนพร้อมประวัติ
@@ -78,7 +80,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
           level: true,
           attendances: { 
             where: { type: "assembly", subjectId: null, ...(hasDateFilter ? { timestamp: assemblyDateFilter } : {}) },
-            select: { status: true }
+            select: { status: true, timestamp: true }
           }
         },
         orderBy: { username: 'asc' }
@@ -86,8 +88,20 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
 
       // 3. ปั้นข้อมูลเข้าตาราง (กฎ ผ. / มผ.)
       summaryData = students.map(st => {
-        // Bug #9 fix: นับ LATE ด้วยเหมือน HeadAdminOverview เพื่อให้ตัวเลขสอดคล้องกัน
-        const presentCount = st.attendances.filter(a => a.status === 'PRESENT' || a.status === 'LATE').length; 
+        // จัดกลุ่มประวัติตามวันที่ในเวลาไทย เพื่อป้องกันการนับซ้ำในวันเดียวกัน
+        const dayStatusMap = new Map<string, string>();
+        st.attendances.forEach((a: any) => {
+          const dStr = new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+          if (!dayStatusMap.has(dStr)) {
+            dayStatusMap.set(dStr, a.status);
+          } else {
+            const prev = dayStatusMap.get(dStr);
+            if (prev !== 'PRESENT' && a.status === 'PRESENT') dayStatusMap.set(dStr, a.status);
+            else if (prev === 'ABSENT' && a.status === 'LATE') dayStatusMap.set(dStr, a.status);
+          }
+        });
+
+        const presentCount = Array.from(dayStatusMap.values()).filter(status => status === 'PRESENT' || status === 'LATE').length;
         const percent = totalAssemblyDays > 0 ? (presentCount / totalAssemblyDays) * 100 : 0;
         
         // เกณฑ์: ผ่านคือ >= 60%
@@ -192,6 +206,113 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
         orderBy: { timestamp: 'desc' },
         take: 300 // limit to recent logs to prevent huge payloads
      });
+
+     // จัดลำดับแบบ A: วันที่ล่าสุด -> คนมาเรียน/มาสาย/ลา อยู่บนสุด -> คนขาดเรียน (ABSENT) อยู่ล่างสุด
+     logs.sort((a: any, b: any) => {
+       const dateA = new Intl.DateTimeFormat('en-CA', {
+         timeZone: 'Asia/Bangkok',
+         year: 'numeric',
+         month: '2-digit',
+         day: '2-digit'
+       }).format(new Date(a.timestamp));
+
+       const dateB = new Intl.DateTimeFormat('en-CA', {
+         timeZone: 'Asia/Bangkok',
+         year: 'numeric',
+         month: '2-digit',
+         day: '2-digit'
+       }).format(new Date(b.timestamp));
+
+       // 1. เรียงวันที่ล่าสุดมาก่อน (DESC)
+       if (dateA !== dateB) {
+         return dateB.localeCompare(dateA);
+       }
+
+       // 2. ลำดับสถานะ: มาเรียน(1) / มาสาย(2) / ลา(3) อยู่บนสุด, ขาดเรียน(99) อยู่ล่างสุด
+       const getScore = (s: string) => {
+         if (s === "PRESENT") return 1;
+         if (s === "LATE") return 2;
+         if (s && s.startsWith("LEAVE")) return 3;
+         if (s === "ABSENT") return 99;
+         return 4;
+       };
+
+       const scoreA = getScore(a.status);
+       const scoreB = getScore(b.status);
+
+       if (scoreA !== scoreB) {
+         return scoreA - scoreB;
+       }
+
+       // 3. ถ้าอยู่ในกลุ่มเดียวกัน:
+       // คนขาดเรียน: เรียงตามรหัสนักเรียน เพื่อความสะดวกในการตรวจรายชื่อ
+       if (scoreA === 99) {
+         return (a.student?.username || "").localeCompare(b.student?.username || "");
+       }
+
+       // คนมาเรียน/สาย: เรียงตามเวลาสแกนล่าสุดมาก่อน
+       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+     });
+  }
+
+  // ดึงข้อมูลคาบสอนชดเชยสำหรับวิชาที่เกี่ยวข้องในประวัติรายวัน
+  let makeupClassesList: any[] = [];
+  if (!isSummaryView(viewMode) && logs.length > 0) {
+    const relevantSubjectIds = Array.from(new Set(logs.map((l: any) => l.subjectId).filter(Boolean))) as string[];
+    if (relevantSubjectIds.length > 0) {
+      try {
+        makeupClassesList = await (prisma as any).makeupClass.findMany({
+          where: { subjectId: { in: relevantSubjectIds } },
+          select: {
+            id: true,
+            subjectId: true,
+            date: true,
+            startTime: true,
+            endTime: true,
+            remark: true,
+          }
+        });
+      } catch (err) {
+        makeupClassesList = [];
+      }
+    }
+  }
+
+  function findMakeupForLog(log: any, makeups: any[]) {
+    if (!log.subjectId || !makeups || makeups.length === 0) return null;
+    const logDate = new Date(log.timestamp);
+    const logDateStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(logDate);
+
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Bangkok',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false
+    }).formatToParts(logDate);
+    const h = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+    const m = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+    const logMinutes = h * 60 + m;
+
+    return makeups.find((mc: any) => {
+      if (mc.subjectId !== log.subjectId) return false;
+      const mcDateStr = new Date(mc.date).toISOString().split('T')[0];
+      if (mcDateStr !== logDateStr) return false;
+
+      if (mc.startTime && mc.endTime) {
+        const [startH, startM] = mc.startTime.split(':').map(Number);
+        const [endH, endM] = mc.endTime.split(':').map(Number);
+        const startMin = startH * 60 + startM;
+        const endMin = endH * 60 + endM;
+        // ครอบคลุมช่วงเปิดสแกน (ก่อนเริ่ม 45 นาที ถึงหลังเลิก 60 นาที)
+        return logMinutes >= (startMin - 45) && logMinutes <= (endMin + 60);
+      }
+      return true;
+    }) || null;
   }
 
   function isSummaryView(v: string) { return v === "summary"; }
@@ -234,7 +355,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
               <BarChart3 className="w-4 h-4 mr-2" /> สรุปประเมินผล
             </Link>
             <Link href={`/dashboard/teacher/report?view=logs&subjectId=${activeSubjectId}&level=${activeLevel}`} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center transition ${!isSummaryView(viewMode) ? 'bg-indigo-50 text-indigo-700 shadow-sm dark:bg-indigo-900/50 dark:text-indigo-300' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'}`}>
-              <ListChecks className="w-4 h-4 mr-2" /> ดู/แก้ไขรายวัน
+              <ListChecks className="w-4 h-4 mr-2" /> ดูประวัติรายวัน
             </Link>
           </div>
         </div>
@@ -449,7 +570,7 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
           <div className="p-3 sm:p-5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col sm:flex-row gap-4 justify-between items-center text-sm">
             <div className="flex items-center gap-3">
-              <h3 className="font-semibold text-slate-800 dark:text-slate-200">ประวัติรายวัน (คลิกเพื่อแก้ไขสถานะ)</h3>
+              <h3 className="font-semibold text-slate-800 dark:text-slate-200">ประวัติการเข้าเรียนรายวัน</h3>
               <span className="text-xs text-slate-500 bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded hidden sm:inline-block">แสดงล่าสุด {logs.length} รายการ</span>
             </div>
             
@@ -463,33 +584,51 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
                   <th className="px-6 py-3 text-left font-bold text-slate-500 tracking-wider">วันเวลา</th>
                   <th className="px-6 py-3 text-left font-bold text-slate-500 tracking-wider">นักเรียน</th>
                   <th className="px-6 py-3 text-left font-bold text-slate-500 tracking-wider">ชั้นปี/วิชา</th>
-                  <th className="px-6 py-3 text-center font-bold text-slate-500 tracking-wider relative">แก้ไขสถานะ (Auto Save)</th>
+                  <th className="px-6 py-3 text-center font-bold text-slate-500 tracking-wider">สถานะ</th>
                 </tr>
               </thead>
               <tbody id="logs-tbody" className="bg-white dark:bg-slate-800 divide-y divide-slate-100 dark:divide-slate-700/50">
                 {logs.length === 0 ? (
                   <tr><td colSpan={4} className="px-6 py-8 text-center text-slate-500">ไม่มีประวัติการเช็คชื่อสำหรับตัวกรองนี้</td></tr>
                 ) : (
-                  logs.map((log: any) => (
-                    <tr key={log.id} className="log-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                      <td className="px-6 py-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
-                        {new Date(log.timestamp).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-slate-900 dark:text-slate-100">{log.student?.name}</div>
-                        <div className="text-xs text-slate-500">{log.student?.username}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2.5 py-1 text-xs font-semibold rounded-md border border-slate-200 bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">
-                          [{log.student?.level || log.subject?.level || "-"}] {log.subject ? log.subject.name : 'เข้าแถวรวม'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        {/* Re-use StatusEditor */}
-                        <StatusEditor id={log.id} initialStatus={log.status} />
-                      </td>
-                    </tr>
-                  ))
+                  logs.map((log: any) => {
+                    const makeup = findMakeupForLog(log, makeupClassesList);
+                    return (
+                      <tr key={log.id} className="log-row hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                        <td className="px-6 py-4 whitespace-nowrap text-slate-700 dark:text-slate-300">
+                          {new Date(log.timestamp).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="font-medium text-slate-900 dark:text-slate-100">{log.student?.name}</div>
+                          <div className="text-xs text-slate-500">{log.student?.username}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className="px-2.5 py-1 text-xs font-semibold rounded-md border border-slate-200 bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600">
+                              [{log.student?.level || log.subject?.level || "-"}] {log.subject ? log.subject.name : 'เข้าแถวรวม'}
+                            </span>
+                            {makeup && (
+                              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-bold rounded-md bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60 shadow-2xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                สอนชดเชย {makeup.remark ? `(${makeup.remark})` : ''}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {/* Status Badge with Modal Editor */}
+                          <StatusEditor 
+                            id={log.id} 
+                            initialStatus={log.status} 
+                            studentName={log.student?.name}
+                            studentCode={log.student?.username}
+                            subjectName={log.subject ? `[${log.subject.code || ''}] ${log.subject.name}` : 'เข้าแถวรวม'}
+                            dateStr={new Date(log.timestamp).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

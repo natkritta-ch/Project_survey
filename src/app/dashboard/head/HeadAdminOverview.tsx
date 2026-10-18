@@ -76,7 +76,9 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
       allAssemblyLogs = allAssemblyLogs.filter((a: any) => new Date(a.timestamp).getTime() <= end);
     }
 
-    const uniqueAssemblyDates = new Set(allAssemblyLogs.map((a: any) => new Date(a.timestamp).toDateString()));
+    const uniqueAssemblyDates = new Set(allAssemblyLogs.map((a: any) => 
+      new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
+    ));
     const totalDays = uniqueAssemblyDates.size;
 
     let failedCount = 0;
@@ -94,7 +96,21 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
       }
 
       if (totalDays === 0) return;
-      const presents = myAsmLogs.filter((a: any) => ["PRESENT", "LATE"].includes(a.status)).length;
+
+      // จัดกลุ่มประวัติตามวันที่ในเวลาไทย ป้องกันการนับซ้ำในวันเดียวกัน
+      const dayStatusMap = new Map<string, string>();
+      myAsmLogs.forEach((a: any) => {
+        const dStr = new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+        if (!dayStatusMap.has(dStr)) {
+          dayStatusMap.set(dStr, a.status);
+        } else {
+          const prev = dayStatusMap.get(dStr);
+          if (prev !== 'PRESENT' && a.status === 'PRESENT') dayStatusMap.set(dStr, a.status);
+          else if (prev === 'ABSENT' && a.status === 'LATE') dayStatusMap.set(dStr, a.status);
+        }
+      });
+
+      const presents = Array.from(dayStatusMap.values()).filter((status: string) => ["PRESENT", "LATE"].includes(status)).length;
       const percent = Math.round((presents / totalDays) * 100);
       if (percent < 60) {
         failedCount++;

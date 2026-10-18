@@ -209,31 +209,29 @@ export async function POST(request: Request) {
       }
     }
 
-    const duplicateWhere: any = { studentId };
+    // ตรวจสอบประวัติเข้าเรียน/เข้าแถวในวันนี้ (รองรับเวลาไทย UTC+7)
+    const now = new Date();
+    const thaiFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const parts = thaiFormatter.formatToParts(now);
+    const month = parts.find(p => p.type === 'month')?.value;
+    const day = parts.find(p => p.type === 'day')?.value;
+    const year = parts.find(p => p.type === 'year')?.value;
+    
+    const todayStart = new Date(`${year}-${month}-${day}T00:00:00.000+07:00`);
+    const todayEnd = new Date(`${year}-${month}-${day}T23:59:59.999+07:00`);
+
+    const duplicateWhere: any = { studentId, timestamp: { gte: todayStart, lte: todayEnd } };
 
     if (isAssembly) {
-      // เข้าแถว: ตรวจซ้ำการบันทึกในวันเดียวกัน (เครื่องเดียวกันใน production ใช้ UTC+7)
-      const now = new Date();
-      const thaiFormatter = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' });
-      const parts = thaiFormatter.formatToParts(now);
-      const month = parts.find(p => p.type === 'month')?.value;
-      const day = parts.find(p => p.type === 'day')?.value;
-      const year = parts.find(p => p.type === 'year')?.value;
-      
-      const todayStart = new Date(`${year}-${month}-${day}T00:00:00.000+07:00`);
-      const todayEnd = new Date(`${year}-${month}-${day}T23:59:59.999+07:00`);
-
       duplicateWhere.subjectId = null;
       duplicateWhere.type = "assembly";
-      duplicateWhere.timestamp = { gte: todayStart, lte: todayEnd };
     } else {
-      // เข้าเรียน: ตรวจซ้ำภายใน 5 นาที (ในคาบเดียวกัน สแกนหลายครั้ง)
       duplicateWhere.subjectId = subjectId;
-      duplicateWhere.timestamp = { gt: new Date(Date.now() - 5 * 60 * 1000) };
     }
 
     const recent = await prisma.attendance.findFirst({
-      where: duplicateWhere
+      where: duplicateWhere,
+      orderBy: { timestamp: 'desc' }
     });
 
     if (recent) {

@@ -23,7 +23,6 @@ import {
   ArrowDownUp,
   Sparkles,
   Check,
-  Search,
   School
 } from "lucide-react";
 
@@ -71,7 +70,6 @@ export default function TranscriptView({
   // Filter & Sorting State (รูปแบบที่ 1)
   const [selectedFilter, setSelectedFilter] = useState<string>("ALL"); // "ALL" หรือปีการศึกษา เช่น "2569", "2568"
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // "desc" = ล่าสุดก่อน, "asc" = เรียงตามหลักสูตร
-  const [searchQuery, setSearchQuery] = useState<string>("");
 
   // Accordion State (รูปแบบที่ 2)
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -244,25 +242,13 @@ export default function TranscriptView({
     }
   }
 
-  // กรองตาม Filter (ปีการศึกษา) และคำค้นหา
+  // กรองตาม Filter (ปีการศึกษา)
   const displayedTerms = useMemo(() => {
     let result = [...allTerms];
 
     // กรองตามปีการศึกษา
     if (selectedFilter !== "ALL") {
       result = result.filter(t => t.year === selectedFilter);
-    }
-
-    // กรองตามคำค้นหารายวิชา หรือคำค้นหาเทอม
-    if (searchQuery.trim()) {
-      const q = searchQuery.trim().toLowerCase();
-      result = result.filter(t => {
-        const matchTerm = `ภาคเรียนที่ ${t.term}/${t.year}`.toLowerCase().includes(q);
-        const matchSubject = t.subjects.some(s => 
-          s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q)
-        );
-        return matchTerm || matchSubject;
-      });
     }
 
     // จัดเรียงตามลำดับที่เลือก
@@ -273,7 +259,7 @@ export default function TranscriptView({
     }
 
     return result;
-  }, [allTerms, selectedFilter, sortOrder, searchQuery]);
+  }, [allTerms, selectedFilter, sortOrder]);
 
   // ฟังก์ชันควบคุม Accordion
   const toggleAccordion = (key: string) => {
@@ -286,14 +272,6 @@ export default function TranscriptView({
       }
       return next;
     });
-  };
-
-  const expandAll = () => {
-    setExpandedKeys(new Set(allTerms.map(t => t.key)));
-  };
-
-  const collapseAll = () => {
-    setExpandedKeys(new Set());
   };
 
   // หมายเลขอ้างอิงดิจิทัลประจำตัว (Official Verification Ref Code)
@@ -418,9 +396,9 @@ export default function TranscriptView({
       </div>
 
       {/* ========================================================
-          3. แถบเครื่องมือ: Filter Bar + Accordion Controls (รูปแบบที่ 1 & 2)
+          3. แถบเครื่องมือ: Filter Bar (Filter Chips + Sort + Print)
       ======================================================== */}
-      <div className="no-print space-y-3 bg-card p-4 sm:p-5 rounded-2xl border border-border shadow-xs">
+      <div className="no-print bg-card p-4 sm:p-5 rounded-2xl border border-border shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           
           {/* ตัวกรองปีการศึกษา (Filter Chips) */}
@@ -432,7 +410,7 @@ export default function TranscriptView({
             
             <button
               onClick={() => setSelectedFilter("ALL")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 selectedFilter === "ALL"
                   ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/20"
                   : "bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -445,7 +423,7 @@ export default function TranscriptView({
               <button
                 key={year}
                 onClick={() => setSelectedFilter(year)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   selectedFilter === year
                     ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/20"
                     : "bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -460,7 +438,7 @@ export default function TranscriptView({
           <div className="flex items-center gap-2 self-end lg:self-auto">
             <button
               onClick={() => setSortOrder(prev => prev === "desc" ? "asc" : "desc")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-bold transition-colors cursor-pointer"
               title="สลับลำดับการแสดงผล"
             >
               <ArrowDownUp className="w-3.5 h-3.5" />
@@ -470,49 +448,10 @@ export default function TranscriptView({
             {showPrintButton && (
               <button
                 onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-all border border-primary/20 shadow-xs active:scale-95"
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-all border border-primary/20 shadow-xs active:scale-95 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>พิมพ์ระเบียน (Print)</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* แถวล่าง: ปุ่ม ขยาย/ยุบทั้งหมด + ค้นหารายวิชา */}
-        <div className="pt-3 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground font-medium">จัดการมุมมองเทอม:</span>
-            <button
-              onClick={expandAll}
-              className="px-2.5 py-1 rounded-lg bg-muted/50 hover:bg-muted text-foreground font-bold text-[11px] transition-colors"
-            >
-              ขยายทั้งหมด
-            </button>
-            <button
-              onClick={collapseAll}
-              className="px-2.5 py-1 rounded-lg bg-muted/50 hover:bg-muted text-foreground font-bold text-[11px] transition-colors"
-            >
-              ยุบทั้งหมด
-            </button>
-          </div>
-
-          {/* ช่องค้นหารายวิชา */}
-          <div className="relative w-full sm:w-64">
-            <input
-              type="text"
-              placeholder="ค้นหารหัสวิชา หรือ ชื่อวิชา..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-background border border-border focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-            />
-            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-2.5 top-2.5" />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-2.5 top-2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>

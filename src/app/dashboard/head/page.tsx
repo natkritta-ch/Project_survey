@@ -45,7 +45,10 @@ export default async function HeadDashboard() {
       updatedAt: true,
       isTwoFactorEnabled: true,
       student: true, 
-      attendances: true,
+      attendances: {
+        include: { subject: true },
+        orderBy: { timestamp: 'desc' }
+      },
       parentLinks: {
         include: { student: true }
       }

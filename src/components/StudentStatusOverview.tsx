@@ -11,14 +11,22 @@ export default function StudentStatusOverview({ attendances, subjects }: { atten
     // Deduplicate by date to get total valid assembly days for this student
     const uniqueDaysMap = new Map();
     assemblyLogs.forEach(a => {
-      const dateStr = new Date(a.timestamp).toISOString().split('T')[0];
-      // If multiple logs on same day, take the best status
+      const dateStr = new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+      // If multiple logs on same day, take the best status: PRESENT > LATE > LEAVE > ABSENT
+      const getPriority = (s: string) => {
+        if (s === "PRESENT") return 1;
+        if (s === "LATE") return 2;
+        if (s && s.startsWith("LEAVE")) return 3;
+        return 4;
+      };
+
       if (!uniqueDaysMap.has(dateStr)) {
          uniqueDaysMap.set(dateStr, a);
       } else {
          const existing = uniqueDaysMap.get(dateStr);
-         if (existing.status !== "PRESENT" && a.status === "PRESENT") uniqueDaysMap.set(dateStr, a);
-         if (existing.status === "ABSENT" && a.status === "LATE") uniqueDaysMap.set(dateStr, a);
+         if (getPriority(a.status) < getPriority(existing.status)) {
+           uniqueDaysMap.set(dateStr, a);
+         }
       }
     });
     

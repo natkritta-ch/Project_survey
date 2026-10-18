@@ -29,31 +29,30 @@ export async function POST(request: Request) {
     const todayStart = new Date(`${year}-${month}-${day}T00:00:00.000+07:00`);
     const todayEnd = new Date(`${year}-${month}-${day}T23:59:59.999+07:00`);
 
-    const alreadyPresentWhere: any = {
+    const alreadyLoggedWhere: any = {
       studentId: { in: studentIds },
-      status: { in: ["PRESENT", "LATE"] },
       timestamp: { gte: todayStart, lte: todayEnd },
     };
 
     if (isAssembly) {
-      alreadyPresentWhere.type = "assembly";
-      alreadyPresentWhere.subjectId = null;
+      alreadyLoggedWhere.type = "assembly";
+      alreadyLoggedWhere.subjectId = null;
     } else {
-      alreadyPresentWhere.subjectId = subjectId;
+      alreadyLoggedWhere.subjectId = subjectId;
     }
 
-    const alreadyPresent = await prisma.attendance.findMany({
-      where: alreadyPresentWhere,
+    const alreadyLogged = await prisma.attendance.findMany({
+      where: alreadyLoggedWhere,
       select: { studentId: true }
     });
 
-    const alreadyPresentIds = new Set(alreadyPresent.map(a => a.studentId));
+    const alreadyLoggedIds = new Set(alreadyLogged.map(a => a.studentId));
 
-    // กรองเฉพาะคนที่ขาดจริงๆ (ยังไม่มี PRESENT ในวันนี้เลย)
-    const trulyAbsentIds = studentIds.filter((id: string) => !alreadyPresentIds.has(id));
+    // กรองเฉพาะคนที่ยังไม่มีบันทึกใดๆ ในวันนี้เลย (ไม่ทับคนมาเรียน คนมาสาย คนลา หรือคนที่เคยถูกเช็คขาดไปแล้ว)
+    const trulyAbsentIds = studentIds.filter((id: string) => !alreadyLoggedIds.has(id));
 
     if (trulyAbsentIds.length === 0) {
-      return NextResponse.json({ success: true, count: 0, message: "ไม่มีนักเรียนที่ต้องบันทึกขาดเพิ่มเติม (ทุกคนเช็คชื่อแล้วจากเครื่องอื่น)" });
+      return NextResponse.json({ success: true, count: 0, message: "ไม่มีนักเรียนที่ต้องบันทึกขาดเพิ่มเติม (ทุกคนมีสถานะแล้ว)" });
     }
 
     const attendanceData = trulyAbsentIds.map((studentId: string) => ({
