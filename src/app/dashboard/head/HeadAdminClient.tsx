@@ -72,7 +72,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [userPassword, setUserPassword] = useState("");
   const [showUserPassword, setShowUserPassword] = useState(false);
   const [showEditUserPassword, setShowEditUserPassword] = useState(false);
-  const [userRole, setUserRole] = useState("TEACHER");
+  const [userRole, setUserRole] = useState("STUDENT");
   const [userLevel, setUserLevel] = useState("ปวช.1");
   const [userNickname, setUserNickname] = useState("");
   const [userGender, setUserGender] = useState("");
@@ -83,7 +83,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [userStudentId, setUserStudentId] = useState("");
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
-  const [filterUserRole, setFilterUserRole] = useState("ทั้งหมด");
+  const [filterUserRole, setFilterUserRole] = useState("STUDENT");
   const [filterUserLevel, setFilterUserLevel] = useState("ทั้งหมด");
   const [searchUser, setSearchUser] = useState("");
   
@@ -286,7 +286,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setUserPassword(""); 
     setShowUserPassword(false);
     setShowEditUserPassword(false);
-    setUserRole("TEACHER"); 
+    setUserRole("STUDENT"); 
     setUserLevel("ปวช.1"); 
     setUserNickname("");
     setUserGender("");
