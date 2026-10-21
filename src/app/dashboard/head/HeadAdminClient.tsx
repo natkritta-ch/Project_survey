@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restoreSubject, hardDeleteSubject, restoreAllSubjects, hardDeleteAllSubjects, createSchedule, updateSchedule, deleteSchedule, deleteManySchedules, restoreSchedule, hardDeleteSchedule, restoreAllSchedules, hardDeleteAllSchedules, createUser, updateUser, deleteUser, deleteManyUsers, restoreUser, hardDeleteUser, restoreAllUsers, hardDeleteAllUsers, toggleEditPermission, promoteStudents, clearOldGraduates, getUserDetails } from "./actions";
+import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restoreSubject, hardDeleteSubject, restoreAllSubjects, hardDeleteAllSubjects, createSchedule, updateSchedule, deleteSchedule, deleteManySchedules, restoreSchedule, hardDeleteSchedule, restoreAllSchedules, hardDeleteAllSchedules, createUser, updateUser, deleteUser, deleteManyUsers, restoreUser, hardDeleteUser, restoreAllUsers, hardDeleteAllUsers, toggleEditPermission, promoteStudents, clearOldGraduates, getUserDetails, generateParentCodesForAllStudents } from "./actions";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import HeadAdminOverview from "./HeadAdminOverview";
 import HeadProgressionManagement from "./HeadProgressionManagement";
@@ -81,6 +81,9 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [userAddress, setUserAddress] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [userStudentId, setUserStudentId] = useState("");
+  const [userParentCode, setUserParentCode] = useState("");
+  const [isParentCodesModalOpen, setIsParentCodesModalOpen] = useState(false);
+  const [parentCodeSearch, setParentCodeSearch] = useState("");
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [filterUserRole, setFilterUserRole] = useState("STUDENT");
@@ -230,6 +233,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       if (userRole === "STUDENT") {
         data.level = userLevel;
         data.studentId = null;
+        if (userParentCode) data.parentCode = userParentCode.trim().toUpperCase();
       } else if (userRole === "PARENT") {
         data.level = null;
         data.studentId = userStudentId || null;
@@ -272,6 +276,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setUserPhone(u.phone || "");
     setUserAddress(u.address || "");
     setUserEmail(u.email || "");
+    setUserParentCode(u.parentCode || "");
     setUserStudentId(u.approvedChildren?.[0]?.id || u.studentId || "");
     setIsStudentDropdownOpen(false);
     setStudentSearchQuery("");
@@ -294,6 +299,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setUserPhone("");
     setUserAddress("");
     setUserEmail("");
+    setUserParentCode("");
     setUserStudentId("");
     setIsStudentDropdownOpen(false);
     setStudentSearchQuery("");
@@ -474,9 +480,27 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     if (filterUserLevel !== "ทั้งหมด" && u.level !== filterUserLevel) return false;
     if (searchUser) {
       const searchLower = searchUser.toLowerCase();
-      const matchName = u.name.toLowerCase().includes(searchLower);
-      const matchUsername = u.username.toLowerCase().includes(searchLower);
-      if (!matchName && !matchUsername) return false;
+      const matchName = u.name?.toLowerCase().includes(searchLower);
+      const matchUsername = u.username?.toLowerCase().includes(searchLower);
+      
+      // ค้นหาผู้ปกครองจากชื่อนักเรียน (บุตรหลาน), รหัสนักเรียน หรือรหัส Parent Code
+      const matchChild = u.role === "PARENT" && (
+        u.approvedChildren?.some((c: any) => 
+          c.name?.toLowerCase().includes(searchLower) ||
+          c.username?.toLowerCase().includes(searchLower) ||
+          c.parentCode?.toLowerCase().includes(searchLower)
+        ) ||
+        (u.student && (
+          u.student.name?.toLowerCase().includes(searchLower) ||
+          u.student.username?.toLowerCase().includes(searchLower) ||
+          u.student.parentCode?.toLowerCase().includes(searchLower)
+        ))
+      );
+
+      // ค้นหานักเรียนจาก Parent Code ของนักเรียนเอง
+      const matchParentCode = u.role === "STUDENT" && u.parentCode?.toLowerCase().includes(searchLower);
+
+      if (!matchName && !matchUsername && !matchChild && !matchParentCode) return false;
     }
     return true;
   });
@@ -1553,6 +1577,14 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                       <option value="PARENT">ผู้ปกครอง</option>
                     </select>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsParentCodesModalOpen(true)}
+                    className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-md text-xs font-bold transition shadow-sm flex items-center gap-1.5 whitespace-nowrap active:scale-95"
+                    title="ดูรหัสผูกผู้ปกครองของนักเรียนทั้งหมดสำหรับแจกในวันประชุม"
+                  >
+                    🔑 รหัสผู้ปกครอง (Parent Codes)
+                  </button>
                 </div>
               </div>
 
@@ -1661,6 +1693,22 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                           <p className="text-gray-500 dark:text-gray-400 col-span-2 line-clamp-2 text-[11px]" title={u.address || ""}>
                             ที่อยู่: <span className="text-gray-700 dark:text-gray-300">{u.address || "-"}</span>
                           </p>
+                          <div className="col-span-2 flex items-center justify-between text-[11px] bg-amber-50/80 dark:bg-amber-950/30 px-2 py-1 rounded-lg border border-amber-200/80 dark:border-amber-800/40 mt-0.5">
+                            <span className="text-amber-800 dark:text-amber-300 font-semibold">รหัสผู้ปกครอง:</span>
+                            <span 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (u.parentCode) {
+                                  navigator.clipboard.writeText(u.parentCode);
+                                  showToast(`คัดลอกรหัส ${u.parentCode} แล้ว`, "success");
+                                }
+                              }}
+                              title="คลิกเพื่อคัดลอกรหัส"
+                              className="font-mono font-bold text-amber-900 dark:text-amber-200 hover:text-amber-600 dark:hover:text-amber-300 cursor-pointer transition"
+                            >
+                              🔑 {u.parentCode || "-"}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1715,8 +1763,12 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อ-นามสกุล</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เบอร์โทร / ที่อยู่</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สิทธิ์</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชั้นปี</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สิทธิ์แก้ไขโปรไฟล์</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {filterUserRole === "PARENT" ? "ชั้นปี (บุตรหลาน)" : "ชั้นปี"}
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {filterUserRole === "PARENT" ? "รหัสผูกผู้ปกครอง" : "สิทธิ์แก้ไขโปรไฟล์"}
+                      </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">จัดการ</th>
                     </tr>
                   </thead>
@@ -1766,6 +1818,22 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                                   ? "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" 
                                   : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
                             }`}>{u.level || "-"}</span>
+                          ) : u.role === "PARENT" ? (
+                            u.approvedChildren && u.approvedChildren.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {u.approvedChildren.map((c: any) => (
+                                  <span key={c.id} className="px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                    {c.level || "-"}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : u.student?.level ? (
+                              <span className="px-2.5 py-0.5 inline-flex text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                {u.student.level}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
+                            )
                           ) : (
                             "-"
                           )}
@@ -1779,6 +1847,41 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                             >
                               {u.canEditProfile ? "✓ เปิดอยู่ (กดเพื่อปิด)" : "✗ ปิดอยู่ (กดเพื่อเปิด)"}
                             </button>
+                          ) : u.role === "PARENT" ? (
+                            u.approvedChildren && u.approvedChildren.length > 0 ? (
+                              <div className="flex flex-col gap-1.5">
+                                {u.approvedChildren.map((c: any) => (
+                                  <span 
+                                    key={c.id} 
+                                    onClick={() => {
+                                      if (c.parentCode) {
+                                        navigator.clipboard.writeText(c.parentCode);
+                                        showToast(`คัดลอกรหัส ${c.parentCode} แล้ว`, "success");
+                                      }
+                                    }}
+                                    title="คลิกเพื่อคัดลอกรหัส"
+                                    className="font-mono text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800 inline-flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/60 transition w-fit"
+                                  >
+                                    🔑 {c.parentCode || "-"}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : u.student ? (
+                              <span 
+                                onClick={() => {
+                                  if (u.student.parentCode) {
+                                    navigator.clipboard.writeText(u.student.parentCode);
+                                    showToast(`คัดลอกรหัส ${u.student.parentCode} แล้ว`, "success");
+                                  }
+                                }}
+                                title="คลิกเพื่อคัดลอกรหัส"
+                                className="font-mono text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800 inline-flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/60 transition w-fit"
+                              >
+                                🔑 {u.student.parentCode || "-"}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">-</span>
+                            )
                           ) : (
                             <span className="text-xs text-gray-400">-</span>
                           )}
@@ -2475,12 +2578,41 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </select>
               </div>
               {userRole === "STUDENT" && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ชั้นปี</label>
-                  <select value={userLevel} onChange={e => setUserLevel(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
-                    {studentLevelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ชั้นปี</label>
+                    <select value={userLevel} onChange={e => setUserLevel(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border">
+                      {studentLevelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">รหัสผูกผู้ปกครอง (Parent Code)</label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input 
+                        type="text" 
+                        value={userParentCode} 
+                        onChange={e => setUserParentCode(e.target.value.toUpperCase())} 
+                        placeholder="เช่น P-7492-8K2M" 
+                        className="block w-full font-mono font-bold rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200 uppercase" 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+                          let num = Math.floor(1000 + Math.random() * 9000);
+                          let str = "";
+                          for (let i = 0; i < 4; i++) str += chars.charAt(Math.floor(Math.random() * chars.length));
+                          setUserParentCode(`P-${num}-${str}`);
+                        }}
+                        className="px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-xs font-semibold whitespace-nowrap transition"
+                        title="สุ่มรหัสใหม่"
+                      >
+                        สุ่มใหม่
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1">รหัสเฉพาะสำหรับผู้ปกครองของนักเรียนคนนี้ใช้ผูกข้อมูล</p>
+                  </div>
+                </>
               )}
               {userRole === "PARENT" && (
                 <div className="relative">
@@ -2572,6 +2704,148 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= Parent Codes Management Modal ================= */}
+      {isParentCodesModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 flex flex-col rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95">
+            {/* Header */}
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 dark:border-gray-700 bg-amber-50/60 dark:bg-amber-950/20 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-xl shadow-sm">
+                  🔑
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+                    รหัสผูกผู้ปกครอง (Parent Codes) ของนักเรียนทั้งหมด
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    นำรหัสเฉพาะเหล่านี้ไปแจกให้ผู้ปกครองในวันประชุมผู้ปกครอง หรือส่งให้นักเรียนเพื่อส่งต่อให้พ่อแม่ใช้ลงทะเบียน
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsParentCodesModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 p-2 rounded-full transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Actions Bar */}
+            <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-750 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                <input 
+                  type="text" 
+                  value={parentCodeSearch}
+                  onChange={e => setParentCodeSearch(e.target.value)}
+                  placeholder="ค้นหาชื่อ, รหัสนักศึกษา, ชั้นปี หรือรหัสโค้ด..." 
+                  className="w-full sm:w-72 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={async () => {
+                    setIsLoading(true);
+                    try {
+                      const res = await generateParentCodesForAllStudents();
+                      showToast(`สร้างรหัสผู้ปกครองสำเร็จ (${res.count} คน)`, "success");
+                    } catch (e: any) {
+                      showError("เกิดข้อผิดพลาด", e.message);
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  ⚡ สร้างรหัสให้อัตโนมัติ (คนที่ยังไม่มี)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                >
+                  🖨️ พิมพ์รายการ
+                </button>
+              </div>
+            </div>
+
+            {/* Students Table */}
+            <div className="overflow-y-auto flex-1 p-4">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 shadow-xs">
+                  <tr>
+                    <th className="px-4 py-2.5 text-left text-xs font-bold text-gray-500 uppercase">ลำดับ</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-bold text-gray-500 uppercase">รหัสนักศึกษา</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-bold text-gray-500 uppercase">ชื่อ-นามสกุล</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-bold text-gray-500 uppercase">ชั้นปี</th>
+                    <th className="px-4 py-2.5 text-left text-xs font-bold text-gray-500 uppercase">รหัสผูกผู้ปกครอง (Parent Code)</th>
+                    <th className="px-4 py-2.5 text-right text-xs font-bold text-gray-500 uppercase">คัดลอก</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-750">
+                  {users
+                    .filter(u => u.role === "STUDENT" && !u.deletedAt)
+                    .filter(u => {
+                      if (!parentCodeSearch) return true;
+                      const q = parentCodeSearch.toLowerCase();
+                      return (
+                        u.name?.toLowerCase().includes(q) ||
+                        u.username?.toLowerCase().includes(q) ||
+                        u.level?.toLowerCase().includes(q) ||
+                        u.parentCode?.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((st, idx) => (
+                      <tr key={st.id} className="hover:bg-amber-50/40 dark:hover:bg-gray-700/50 transition">
+                        <td className="px-4 py-2 text-gray-400 font-mono text-xs">{idx + 1}</td>
+                        <td className="px-4 py-2 font-mono font-semibold text-gray-900 dark:text-white">{st.username}</td>
+                        <td className="px-4 py-2 font-medium text-gray-900 dark:text-white">{st.name}</td>
+                        <td className="px-4 py-2">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                            {st.level || "-"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="font-mono font-bold text-amber-900 dark:text-amber-200 bg-amber-100/70 dark:bg-amber-950/40 px-2.5 py-1 rounded border border-amber-300/80 dark:border-amber-800 tracking-wider">
+                            {st.parentCode || <span className="text-gray-400 font-normal italic">ยังไม่มีรหัส</span>}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (st.parentCode) {
+                                navigator.clipboard.writeText(st.parentCode);
+                                showToast(`คัดลอกรหัส ${st.parentCode} (${st.name}) แล้ว`, "success");
+                              }
+                            }}
+                            disabled={!st.parentCode}
+                            className="text-xs px-2.5 py-1 bg-white hover:bg-gray-50 border border-gray-200 dark:bg-gray-700 dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 font-medium transition disabled:opacity-30"
+                          >
+                            คัดลอก
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-750 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsParentCodesModalOpen(false)}
+                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg text-sm font-semibold transition"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
           </div>
         </div>
       )}

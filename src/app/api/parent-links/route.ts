@@ -72,7 +72,7 @@ export async function PUT(request: Request) {
   }
 }
 
-// ผู้ปกครองขอเพิ่มบุตรหลานคนใหม่ หรือ ส่งคำขอซ้ำหลังจากถูกยกเลิก
+// ผู้ปกครองขอเพิ่มบุตรหลานคนใหม่ด้วย Parent Code หรือ ผูกข้อมูลซ้ำ
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -81,48 +81,61 @@ export async function POST(request: Request) {
     }
 
     const parentId = (session.user as any).id;
-    const { studentUsername, studentNationalId } = await request.json();
+    const body = await request.json();
+    const { parentCode, studentUsername, studentNationalId } = body;
 
-    // ค้นหานักเรียน
-    const student = await prisma.user.findFirst({
-      where: { username: studentUsername, role: "STUDENT" }
-    });
+    let student: any = null;
 
-    if (!student) {
-      return NextResponse.json({ success: false, message: "ไม่พบรหัสนักเรียนในระบบ" }, { status: 404 });
-    }
-
-    // ตรวจสอบเลขบัตร 4 ตัวท้าย
-    if (student.nationalId) {
-      const last4 = student.nationalId.slice(-4);
-      if (last4 !== studentNationalId) {
-        return NextResponse.json({ success: false, message: "เลขบัตรประชาชน 4 ตัวท้ายไม่ถูกต้อง" }, { status: 400 });
+    if (parentCode && parentCode.trim()) {
+      const cleanCode = parentCode.trim().toUpperCase();
+      student = await prisma.user.findFirst({
+        where: { parentCode: cleanCode, role: "STUDENT", deletedAt: null }
+      });
+      if (!student) {
+        return NextResponse.json({ success: false, message: "ไม่พบข้อมูลนักเรียนจากรหัสผูกผู้ปกครองที่ระบุ กรุณาตรวจสอบรหัสอีกครั้ง" }, { status: 404 });
+      }
+    } else if (studentUsername) {
+      student = await prisma.user.findFirst({
+        where: { username: studentUsername, role: "STUDENT", deletedAt: null }
+      });
+      if (!student) {
+        return NextResponse.json({ success: false, message: "ไม่พบรหัสนักเรียนในระบบ" }, { status: 404 });
+      }
+      if (student.nationalId && studentNationalId) {
+        const last4 = student.nationalId.slice(-4);
+        if (last4 !== studentNationalId) {
+          return NextResponse.json({ success: false, message: "เลขบัตรประชาชน 4 ตัวท้ายไม่ถูกต้อง" }, { status: 400 });
+        }
       }
     } else {
-      return NextResponse.json({ success: false, message: "นักเรียนยังไม่ได้อัปเดตข้อมูลเลขบัตรประชาชนในระบบ กรุณาให้นักเรียนอัปเดตโปรไฟล์ก่อน" }, { status: 400 });
+      return NextResponse.json({ success: false, message: "กรุณาระบุรหัสผูกผู้ปกครอง (Parent Code)" }, { status: 400 });
     }
 
-    // เช็คว่าขอไปแล้วหรือยัง
+    // ตรวจสอบว่าเคยผูกไปแล้วหรือไม่
     const existingLink = await prisma.parentStudentLink.findFirst({
       where: { parentId, studentId: student.id }
     });
 
     if (existingLink) {
       if (existingLink.status === "APPROVED") {
-        return NextResponse.json({ success: false, message: "คุณผูกบัญชีกับนักเรียนคนนี้อยู่แล้ว" }, { status: 400 });
+        return NextResponse.json({ success: false, message: `คุณผูกบัญชีกับนักเรียน (${student.name}) อยู่แล้ว` }, { status: 400 });
       }
-      if (existingLink.status === "PENDING") {
-        return NextResponse.json({ success: false, message: "คุณส่งคำขอติดตามนักเรียนคนนี้ไปแล้ว กรุณารอนักเรียนอนุมัติ" }, { status: 400 });
-      }
-      // กรณีถูกยกเลิกหรือปฏิเสธไปแล้ว (REJECTED): ให้เปลี่ยนสถานะกลับเป็น PENDING เพื่อให้นักเรียนอนุมัติใหม่ได้
+      // ปรับสถานะเป็น APPROVED ทันที
       const updatedLink = await prisma.parentStudentLink.update({
         where: { id: existingLink.id },
-        data: { status: "PENDING" }
+        data: { status: "APPROVED" }
       });
+
+      // ซิงค์ studentId ให้กับผู้ปกครอง
+      await prisma.user.update({
+        where: { id: parentId },
+        data: { studentId: student.id }
+      });
+
       return NextResponse.json({ 
         success: true, 
         link: updatedLink, 
-        message: "ส่งคำขอผูกบัญชีใหม่อีกครั้งเรียบร้อยแล้ว กรุณารอนักเรียนกดยืนยัน" 
+        message: `ผูกข้อมูลกับนักเรียน (${student.name}) สำเร็จเรียบร้อยแล้ว` 
       });
     }
 
@@ -130,11 +143,24 @@ export async function POST(request: Request) {
       data: {
         parentId,
         studentId: student.id,
-        status: "PENDING"
+        status: "APPROVED"
       }
     });
 
-    return NextResponse.json({ success: true, link: newLink });
+    // ซิงค์ studentId ให้กับผู้ปกครองถ้ายังไม่มี
+    const parentUser = await prisma.user.findUnique({ where: { id: parentId }, select: { studentId: true } });
+    if (!parentUser?.studentId) {
+      await prisma.user.update({
+        where: { id: parentId },
+        data: { studentId: student.id }
+      });
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      link: newLink,
+      message: `ผูกข้อมูลกับนักเรียน (${student.name} - ชั้น ${student.level || "ไม่ระบุ"}) เรียบร้อยแล้ว` 
+    });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: "เกิดข้อผิดพลาด: " + error.message }, { status: 500 });
   }

@@ -3,6 +3,7 @@ import { authOptions } from "../../../lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "../../../lib/prisma";
 import { getCurrentTermConfig } from "../../../lib/term";
+import { ensureStudentParentCode } from "../../../lib/parentCode";
 import Link from "next/link";
 import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
@@ -33,6 +34,7 @@ export default async function StudentDashboard() {
       bloodType: true,
       phone: true,
       email: true,
+      parentCode: true,
       isTwoFactorEnabled: true
     }
   });
@@ -40,6 +42,11 @@ export default async function StudentDashboard() {
   // Fix #5: ถ้า user ถูกลบใน DB แต่ session ยังอยู่ → redirect ออกทันที ป้องกัน crash
   if (!myInfo) {
     redirect("/login");
+  }
+
+  // สร้าง Parent Code ให้นักเรียนอัตโนมัติหากยังไม่มี
+  if (!myInfo.parentCode) {
+    myInfo.parentCode = await ensureStudentParentCode(myInfo.id, myInfo.parentCode);
   }
 
   if (!myInfo.isTwoFactorEnabled) {

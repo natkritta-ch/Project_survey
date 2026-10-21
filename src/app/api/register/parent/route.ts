@@ -5,40 +5,35 @@ import bcrypt from "bcryptjs";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, username, password, studentUsername, studentNationalId, phone, address, email } = body;
+    const { name, username, password, parentCode, phone, address, email } = body;
 
-    // 1. ตรวจสอบว่ามีรหัสนักเรียนนี้หรือไม่ (เพิ่ม Security ด่านแรก)
-    const student = await prisma.user.findFirst({
-      where: {
-        username: studentUsername,
-        role: "STUDENT",
-      },
-    });
-
-    if (!student) {
+    if (!parentCode || !parentCode.trim()) {
       return NextResponse.json(
-        { success: false, message: "ไม่พบรหัสนักเรียนในระบบ กรุณาตรวจสอบอีกครั้ง" },
-        { status: 404 }
-      );
-    }
-
-    // ตรวจสอบเลขบัตรประชาชน 4 ตัวท้าย (ถ้ามี)
-    if (student.nationalId && studentNationalId) {
-      const last4 = student.nationalId.slice(-4);
-      if (last4 !== studentNationalId) {
-        return NextResponse.json(
-          { success: false, message: "ข้อมูลยืนยันตัวตน (เลขบัตรประชาชน 4 ตัวท้าย) ไม่ถูกต้อง" },
-          { status: 400 }
-        );
-      }
-    } else if (!student.nationalId) {
-      return NextResponse.json(
-        { success: false, message: "นักเรียนยังไม่ได้อัปเดตข้อมูลเลขบัตรประชาชนในระบบ กรุณาให้นักเรียนอัปเดตโปรไฟล์ก่อน" },
+        { success: false, message: "กรุณาระบุรหัสผูกผู้ปกครอง (Parent Code)" },
         { status: 400 }
       );
     }
 
-    // 2. สร้างบัญชีผู้ปกครองใหม่ (ไม่ต้องใส่ studentId แล้ว)
+    const cleanCode = parentCode.trim();
+
+    // 1. ตรวจสอบรหัสผูกผู้ปกครองกับนักเรียนในระบบ
+    const student = await prisma.user.findFirst({
+      where: {
+        parentCode: cleanCode,
+        role: "STUDENT",
+        deletedAt: null,
+      },
+      select: { id: true, name: true, username: true, level: true }
+    });
+
+    if (!student) {
+      return NextResponse.json(
+        { success: false, message: "ไม่พบข้อมูลนักเรียนจากรหัสผูกผู้ปกครองนี้ กรุณาตรวจสอบรหัสที่ได้รับจากทางแผนกวิชาอีกครั้ง" },
+        { status: 404 }
+      );
+    }
+
+    // 2. สร้างบัญชีผู้ปกครองใหม่ และผูก studentId ให้เรียบร้อย
     const parent = await prisma.user.create({
       data: {
         name,
@@ -48,22 +43,23 @@ export async function POST(request: Request) {
         phone: phone || null,
         address: address || null,
         email: email || null,
+        studentId: student.id,
       },
     });
 
-    // 3. สร้าง ParentStudentLink พร้อมสถานะ PENDING รอให้นักเรียนอนุมัติ
+    // 3. สร้าง ParentStudentLink พร้อมสถานะ APPROVED ทันที ไม่ต้องรออนุมัติ
     await prisma.parentStudentLink.create({
       data: {
         parentId: parent.id,
         studentId: student.id,
-        status: "PENDING",
+        status: "APPROVED",
       }
     });
 
     return NextResponse.json({ 
       success: true, 
       user: { id: parent.id, username: parent.username },
-      message: "สมัครสมาชิกสำเร็จ โปรดรอนักเรียนอนุมัติการเข้าถึงข้อมูล"
+      message: `สมัครสมาชิกสำเร็จและเชื่อมโยงกับนักเรียน (${student.name} - ชั้น ${student.level || "ไม่ระบุ"}) เรียบร้อยแล้ว`
     });
   } catch (error: any) {
     console.error("Register parent error:", error);

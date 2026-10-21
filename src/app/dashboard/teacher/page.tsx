@@ -68,6 +68,7 @@ export default async function TeacherDashboard() {
       username: true,
       name: true,
       level: true,
+      parentCode: true,
       studentLinks: {
         where: { status: "APPROVED" },
         include: { parent: { select: { name: true, phone: true } } }
@@ -81,6 +82,7 @@ export default async function TeacherDashboard() {
     username: st.username,
     name: st.name,
     level: st.level,
+    parentCode: st.parentCode,
     parentLinks: st.studentLinks
   }));
 

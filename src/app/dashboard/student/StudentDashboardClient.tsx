@@ -5,7 +5,7 @@ import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Calendar, Clock, BookOpen, Menu, X, Settings, Camera } from "lucide-react";
+import { User, Users, Calendar, Clock, BookOpen, Menu, X, Settings, Camera } from "lucide-react";
 import { showError, showToast, showConfirm } from "@/lib/alerts";
 
 export default function StudentDashboardClient({
@@ -168,8 +168,8 @@ export default function StudentDashboardClient({
                   </div>
                   <div className="p-5 bg-orange-50 dark:bg-orange-950/20 rounded-xl border border-orange-100 dark:border-orange-900/30 sm:col-span-2 lg:col-span-1 hover:-translate-y-1 transition-transform duration-200">
                     <p className="text-xs text-orange-600/70 dark:text-orange-400/70 font-bold mb-1.5 uppercase tracking-wider">รหัสผูกบัญชีผู้ปกครอง</p>
-                    <p className="font-extrabold text-2xl text-orange-900 dark:text-orange-100">{myInfo?.username}</p>
-                    <p className="text-[11px] font-medium text-orange-700/80 dark:text-orange-500/80 mt-2">ให้ผู้ปกครองนำรหัสนี้ไปใช้ตอนสมัครบัญชี</p>
+                    <p className="font-extrabold text-2xl font-mono text-orange-900 dark:text-orange-100 tracking-wider">{myInfo?.parentCode || "-"}</p>
+                    <p className="text-[11px] font-medium text-orange-700/80 dark:text-orange-500/80 mt-2">รหัสสำหรับให้ผู้ปกครองใช้ลงทะเบียนเชื่อมต่อข้อมูล</p>
                   </div>
                 </div>
 
@@ -183,43 +183,26 @@ export default function StudentDashboardClient({
 
                 {/* Parent Links Section */}
                 <div className="mt-8 border-t border-border pt-6">
-                  <h4 className="font-bold text-md mb-4 text-foreground">จัดการบัญชีผู้ปกครอง</h4>
+                  <h4 className="font-bold text-md mb-4 text-foreground flex items-center gap-2">
+                    <Users className="w-5 h-5 text-indigo-500" /> ข้อมูลผู้ปกครองที่เชื่อมต่อกับคุณ
+                  </h4>
                   {parentLinks.length === 0 ? (
                     <div className="text-sm text-muted-foreground p-4 bg-muted/30 rounded-xl border border-border text-center">
-                      ยังไม่มีบัญชีผู้ปกครองผูกกับคุณ
+                      ยังไม่มีบัญชีผู้ปกครองเชื่อมต่อกับบัญชีของคุณ (ผู้ปกครองสามารถใช้รหัส Parent Code ด้านบนเพื่อลงทะเบียนเชื่อมต่อได้ทันที)
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {parentLinks.map((link: any) => (
-                        <div key={link.id} className="flex flex-col sm:flex-row justify-between items-center p-4 bg-background rounded-xl border border-border shadow-sm">
+                        <div key={link.id} className="flex justify-between items-center p-4 bg-background rounded-xl border border-border shadow-sm">
                           <div>
-                            <p className="font-semibold text-foreground">{link.parent?.name || "ผู้ปกครอง"}</p>
-                            <p className="text-xs text-muted-foreground">สถานะ: 
-                              <span className={`ml-1 font-bold ${link.status === "PENDING" ? "text-orange-500" : link.status === "APPROVED" ? "text-green-500" : "text-red-500"}`}>
-                                {link.status === "PENDING" ? "รออนุมัติ" : link.status === "APPROVED" ? "อนุมัติแล้ว" : "ยกเลิกแล้ว"}
-                              </span>
-                            </p>
+                            <p className="font-bold text-foreground text-sm">{link.parent?.name || "ผู้ปกครอง"}</p>
+                            {link.parent?.phone && (
+                              <p className="text-xs text-muted-foreground mt-0.5">เบอร์ติดต่อ: {link.parent.phone}</p>
+                            )}
                           </div>
-                          {link.status === "PENDING" && (
-                            <div className="flex gap-2 mt-3 sm:mt-0 w-full sm:w-auto">
-                              <button onClick={() => handleUpdateLinkStatus(link.id, "APPROVED", link.parent?.name)} className="flex-1 sm:flex-none px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-sm font-bold rounded-lg shadow-sm transition-colors">
-                                อนุมัติ
-                              </button>
-                              <button onClick={() => handleUpdateLinkStatus(link.id, "REJECTED", link.parent?.name)} className="flex-1 sm:flex-none px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 text-sm font-bold rounded-lg shadow-sm transition-colors">
-                                ปฏิเสธ
-                              </button>
-                            </div>
-                          )}
-                          {link.status === "APPROVED" && (
-                            <button onClick={() => handleUpdateLinkStatus(link.id, "REJECTED", link.parent?.name)} className="mt-3 sm:mt-0 w-full sm:w-auto px-4 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-sm font-bold rounded-lg transition-colors">
-                              ยกเลิกการเข้าถึง
-                            </button>
-                          )}
-                          {link.status === "REJECTED" && (
-                            <button onClick={() => handleUpdateLinkStatus(link.id, "APPROVED", link.parent?.name)} className="mt-3 sm:mt-0 w-full sm:w-auto px-4 py-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-sm font-bold rounded-lg transition-colors">
-                              อนุมัติการเข้าถึงอีกครั้ง
-                            </button>
-                          )}
+                          <span className="text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-200 dark:border-emerald-800">
+                            ✓ เชื่อมต่อแล้ว
+                          </span>
                         </div>
                       ))}
                     </div>

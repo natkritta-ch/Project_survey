@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import prisma from "../../../lib/prisma";
 import HeadAdminClient from "./HeadAdminClient";
 import { clearOldTrash } from "./actions";
+import { ensureStudentParentCode } from "../../../lib/parentCode";
 import LogoutButton from "../../../components/LogoutButton";
 
 export default async function HeadDashboard() {
@@ -33,6 +34,7 @@ export default async function HeadDashboard() {
       address: true,
       email: true,
       nationalId: true,
+      parentCode: true,
       canEditProfile: true,
       isTwin: true,
       twinNote: true,
@@ -54,6 +56,13 @@ export default async function HeadDashboard() {
     }, 
     orderBy: { username: 'asc' } 
   });
+
+  // Auto-heal: หากมีนักเรียนคนใดที่ยังไม่มี parentCode ให้ระบบเจนและบันทึกลงฐานข้อมูลอัตโนมัติทันที
+  for (const u of rawUsers) {
+    if (u.role === "STUDENT" && (!u.parentCode || !u.parentCode.trim())) {
+      u.parentCode = await ensureStudentParentCode(u.id, u.parentCode);
+    }
+  }
 
   const users = rawUsers.map(u => {
     // คำนวณความสัมพันธ์บุตรหลานที่ได้รับการอนุมัติจริง (APPROVED)

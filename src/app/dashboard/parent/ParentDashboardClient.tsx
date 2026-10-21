@@ -23,22 +23,12 @@ export default function ParentDashboardClient({
   const rejectedChildren = childrenData?.filter((c: any) => c.linkStatus === "REJECTED") || [];
   const [activeChildId, setActiveChildId] = useState(approvedChildren[0]?.id || null);
 
-  const [addStudentUsername, setAddStudentUsername] = useState("");
-  const [addStudentNationalId, setAddStudentNationalId] = useState("");
+  const [addParentCode, setAddParentCode] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
-  // Searchable Select สำหรับเลือกนักเรียนที่จะเพิ่ม
-  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
-  const [studentSearch, setStudentSearch] = useState("");
-  const [studentSuggestions, setStudentSuggestions] = useState<any[]>([]);
-  const [isSearchingStudent, setIsSearchingStudent] = useState(false);
-  const [selectedStudentInfo, setSelectedStudentInfo] = useState<any | null>(null);
-  const searchTimeoutRef = useRef<any>(null);
-
-  // ล็อกการเลื่อนหน้าจอข้างหลังเมื่อเปิดเมนูมือถือ และปิดดรอปดาวน์ที่อาจเปิดค้างอยู่
+  // ล็อกการเลื่อนหน้าจอข้างหลังเมื่อเปิดเมนูมือถือ
   React.useEffect(() => {
     if (isMobileMenuOpen) {
-      setIsStudentDropdownOpen(false);
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = "";
@@ -48,54 +38,23 @@ export default function ParentDashboardClient({
     };
   }, [isMobileMenuOpen]);
 
-  const handleStudentSearchChange = (query: string) => {
-    setStudentSearch(query);
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (!query || query.trim().length < 1) {
-      setStudentSuggestions([]);
-      return;
-    }
-
-    setIsSearchingStudent(true);
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/register/search-student?q=${encodeURIComponent(query.trim())}`);
-        const data = await res.json();
-        if (data.success) {
-          setStudentSuggestions(data.students || []);
-        }
-      } catch (err) {
-        console.error("Failed to search students:", err);
-      } finally {
-        setIsSearchingStudent(false);
-      }
-    }, 250);
-  };
-
-  const handleSelectStudent = (st: any) => {
-    setAddStudentUsername(st.username);
-    setSelectedStudentInfo(st);
-    setIsStudentDropdownOpen(false);
-    setStudentSearch("");
-  };
-
   const handleAddChild = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!addParentCode.trim()) return;
     setIsAdding(true);
     try {
       const res = await fetch("/api/parent-links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentUsername: addStudentUsername, studentNationalId: addStudentNationalId })
+        body: JSON.stringify({ parentCode: addParentCode.trim().toUpperCase() })
       });
       const data = await res.json();
       if (data.success) {
-        await showSuccess("ส่งคำขอสำเร็จ", data.message || "กรุณารอให้นักเรียนกดยืนยันการผูกบัญชีจากหน้าจอของนักเรียน");
-        setAddStudentUsername("");
-        setAddStudentNationalId("");
-        window.location.reload(); // Refresh to show pending child
+        await showSuccess("ผูกข้อมูลสำเร็จ", data.message || "ผูกข้อมูลบุตรหลานเรียบร้อยแล้ว");
+        setAddParentCode("");
+        window.location.reload(); // Refresh to show child
       } else {
-        showError("ไม่สามารถส่งคำขอได้", data.message || "กรุณาตรวจสอบข้อมูลและลองใหม่อีกครั้ง");
+        showError("ไม่สามารถผูกข้อมูลได้", data.message || "กรุณาตรวจสอบรหัสแล้วลองใหม่อีกครั้ง");
       }
     } catch (e) {
       showError("เกิดข้อผิดพลาด", "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง");
@@ -230,13 +189,14 @@ export default function ParentDashboardClient({
                       key={child.id}
                       type="button"
                       onClick={() => {
-                        setAddStudentUsername(child.username);
-                        setSelectedStudentInfo(child);
+                        if (child.parentCode) {
+                          setAddParentCode(child.parentCode);
+                        }
                       }}
                       className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-2 rounded-xl transition-all shadow-sm active:scale-95 flex items-center gap-1.5"
                     >
                       <Sparkles className="w-3.5 h-3.5" />
-                      ส่งคำขอผูกกับ {child.name} ใหม่
+                      ผูกกับ {child.name} ใหม่
                     </button>
                   ))}
                 </div>
@@ -245,140 +205,50 @@ export default function ParentDashboardClient({
           )}
 
           {/* แจ้งเตือนกรณีผู้ปกครองใหม่ที่ยังไม่มีนักเรียนเลย */}
-          {approvedChildren.length === 0 && pendingChildren.length === 0 && rejectedChildren.length === 0 && (
+          {approvedChildren.length === 0 && (
             <div className="bg-orange-50 dark:bg-orange-950/20 border-l-4 border-orange-400 p-4 rounded-xl shadow-sm">
               <p className="text-orange-800 dark:text-orange-200 font-bold">
                 ระบบตรวจพบว่าบัญชีของคุณยังไม่ได้ผูกกับรหัสนักเรียนใดๆ
               </p>
               <p className="text-orange-700 dark:text-orange-300 text-sm mt-1">
-                โปรดค้นหาและเลือกชื่อนักเรียน หรือระบุรหัสนักเรียน และเลขบัตรประชาชน 4 ตัวท้ายในแบบฟอร์มด้านล่างเพื่อส่งคำขอผูกบัญชี
+                โปรดระบุรหัสผูกผู้ปกครอง (Parent Code) ที่ได้รับจากแผนกวิชาในช่องด้านล่างเพื่อเชื่อมต่อข้อมูลบุตรหลานได้ทันที
               </p>
             </div>
           )}
 
-          {pendingChildren.length > 0 && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4 rounded-xl shadow-sm">
-              <p className="text-yellow-800 dark:text-yellow-200 font-bold">รอการอนุมัติการเข้าถึงข้อมูลจากนักเรียน:</p>
-              <ul className="mt-2 text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside">
-                {pendingChildren.map((child: any) => (
-                  <li key={child.id}>{child.name} (รหัส: {child.username})</li>
-                ))}
-              </ul>
-              <p className="text-xs text-yellow-700/90 dark:text-yellow-400 mt-1">
-                (กรุณาแจ้งให้นักเรียนเข้าสู่ระบบบัญชีนักเรียนเพื่อกดปุ่ม &quot;อนุมัติ&quot;)
-              </p>
-            </div>
-          )}
-
-          {/* Form ขอเพิ่มบุตรหลาน */}
-          <div className="bg-card p-4 rounded-2xl shadow-sm border border-border mt-4">
-            <h3 className="font-bold text-foreground mb-3 flex items-center gap-2">
-              <User className="w-5 h-5 text-primary" /> เพิ่มบัญชีบุตรหลานที่ต้องการติดตาม
+          {/* Form ขอเพิ่มบุตรหลาน ด้วย Parent Code */}
+          <div className="bg-card p-5 rounded-2xl shadow-sm border border-border mt-4">
+            <h3 className="font-bold text-foreground mb-2 flex items-center gap-2">
+              <User className="w-5 h-5 text-primary" /> เพิ่มบุตรหลานที่ต้องการติดตาม (กรณีมีบุตรหลานมากกว่า 1 คน)
             </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              กรอกรหัสผูกผู้ปกครอง (Parent Code) ของบุตรหลานเพื่อเชื่อมต่อข้อมูลเข้ากับบัญชีนี้ได้ทันที ไม่ต้องสมัครบัญชีใหม่ และไม่ต้องรอนักเรียนอนุมัติ
+            </p>
             <form onSubmit={handleAddChild} className="flex flex-col sm:flex-row gap-3">
-              {/* Searchable Select Combobox สำหรับค้นหาและเลือกนักเรียน */}
-              <div className="flex-1 relative">
-                {isStudentDropdownOpen && (
-                  <div className="fixed inset-0 z-20" onClick={() => setIsStudentDropdownOpen(false)}></div>
-                )}
-
-                <div className="relative z-20">
-                  <div
-                    onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
-                    className={`flex items-center justify-between w-full px-4 py-2 bg-background border rounded-xl text-sm cursor-pointer transition-colors ${
-                      isStudentDropdownOpen 
-                        ? 'border-primary ring-2 ring-primary/20' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
-                      <Users className="w-4 h-4 text-primary shrink-0" />
-                      <span className={`truncate ${addStudentUsername ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                        {selectedStudentInfo 
-                          ? `${selectedStudentInfo.name} (${selectedStudentInfo.username}) - ชั้น ${selectedStudentInfo.level || "ไม่ระบุ"}`
-                          : (addStudentUsername || "-- ค้นหาและเลือกนักเรียน --")
-                        }
-                      </span>
-                    </div>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ml-2 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} />
-                  </div>
-
-                  {isStudentDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-full sm:w-96 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-xl shadow-2xl max-h-60 overflow-y-auto z-30 animate-in fade-in zoom-in-95">
-                      <div className="p-2.5 sticky top-0 bg-card border-b border-border z-10 shadow-sm">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={studentSearch}
-                            onChange={e => handleStudentSearchChange(e.target.value)}
-                            placeholder="พิมพ์ชื่อ หรือ รหัสนักเรียน..."
-                            className="w-full pl-8 pr-3 py-1.5 border border-border rounded-lg text-sm bg-background text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                            autoFocus
-                          />
-                          <Search className="w-4 h-4 text-muted-foreground absolute left-2.5 top-2" />
-                          {isSearchingStudent && (
-                            <Loader2 className="w-4 h-4 animate-spin text-primary absolute right-2.5 top-2" />
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="py-1 divide-y divide-border">
-                        {studentSuggestions.map(st => (
-                          <div
-                            key={st.id}
-                            onClick={() => handleSelectStudent(st)}
-                            className={`p-3 cursor-pointer transition-colors flex items-center justify-between hover:bg-primary/10 ${
-                              addStudentUsername === st.username ? 'bg-primary/10 font-semibold text-primary' : 'text-foreground'
-                            }`}
-                          >
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm">{st.name}</span>
-                                <span className="text-xs text-muted-foreground font-mono">({st.username})</span>
-                              </div>
-                              <div className="text-xs text-muted-foreground mt-0.5">
-                                ชั้น {st.level || "ไม่ระบุ"}
-                              </div>
-                            </div>
-                            <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                              {st.level || "-"}
-                            </span>
-                          </div>
-                        ))}
-
-                        {studentSearch && !isSearchingStudent && studentSuggestions.length === 0 && (
-                          <div className="p-4 text-center text-xs text-muted-foreground italic">
-                            ไม่พบนักเรียนที่ค้นหา
-                          </div>
-                        )}
-
-                        {!studentSearch && studentSuggestions.length === 0 && (
-                          <div className="p-3 text-center text-xs text-muted-foreground">
-                            พิมพ์ชื่อหรือรหัสนักเรียนในช่องค้นหาด้านบน
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
               <div className="flex-1">
                 <input
                   required
                   type="text"
-                  maxLength={4}
-                  placeholder="เลขบัตรประชาชน 4 ตัวท้าย"
-                  className="w-full px-4 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
-                  value={addStudentNationalId}
-                  onChange={(e) => setAddStudentNationalId(e.target.value)}
+                  placeholder="กรอกรหัสผูกผู้ปกครอง เช่น P-7492-8K2M"
+                  className="w-full px-4 py-2.5 bg-background border border-border rounded-xl text-sm font-mono uppercase tracking-wider focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 text-foreground"
+                  value={addParentCode}
+                  onChange={(e) => setAddParentCode(e.target.value.toUpperCase())}
                 />
               </div>
               <button
                 type="submit"
                 disabled={isAdding}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2 rounded-xl text-sm font-bold transition-colors shadow-sm disabled:opacity-50"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
               >
-                {isAdding ? "กำลังส่งคำขอ..." : "ส่งคำขอ"}
+                {isAdding ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> กำลังตรวจสอบ...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" /> ผูกบัญชีบุตรหลานทันที
+                  </>
+                )}
               </button>
             </form>
           </div>

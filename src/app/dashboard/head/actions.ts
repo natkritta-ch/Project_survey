@@ -3,6 +3,7 @@
 import prisma from "../../../lib/prisma";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
+import { generateParentCode } from "../../../lib/parentCode";
 
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
@@ -231,6 +232,10 @@ export async function createUser(data: any) {
   if (data.password) {
     data.password = await bcrypt.hash(data.password, 10);
   }
+  // ถ้าเป็นนักเรียนและยังไม่มี parentCode ให้สร้างอัตโนมัติ
+  if (data.role === "STUDENT" && !data.parentCode) {
+    data.parentCode = generateParentCode();
+  }
   const created = await prisma.user.create({ data });
 
   // ถ้าเป็นผู้ปกครองและมีการระบุ studentId ให้สร้าง ParentStudentLink สถานะ APPROVED อัตโนมัติ
@@ -245,6 +250,39 @@ export async function createUser(data: any) {
   revalidatePath("/dashboard/head");
   revalidatePath("/dashboard/parent");
   revalidatePath("/dashboard/student");
+}
+
+export async function generateParentCodesForAllStudents() {
+  await requireHeadAuth();
+  const studentsWithoutCode = await prisma.user.findMany({
+    where: {
+      role: "STUDENT",
+      OR: [
+        { parentCode: null },
+        { parentCode: "" }
+      ]
+    },
+    select: { id: true }
+  });
+
+  for (const st of studentsWithoutCode) {
+    for (let i = 0; i < 5; i++) {
+      try {
+        await prisma.user.update({
+          where: { id: st.id },
+          data: { parentCode: generateParentCode() }
+        });
+        break;
+      } catch (err: any) {
+        if (err.code === "P2002") continue;
+        break;
+      }
+    }
+  }
+
+  revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/student");
+  return { count: studentsWithoutCode.length };
 }
 
 export async function updateUser(id: string, data: any) {

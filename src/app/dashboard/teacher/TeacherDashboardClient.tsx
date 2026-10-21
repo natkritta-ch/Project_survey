@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck, RotateCcw, AlertTriangle, RefreshCw } from "lucide-react";
+import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck, RotateCcw, AlertTriangle, RefreshCw, Key, Copy, Check } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm, showPromptNumber } from "@/lib/alerts";
 
@@ -11,7 +11,7 @@ export default function TeacherDashboardClient({
   allLevels, 
   initialTerm, 
   sessionName, 
-  studentsWithParents, 
+  studentsWithParents = [], 
   weeklyStats,
   subjects = [],
   initialMakeupClasses = [],
@@ -21,6 +21,19 @@ export default function TeacherDashboardClient({
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
   const [filterTerm, setFilterTerm] = useState(initialTerm || "ทั้งหมด");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [studentParentSearch, setStudentParentSearch] = useState("");
+  const [studentParentLevelFilter, setStudentParentLevelFilter] = useState("ทั้งหมด");
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  const handleCopyCode = (code: string) => {
+    if (!code) return;
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    showToast("คัดลอกรหัสเรียบร้อยแล้ว", "success");
+    setTimeout(() => {
+      setCopiedCode((prev) => (prev === code ? null : prev));
+    }, 2000);
+  };
 
   // ล็อกการเลื่อนหน้าจอข้างหลังเมื่อเปิดเมนูมือถือ
   useEffect(() => {
@@ -768,59 +781,198 @@ export default function TeacherDashboardClient({
         )}
 
         {/* Tab 3: Students & Parents */}
-        {activeTab === "students" && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">รายชื่อนักเรียนและผู้ปกครอง</h2>
-            <p className="text-gray-500 mb-6">ข้อมูลติดต่อผู้ปกครองของนักเรียนในระดับชั้นที่คุณสอน</p>
-            
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
-                  <thead className="bg-gray-50 dark:bg-gray-900/50">
-                    <tr>
-                      <th className="px-6 py-4 text-left font-bold text-gray-500 tracking-wider">รหัสนักเรียน</th>
-                      <th className="px-6 py-4 text-left font-bold text-gray-500 tracking-wider">ชื่อ-นามสกุล</th>
-                      <th className="px-6 py-4 text-center font-bold text-gray-500 tracking-wider">ชั้นปี</th>
-                      <th className="px-6 py-4 text-left font-bold text-gray-500 tracking-wider">ผู้ปกครอง (เบอร์โทร)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                    {studentsWithParents.length === 0 ? (
-                      <tr><td colSpan={4} className="text-center py-8 text-gray-500">ไม่มีนักเรียนในระดับชั้นที่คุณสอน</td></tr>
-                    ) : (
-                      studentsWithParents.map((st: any) => (
-                        <tr key={st.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/80 transition">
-                          <td className="px-6 py-4 whitespace-nowrap text-gray-500 font-mono">{st.username}</td>
-                          <td className="px-6 py-4 whitespace-nowrap font-semibold text-gray-900 dark:text-white">{st.name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">{st.level}</td>
-                          <td className="px-6 py-4">
-                            {st.parentLinks && st.parentLinks.length > 0 ? (
-                              <div className="flex flex-col gap-2">
-                                {st.parentLinks.map((link: any, idx: number) => (
-                                  <div key={idx} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/50 w-fit">
-                                    <Users className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                                    <span className="font-medium text-blue-900 dark:text-blue-300">{link.parent.name}</span>
-                                    {link.parent.phone && (
-                                      <a href={`tel:${link.parent.phone}`} className="flex items-center gap-1 ml-2 text-xs bg-white dark:bg-gray-800 px-2 py-1 rounded text-gray-600 dark:text-gray-300 hover:text-blue-600 border border-gray-200 dark:border-gray-700 transition">
-                                        <Phone className="w-3 h-3" /> {link.parent.phone}
-                                      </a>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 italic text-xs">ยังไม่มีผู้ปกครองเชื่อมโยง</span>
-                            )}
+        {activeTab === "students" && (() => {
+          const filteredStudents = studentsWithParents.filter((st: any) => {
+            const matchesLevel = studentParentLevelFilter === "ทั้งหมด" || st.level === studentParentLevelFilter;
+            if (!matchesLevel) return false;
+            if (!studentParentSearch.trim()) return true;
+
+            const q = studentParentSearch.toLowerCase().trim();
+            const matchName = st.name?.toLowerCase().includes(q);
+            const matchUsername = st.username?.toLowerCase().includes(q);
+            const matchCode = st.parentCode?.toLowerCase().includes(q);
+            const matchParent = st.parentLinks?.some((link: any) => 
+              link.parent?.name?.toLowerCase().includes(q) || 
+              link.parent?.phone?.includes(q)
+            );
+
+            return matchName || matchUsername || matchCode || matchParent;
+          });
+
+          const totalCount = studentsWithParents.length;
+          const linkedCount = studentsWithParents.filter((st: any) => st.parentLinks && st.parentLinks.length > 0).length;
+          const unlinkedCount = totalCount - linkedCount;
+
+          return (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
+                    <span className="p-2 rounded-xl bg-indigo-100 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+                      <Users className="w-6 h-6" />
+                    </span>
+                    รายชื่อนักเรียนและรหัสผู้ปกครอง
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    ข้อมูลติดต่อผู้ปกครองและรหัสผูกบัญชี (Parent Code) ของนักเรียนในระดับชั้นที่คุณสอน สามารถคัดลอกส่งให้ผู้ปกครองได้ทันที
+                  </p>
+                </div>
+
+                {/* Quick Summary Badges */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="px-3 py-1.5 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm text-xs font-medium text-gray-700 dark:text-gray-300">
+                    นักเรียนทั้งหมด: <span className="font-bold text-indigo-600 dark:text-indigo-400">{totalCount}</span> คน
+                  </div>
+                  <div className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                    ผูกผู้ปกครองแล้ว: <span className="font-bold">{linkedCount}</span> คน
+                  </div>
+                  {unlinkedCount > 0 && (
+                    <div className="px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      ยังไม่ผูกผู้ปกครอง: <span className="font-bold">{unlinkedCount}</span> คน
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row items-center gap-3 bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                <div className="relative flex-1 w-full">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={studentParentSearch}
+                    onChange={(e) => setStudentParentSearch(e.target.value)}
+                    placeholder="ค้นหาชื่อนักเรียน, รหัส นร., รหัสผู้ปกครอง, หรือชื่อ/เบอร์ผู้ปกครอง..."
+                    className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
+                  />
+                  {studentParentSearch && (
+                    <button
+                      onClick={() => setStudentParentSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    >
+                      ล้าง
+                    </button>
+                  )}
+                </div>
+
+                {allLevels.length > 1 && (
+                  <div className="w-full sm:w-48">
+                    <select
+                      value={studentParentLevelFilter}
+                      onChange={(e) => setStudentParentLevelFilter(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="ทั้งหมด">ทุกระดับชั้น ({allLevels.length})</option>
+                      {allLevels.map((lvl: string) => (
+                        <option key={lvl} value={lvl}>{lvl}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+              
+              {/* Table */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                    <thead className="bg-gray-50/80 dark:bg-gray-900/50">
+                      <tr>
+                        <th className="px-6 py-4 text-left font-bold text-gray-500 dark:text-gray-400 tracking-wider">รหัสนักเรียน</th>
+                        <th className="px-6 py-4 text-left font-bold text-gray-500 dark:text-gray-400 tracking-wider">ชื่อ-นามสกุล</th>
+                        <th className="px-6 py-4 text-center font-bold text-gray-500 dark:text-gray-400 tracking-wider">ระดับชั้น</th>
+                        <th className="px-6 py-4 text-left font-bold text-gray-500 dark:text-gray-400 tracking-wider">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Key className="w-4 h-4 text-indigo-500" />
+                            รหัสผูกผู้ปกครอง (Parent Code)
+                          </span>
+                        </th>
+                        <th className="px-6 py-4 text-left font-bold text-gray-500 dark:text-gray-400 tracking-wider">ผู้ปกครองที่เชื่อมโยง</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                      {filteredStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="text-center py-12 text-gray-500 dark:text-gray-400">
+                            <Users className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                            ไม่พบข้อมูลนักเรียนที่ตรงกับเงื่อนไขการค้นหา
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        filteredStudents.map((st: any) => (
+                          <tr key={st.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/80 transition">
+                            <td className="px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-400 font-mono font-medium">
+                              {st.username}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap font-semibold text-gray-900 dark:text-white">
+                              {st.name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                                {st.level || "ไม่ระบุ"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {st.parentCode ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyCode(st.parentCode)}
+                                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-950/40 dark:to-blue-950/40 border border-indigo-200/80 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 font-mono font-bold text-xs hover:border-indigo-400 transition shadow-sm group"
+                                  title="คลิกเพื่อคัดลอกรหัสให้ผู้ปกครอง"
+                                >
+                                  <Key className="w-3.5 h-3.5 text-indigo-500" />
+                                  <span className="tracking-wider">{st.parentCode}</span>
+                                  {copiedCode === st.parentCode ? (
+                                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                  ) : (
+                                    <Copy className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition" />
+                                  )}
+                                </button>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs text-gray-400 italic">
+                                  ยังไม่มีรหัส
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              {st.parentLinks && st.parentLinks.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {st.parentLinks.map((link: any, idx: number) => (
+                                    <div 
+                                      key={idx} 
+                                      className="inline-flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-xl border border-emerald-200/70 dark:border-emerald-800/60"
+                                    >
+                                      <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                      <span className="font-medium text-emerald-900 dark:text-emerald-300 text-xs">
+                                        {link.parent.name}
+                                      </span>
+                                      {link.parent.phone && (
+                                        <a 
+                                          href={`tel:${link.parent.phone}`} 
+                                          className="inline-flex items-center gap-1 ml-1 text-xs bg-white dark:bg-gray-800 px-2 py-0.5 rounded-lg text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 border border-emerald-200 dark:border-emerald-700 transition"
+                                          title={`โทรหา ${link.parent.name}`}
+                                        >
+                                          <Phone className="w-3 h-3" /> {link.parent.phone}
+                                        </a>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-1 rounded-lg border border-amber-200/60 dark:border-amber-900/50">
+                                  ยังไม่มีผู้ปกครองผูกรหัส
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Tab 4: Trashed Makeup Classes */}
         {activeTab === "trash" && (

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "../../../lib/prisma";
 import bcrypt from "bcryptjs";
 import { calculateEuclideanDistance, distanceToSimilarity } from "../../../lib/faceLiveness";
+import { generateParentCode } from "../../../lib/parentCode";
 
 export async function POST(request: Request) {
   try {
@@ -158,6 +159,7 @@ export async function POST(request: Request) {
           isTwin: Boolean(isTwin),
           twinNote: twinNote || null,
           twinVerified: false,
+          parentCode: existingUser.parentCode || generateParentCode(),
         }
       });
       return NextResponse.json({ success: true, user: { id: updatedUser.id, username: updatedUser.username } });
@@ -178,6 +180,7 @@ export async function POST(request: Request) {
         bloodType: bloodType || null,
         gender: gender || null,
         nationalId: nationalId || null,
+        parentCode: generateParentCode(),
         profilePicture: profilePicture || null,
         isTwin: Boolean(isTwin),
         twinNote: twinNote || null,

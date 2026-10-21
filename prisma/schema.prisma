@@ -107,6 +107,7 @@ model user {
   gender             String?
   email              String?      @unique(map: "User_email_key")
   nationalId         String?      // รหัสประจำตัวประชาชน
+  parentCode         String?      @unique(map: "User_parentCode_key") // รหัสผูกสำหรับผู้ปกครอง
   isTwin             Boolean      @default(false)
   twinNote           String?      @db.Text
   twinVerified       Boolean      @default(false)
