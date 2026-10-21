@@ -20,7 +20,6 @@ export default function TeacherDashboardClient({
   advisoryData = null
 }: any) {
   const [activeTab, setActiveTab] = useState("overview");
-  const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
   const [filterTerm, setFilterTerm] = useState(initialTerm || "ทั้งหมด");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [studentParentSearch, setStudentParentSearch] = useState("");
@@ -332,7 +331,6 @@ export default function TeacherDashboardClient({
   const allTerms = Array.from(new Set(schedules.map((sc: any) => sc.subject?.term || "-"))).sort();
 
   const displaySchedules = schedules.filter((sc: any) => {
-    if (filterLevel !== "ทั้งหมด" && (sc.subject?.level || "ไม่ระบุ") !== filterLevel) return false;
     if (filterTerm !== "ทั้งหมด" && (sc.subject?.term || "-") !== filterTerm) return false;
     return true;
   });
@@ -696,28 +694,17 @@ export default function TeacherDashboardClient({
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm mb-6 gap-5">
               <div>
                 <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-indigo-500" /> ตารางสอนสัปดาห์นี้
+                  <Calendar className="w-5 h-5 text-indigo-500" /> ตารางสอนเทอมนี้
                 </h3>
               </div>
               
-              <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 flex-1 md:flex-none">
-                  <Filter className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-500">ชั้นปี:</span>
-                  <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} className="bg-transparent border-none text-sm font-bold text-gray-900 dark:text-white focus:ring-0 cursor-pointer w-full outline-none">
-                    <option value="ทั้งหมด">ทั้งหมด</option>
-                    {allLevels.map((l: string) => <option key={l} value={l}>{l}</option>)}
-                  </select>
-                </div>
-                
-                <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 flex-1 md:flex-none">
-                  <Search className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-500">เทอม:</span>
-                  <select value={filterTerm} onChange={e => setFilterTerm(e.target.value)} className="bg-transparent border-none text-sm font-bold text-gray-900 dark:text-white focus:ring-0 cursor-pointer w-full outline-none">
-                    <option value="ทั้งหมด">ทั้งหมด</option>
-                    {allTerms.map((t: string) => <option key={t} value={t}>เทอม {t}</option>)}
-                  </select>
-                </div>
+              <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-900 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 w-full md:w-auto">
+                <Search className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-500">เทอม:</span>
+                <select value={filterTerm} onChange={e => setFilterTerm(e.target.value)} className="bg-transparent border-none text-sm font-bold text-gray-900 dark:text-white focus:ring-0 cursor-pointer outline-none">
+                  <option value="ทั้งหมด">ทั้งหมด</option>
+                  {allTerms.map((t: string) => <option key={t} value={t}>เทอม {t}</option>)}
+                </select>
               </div>
             </div>
 
