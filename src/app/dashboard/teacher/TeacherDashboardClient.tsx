@@ -340,23 +340,7 @@ export default function TeacherDashboardClient({
     return advisoryData.students.filter((s: any) => s.isTwin && !s.twinVerified).length;
   }, [advisoryData]);
 
-  const tabs = [
-    { id: "overview", label: "ภาพรวมวันนี้", icon: <Home className="w-5 h-5" /> },
-    ...(advisoryData && advisoryData.assignments && advisoryData.assignments.length > 0 ? [{
-      id: "advisees",
-      label: "ห้องในที่ปรึกษาของฉัน",
-      icon: <GraduationCap className="w-5 h-5" />,
-      badge: pendingTwinsCount > 0 ? pendingTwinsCount : null
-    }] : []),
-    { id: "schedule", label: "ตารางสอนทั้งหมด", icon: <Calendar className="w-5 h-5" /> },
-    { id: "students", label: "รายชื่อนักเรียนและผู้ปกครอง", icon: <Users className="w-5 h-5" /> },
-    { 
-      id: "trash", 
-      label: "ถังขยะคลาสชดเชย", 
-      icon: <Trash2 className="w-5 h-5" />,
-      badge: trashedMakeupClasses.length > 0 ? trashedMakeupClasses.length : null
-    }
-  ];
+  const isAdvisor = !!(advisoryData && advisoryData.assignments && advisoryData.assignments.length > 0);
 
   const handleTabClick = (id: string) => {
     setActiveTab(id);
@@ -392,38 +376,91 @@ export default function TeacherDashboardClient({
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1.5">
-          {tabs.map(tab => (
+          {/* 1. ภาพรวมวันนี้ */}
+          <button
+            type="button"
+            onClick={() => handleTabClick("overview")}
+            className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm text-left
+              ${activeTab === "overview" 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
+                : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+              }`}
+          >
+            <div className="flex items-center gap-3">
+              <Home className="w-5 h-5" /> ภาพรวมวันนี้
+            </div>
+          </button>
+
+          {/* 2. ตารางสอนทั้งหมด */}
+          <button
+            type="button"
+            onClick={() => handleTabClick("schedule")}
+            className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm text-left
+              ${activeTab === "schedule" 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
+                : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+              }`}
+          >
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5" /> ตารางสอนทั้งหมด
+            </div>
+          </button>
+
+          {/* 3. รายงานการเข้าเรียน */}
+          <Link 
+            href="/dashboard/teacher/report" 
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-indigo-200 hover:bg-indigo-800/50 hover:text-white transition-all font-medium text-sm"
+          >
+            <BarChart className="w-5 h-5" /> รายงานการเข้าเรียน
+          </Link>
+
+          {/* 4. ห้องในที่ปรึกษาของฉัน (แสดงเมื่อได้รับการแต่งตั้งเป็นที่ปรึกษา) */}
+          {isAdvisor && (
             <button
-              key={tab.id}
-              onClick={() => {
-                handleTabClick(tab.id);
-                if (tab.id === "trash") fetchTrashedMakeupClasses();
-              }}
+              type="button"
+              onClick={() => handleTabClick("advisees")}
               className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all font-medium text-sm text-left
-                ${activeTab === tab.id 
+                ${activeTab === "advisees" 
                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
                   : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
                 }`}
             >
               <div className="flex items-center gap-3">
-                {tab.icon} {tab.label}
+                <GraduationCap className="w-5 h-5" /> ห้องในที่ปรึกษาของฉัน
               </div>
-              {tab.badge && (
+              {pendingTwinsCount > 0 && (
                 <span className="bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full leading-none">
-                  {tab.badge}
+                  {pendingTwinsCount}
                 </span>
               )}
             </button>
-          ))}
-          
-          <div className="my-4 border-t border-indigo-800/50" />
-          
-          <Link href="/dashboard/teacher/report" className="flex items-center gap-3 px-4 py-3 rounded-xl text-indigo-200 hover:bg-indigo-800/50 hover:text-white transition-all font-medium text-sm">
-            <BarChart className="w-5 h-5" /> รายงานการเข้าเรียน
-          </Link>
+          )}
         </nav>
 
-        <div className="p-4 border-t border-indigo-800/50">
+        {/* เมนูด้านล่าง: ถังขยะคลาสชดเชย & ออกจากระบบ */}
+        <div className="p-3 border-t border-indigo-800/50 flex flex-col gap-1.5 bg-indigo-950/20">
+          <button
+            type="button"
+            onClick={() => {
+              handleTabClick("trash");
+              fetchTrashedMakeupClasses();
+            }}
+            className={`flex items-center justify-between px-4 py-2.5 rounded-xl transition-all font-medium text-sm text-left
+              ${activeTab === "trash" 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
+                : 'text-indigo-200 hover:bg-indigo-800/50 hover:text-white'
+              }`}
+          >
+            <div className="flex items-center gap-3">
+              <Trash2 className="w-5 h-5 text-indigo-300" /> ถังขยะคลาสชดเชย
+            </div>
+            {trashedMakeupClasses.length > 0 && (
+              <span className="bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full leading-none">
+                {trashedMakeupClasses.length}
+              </span>
+            )}
+          </button>
+
           <button 
             type="button"
             onClick={async () => {
@@ -434,7 +471,7 @@ export default function TeacherDashboardClient({
               }
               window.location.href = "/login";
             }}
-            className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-300 hover:bg-red-900/30 hover:text-red-200 transition-all font-medium text-sm"
+            className="flex items-center gap-3 px-4 py-2.5 w-full rounded-xl text-red-300 hover:bg-red-900/30 hover:text-red-200 transition-all font-medium text-sm"
           >
             <LogOut className="w-5 h-5" /> ออกจากระบบ
           </button>
