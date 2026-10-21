@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { showSuccess, showError, showConfirm, showToast } from "@/lib/alerts";
 import { verifyTwinStudent } from "../head/actions";
+import SearchableStudentSelect from "@/components/SearchableStudentSelect";
 
 export interface SubjectAttendanceItem {
   id: string;
@@ -89,6 +90,7 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
   const { academicYear, assignments, students: initialStudents } = advisoryData;
   const [students, setStudents] = useState<StudentAdvisee[]>(initialStudents || []);
   const [selectedLevel, setSelectedLevel] = useState<string>(assignments[0]?.level || "ทั้งหมด");
+  const [selectedStudentFilterId, setSelectedStudentFilterId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "atRiskAssembly" | "atRiskSubject" | "noParent" | "twin">("all");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -125,23 +127,28 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
     return students.filter(s => s.isTwin && !s.twinVerified);
   }, [students]);
 
-  // กรองรายชื่อนักเรียนตามระดับชั้น, คำค้นหา และประเภทฟิลเตอร์
+  // กรองรายชื่อนักเรียนตามระดับชั้น, นักเรียนที่เลือกเจาะจง, คำค้นหา และประเภทฟิลเตอร์
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
       // 1. กรองตามระดับชั้น
       if (selectedLevel !== "ทั้งหมด" && s.level !== selectedLevel) {
         return false;
       }
-      // 2. กรองตามคำค้นหา
+      // 2. กรองตามนักเรียนที่เลือกเจาะจงจาก Select Dropdown
+      if (selectedStudentFilterId && s.id !== selectedStudentFilterId) {
+        return false;
+      }
+      // 3. กรองตามคำค้นหา
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchName = s.name.toLowerCase().includes(q);
         const matchUser = s.username.toLowerCase().includes(q);
         const matchNick = (s.nickname || "").toLowerCase().includes(q);
-        const matchParent = s.parents.some(p => p.name.toLowerCase().includes(q));
-        if (!matchName && !matchUser && !matchNick && !matchParent) return false;
+        const matchPhone = (s.phone || "").includes(q);
+        const matchParent = s.parents.some(p => p.name.toLowerCase().includes(q) || (p.phone && p.phone.includes(q)));
+        if (!matchName && !matchUser && !matchNick && !matchParent && !matchPhone) return false;
       }
-      // 3. กรองตามประเภท
+      // 4. กรองตามประเภท
       if (filterType === "atRiskAssembly" && !s.assemblySummary?.isAtRisk) return false;
       if (filterType === "atRiskSubject" && !s.hasSubjectRisk) return false;
       if (filterType === "noParent" && s.parents.length > 0) return false;
@@ -149,7 +156,7 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
 
       return true;
     });
-  }, [students, selectedLevel, searchQuery, filterType]);
+  }, [students, selectedLevel, selectedStudentFilterId, searchQuery, filterType]);
 
   // สถิติภาพรวม
   const stats = useMemo(() => {
@@ -336,7 +343,10 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
           <button
             type="button"
-            onClick={() => setSelectedLevel("ทั้งหมด")}
+            onClick={() => {
+              setSelectedLevel("ทั้งหมด");
+              setSelectedStudentFilterId(null);
+            }}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
               selectedLevel === "ทั้งหมด"
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
@@ -351,7 +361,10 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
               <button
                 key={a.level}
                 type="button"
-                onClick={() => setSelectedLevel(a.level)}
+                onClick={() => {
+                  setSelectedLevel(a.level);
+                  setSelectedStudentFilterId(null);
+                }}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 ${
                   selectedLevel === a.level
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
@@ -488,14 +501,17 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
 
       {/* กล่องค้นหา & Filter */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="พิมพ์ชื่อ, รหัสนักเรียน หรือชื่อผู้ปกครอง..."
-            className="w-full text-xs pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
+        <div className="w-full sm:w-96">
+          <SearchableStudentSelect
+            students={selectedLevel === "ทั้งหมด" ? students : students.filter(s => s.level === selectedLevel)}
+            selectedStudentId={selectedStudentFilterId}
+            searchQuery={searchQuery}
+            onSelectStudent={(st) => setSelectedStudentFilterId(st?.id || null)}
+            onSearchQueryChange={(q) => {
+              setSearchQuery(q);
+              if (q) setSelectedStudentFilterId(null);
+            }}
+            placeholder="เลือกหรือค้นหานักเรียนในห้อง..."
           />
         </div>
 
