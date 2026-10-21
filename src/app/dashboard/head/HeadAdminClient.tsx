@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restoreSubject, hardDeleteSubject, restoreAllSubjects, hardDeleteAllSubjects, createSchedule, updateSchedule, deleteSchedule, deleteManySchedules, restoreSchedule, hardDeleteSchedule, restoreAllSchedules, hardDeleteAllSchedules, createUser, updateUser, deleteUser, deleteManyUsers, restoreUser, hardDeleteUser, restoreAllUsers, hardDeleteAllUsers, toggleEditPermission, promoteStudents, clearOldGraduates, getUserDetails } from "./actions";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import HeadAdminOverview from "./HeadAdminOverview";
+import HeadProgressionManagement from "./HeadProgressionManagement";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -434,43 +435,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
   const activeStudents = activeUsers.filter(u => u.role === "STUDENT");
 
-  const handlePromoteStudents = async () => {
-    const confirmed = await showConfirm({
-      title: "ยืนยันเลื่อนชั้นปีนักเรียนทั้งวิทยาลัย?",
-      text: "- ปวช.1 -> ปวช.2, ปวช.2 -> ปวช.3\n- ปวส.1 -> ปวส.2, ปวส.1(ม.6) -> ปวส.2(ม.6)\n- ปวช.3, ปวส.2 และ ปวส.2(ม.6) จะเปลี่ยนสถานะเป็น 'จบการศึกษา' (ระบบจะเก็บข้อมูลไว้อย่างน้อย 3 ปี)",
-      confirmText: "เลื่อนชั้นปี",
-      cancelText: "ยกเลิก",
-      icon: "question",
-    });
-    if (!confirmed) return;
-    setIsLoading(true);
-    try {
-      await promoteStudents();
-      showSuccess("เลื่อนชั้นปีนักเรียนเสร็จสมบูรณ์", "ระบบได้ปรับปรุงระดับชั้นของนักเรียนทุกคนเรียบร้อยแล้ว");
-    } catch (e) {
-      showError("เกิดข้อผิดพลาดในการเลื่อนชั้นปี");
-    }
-    setIsLoading(false);
-  };
 
-  const handleClearOldGraduates = async () => {
-    const confirmed = await showConfirm({
-      title: "ยืนยันล้างข้อมูลคนจบการศึกษา > 3 ปี?",
-      text: "คุณแน่ใจหรือไม่ที่จะลบข้อมูลนักเรียนที่ 'จบการศึกษา' ไปแล้วเกิน 3 ปี ถาวร?\n(การกระทำนี้ไม่สามารถกู้คืนได้ และจะช่วยเพิ่มพื้นที่ว่างให้ฐานข้อมูล)",
-      confirmText: "ล้างข้อมูลถาวร",
-      cancelText: "ยกเลิก",
-      isDanger: true,
-    });
-    if (!confirmed) return;
-    setIsLoading(true);
-    try {
-      await clearOldGraduates();
-      showSuccess("ล้างข้อมูลเรียบร้อยแล้ว", "ระบบได้ลบข้อมูลผู้ที่จบการศึกษาเกิน 3 ปี ถาวรแล้ว");
-    } catch (e) {
-      showError("เกิดข้อผิดพลาดในการล้างข้อมูล");
-    }
-    setIsLoading(false);
-  };
 
   const handleViewAttendance = async (u: any) => {
     setIsLoading(true);
@@ -493,6 +458,10 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         <button onClick={() => {setActiveTab("subjects"); resetSubjectForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'subjects' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>จัดการวิชา</button>
         <button onClick={() => {setActiveTab("schedules"); resetScheduleForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'schedules' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>ตารางเรียน</button>
         <button onClick={() => {setActiveTab("users"); resetUserForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'users' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>จัดการผู้ใช้งาน</button>
+        <button onClick={() => {setActiveTab("progression");}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${activeTab === 'progression' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
+          <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
+          เลื่อนภาคเรียน & เลื่อนชั้น
+        </button>
         <button onClick={() => {setActiveTab("trash");}} className={`ml-auto px-6 py-3 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${activeTab === 'trash' ? 'border-b-2 border-red-500 text-red-600' : 'text-red-400 hover:text-red-600'}`}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           ถังขยะ
@@ -1326,20 +1295,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
             <div className="flex justify-between items-end mt-8 border-t pt-6">
               <h3 className="text-lg font-bold dark:text-white">ผู้ใช้งานในระบบ</h3>
-              <div className="flex flex-col items-end gap-3">
-                {filterUserRole === "STUDENT" && (
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <button disabled={isLoading} onClick={handlePromoteStudents} className="bg-amber-500 text-white px-3 py-2 rounded-md hover:bg-amber-600 disabled:opacity-50 text-sm font-semibold flex items-center shadow-sm">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 11l7-7 7 7M5 19l7-7 7 7" /></svg>
-                      เลื่อนชั้นปีนักเรียนทั้งหมด
-                    </button>
-                    <button disabled={isLoading} onClick={handleClearOldGraduates} className="bg-red-500 text-white px-3 py-2 rounded-md hover:bg-red-600 disabled:opacity-50 text-sm font-semibold flex items-center shadow-sm">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                      ล้างข้อมูลคนจบการศึกษา &gt; 3 ปี
-                    </button>
-                  </div>
-                )}
-                <div className="flex items-center gap-4 flex-wrap justify-end">
+              <div className="flex items-center gap-4 flex-wrap justify-end">
                   <div className="flex items-center gap-2">
                     <span className="text-sm dark:text-gray-300 whitespace-nowrap flex-shrink-0">ค้นหา:</span>
                     <input 
@@ -1371,7 +1327,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   </div>
                 </div>
               </div>
-            </div>
 
             {selectedUsers.length > 0 && (
               <div className="mt-4 mb-2 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg flex items-center justify-between border border-red-100 dark:border-red-800">
@@ -1814,6 +1769,10 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
           </div>
         )}
 
+        {/* ================= Progression Tab ================= */}
+        {activeTab === "progression" && (
+          <HeadProgressionManagement users={users} termConfigs={termConfigs} setActiveTab={setActiveTab} />
+        )}
 
       </div>
 

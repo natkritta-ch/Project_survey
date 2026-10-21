@@ -387,6 +387,99 @@ export async function createOrUpdateTermConfig(data: { academicYear: string; ter
   revalidatePath("/dashboard/teacher");
 }
 
+export async function advanceAcademicTerm(data: {
+  nextTerm: string;
+  nextYear: string;
+  startDate: string;
+  endDate: string;
+  promoteLevels: boolean;
+}) {
+  await requireHeadAuth();
+
+  const start = new Date(data.startDate);
+  const end = new Date(data.endDate);
+
+  // 1. ปิด isCurrent ของทุกเทอมเก่า
+  await prisma.termConfig.updateMany({
+    data: { isCurrent: false }
+  });
+
+  // 2. สร้างหรืออัปเดตเทอมใหม่ พร้อมตั้ง isCurrent: true
+  const existingTerm = await prisma.termConfig.findUnique({
+    where: { academicYear_term: { academicYear: data.nextYear, term: data.nextTerm } }
+  });
+
+  if (existingTerm) {
+    await prisma.termConfig.update({
+      where: { id: existingTerm.id },
+      data: { startDate: start, endDate: end, isCurrent: true }
+    });
+  } else {
+    await prisma.termConfig.create({
+      data: { academicYear: data.nextYear, term: data.nextTerm, startDate: start, endDate: end, isCurrent: true }
+    });
+  }
+
+  // 3. กรณีเลื่อนชั้นปี (promoteLevels = true)
+  const promotedCounts: Record<string, number> = {};
+  let totalPromoted = 0;
+
+  if (data.promoteLevels) {
+    const students = await prisma.user.findMany({ where: { role: "STUDENT", deletedAt: null } });
+    const transactions: any[] = [];
+
+    for (const student of students) {
+      let nextLevel = student.level;
+      let transitionKey = "";
+      if (student.level === "ปวช.1") { nextLevel = "ปวช.2"; transitionKey = "ปวช.1 ➡️ ปวช.2"; }
+      else if (student.level === "ปวช.2") { nextLevel = "ปวช.3"; transitionKey = "ปวช.2 ➡️ ปวช.3"; }
+      else if (student.level === "ปวช.3") { nextLevel = "จบการศึกษา"; transitionKey = "ปวช.3 ➡️ จบการศึกษา"; }
+      else if (student.level === "ปวส.1") { nextLevel = "ปวส.2"; transitionKey = "ปวส.1 ➡️ ปวส.2"; }
+      else if (student.level === "ปวส.2") { nextLevel = "จบการศึกษา"; transitionKey = "ปวส.2 ➡️ จบการศึกษา"; }
+      else if (student.level === "ปวส.1(ม.6)") { nextLevel = "ปวส.2(ม.6)"; transitionKey = "ปวส.1(ม.6) ➡️ ปวส.2(ม.6)"; }
+      else if (student.level === "ปวส.2(ม.6)") { nextLevel = "จบการศึกษา"; transitionKey = "ปวส.2(ม.6) ➡️ จบการศึกษา"; }
+
+      if (nextLevel && nextLevel !== student.level) {
+        if (transitionKey) promotedCounts[transitionKey] = (promotedCounts[transitionKey] || 0) + 1;
+        totalPromoted++;
+        if (nextLevel === "จบการศึกษา") {
+          transactions.push(
+            prisma.user.update({
+              where: { id: student.id },
+              data: { level: nextLevel, updatedAt: new Date() }
+            })
+          );
+        } else {
+          transactions.push(
+            prisma.user.update({
+              where: { id: student.id },
+              data: { level: nextLevel }
+            })
+          );
+        }
+      }
+    }
+
+    if (transactions.length > 0) {
+      await prisma.$transaction(transactions);
+    }
+  }
+
+  revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/teacher");
+  revalidatePath("/dashboard/student");
+  revalidatePath("/dashboard/parent");
+
+  return {
+    success: true,
+    nextTerm: data.nextTerm,
+    nextYear: data.nextYear,
+    promoteLevels: data.promoteLevels,
+    promotedCounts,
+    totalPromoted
+  };
+}
+
 export async function promoteStudents() {
   await requireHeadAuth();
   const students = await prisma.user.findMany({ where: { role: "STUDENT", deletedAt: null } });
