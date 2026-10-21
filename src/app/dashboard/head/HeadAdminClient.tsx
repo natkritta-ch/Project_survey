@@ -325,9 +325,21 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       return;
     }
 
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) {
-      showError("ไม่สามารถเปิดหน้าต่างพิมพ์ได้", "กรุณาอนุญาตป็อปอัป (Pop-up) ในเบราว์เซอร์");
+    // สร้าง iframe ซ่อนสำหรับสั่งพิมพ์โดยตรง ไม่ต้องเปิดแท็บใหม่
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    iframe.style.visibility = "hidden";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      showError("ไม่สามารถสั่งพิมพ์ได้", "เกิดข้อผิดพลาดในการสร้างหน้าพิมพ์");
       return;
     }
 
@@ -360,7 +372,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       minute: "2-digit",
     });
 
-    printWindow.document.write(`
+    doc.open();
+    doc.write(`
       <!DOCTYPE html>
       <html>
         <head>
@@ -428,12 +441,21 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         </body>
       </html>
     `);
+    doc.close();
 
-    printWindow.document.close();
-    printWindow.focus();
-
+    iframe.contentWindow?.focus();
     setTimeout(() => {
-      printWindow.print();
+      try {
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Print error:", err);
+      } finally {
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1500);
+      }
     }, 250);
   };
 
