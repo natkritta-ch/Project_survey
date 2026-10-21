@@ -354,18 +354,6 @@ export async function clearOldTrash() {
   }
 }
 
-export async function resetAllFaces() {
-  await requireHeadAuth();
-
-  await prisma.user.updateMany({
-    where: { role: "STUDENT" },
-    data: {
-      faceDescriptor: null,
-      profilePicture: null
-    }
-  });
-  revalidatePath("/dashboard/head");
-}
 
 export async function toggleEditPermission(id: string, canEditProfile: boolean) {
   await requireHeadAuth();

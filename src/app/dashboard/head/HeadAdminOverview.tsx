@@ -3,8 +3,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Search, ChevronDown, Clock } from "lucide-react";
 import * as XLSX from "xlsx";
-import { resetAllFaces } from "./actions";
-import { showSuccess, showError, showConfirm } from "@/lib/alerts";
 
 export default function HeadAdminOverview({ subjects, users, levelsOptions, termConfigs = [] }: { subjects: any[], users: any[], levelsOptions: string[], termConfigs?: any[] }) {
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
@@ -497,47 +495,6 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
           </div>
         </div>
       </div>
-
-      {/* Danger Zone: Reset Faces */}
-      <div className="mt-12 p-6 border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 rounded-2xl">
-        <h3 className="text-lg font-bold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
-          <ShieldAlert className="w-5 h-5" />
-          เขตอันตราย (Danger Zone)
-        </h3>
-        <p className="text-sm text-red-600/80 dark:text-red-400/80 mb-6 max-w-3xl">
-          การดำเนินการในส่วนนี้จะส่งผลกระทบต่อข้อมูลสำคัญของระบบ ไม่สามารถย้อนกลับได้ โปรดใช้งานด้วยความระมัดระวัง
-        </p>
-        
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white dark:bg-slate-900 rounded-xl border border-red-100 dark:border-red-900/30">
-          <div>
-            <h4 className="font-semibold text-slate-800 dark:text-slate-200">รีเซ็ตใบหน้านักเรียนทั้งหมด</h4>
-            <p className="text-sm text-slate-500 mt-1">ลบรูปถ่ายและล้างค่าการจดจำใบหน้าของนักเรียนทุกคนออกจากระบบ เพื่อบังคับให้นักเรียนถ่ายรูปใหม่</p>
-          </div>
-          <button 
-            onClick={async () => {
-              const ok = await showConfirm({
-                title: "คำเตือน: ลบข้อมูลใบหน้านักเรียนทุกคน?",
-                text: "การกระทำนี้จะล้างข้อมูลใบหน้าของนักเรียนทุกคนในระบบ\nส่งผลให้นักเรียนทุกคนสแกนหน้าไม่ผ่าน จนกว่าจะเข้าสู่ระบบไปถ่ายรูปใหม่ในหน้าโปรไฟล์\n\nคุณแน่ใจหรือไม่ว่าต้องการดำเนินการต่อ?",
-                confirmText: "ยืนยันล้างข้อมูลใบหน้า",
-                cancelText: "ยกเลิก",
-                isDanger: true,
-              });
-              if (ok) {
-                try {
-                  await resetAllFaces();
-                  showSuccess("รีเซ็ตใบหน้านักเรียนทุกคนสำเร็จแล้ว!", "นักเรียนทุกคนจะต้องถ่ายภาพใบหน้าใหม่ก่อนสแกนเข้าเรียน");
-                } catch(e) {
-                  showError("เกิดข้อผิดพลาดในการลบข้อมูล");
-                }
-              }
-            }}
-            className="px-4 py-2 bg-red-100 hover:bg-red-600 text-red-700 hover:text-white rounded-lg font-medium transition whitespace-nowrap"
-          >
-            ล้างข้อมูลใบหน้า
-          </button>
-        </div>
-      </div>
-
 
     </div>
   );
