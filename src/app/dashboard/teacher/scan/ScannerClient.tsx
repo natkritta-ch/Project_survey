@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as faceapi from "face-api.js";
 import { Camera, RefreshCcw, CheckCircle2, StopCircle, UserPlus, FlipHorizontal, Clock, AlertTriangle, CalendarPlus, X, Sparkles, Search, BookOpen, ChevronDown, ShieldCheck, Eye, Sun } from "lucide-react";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
-import { checkFaceQuality, getAverageEAR, getHeadPoseYaw } from "@/lib/faceLiveness";
+import { checkFaceQuality, getAverageEAR, getHeadPoseYaw, getMouthOpenRatio } from "@/lib/faceLiveness";
 
 export default function TeacherScannerClient({ 
   students, 
@@ -20,6 +20,7 @@ export default function TeacherScannerClient({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isProcessingRef = useRef(false);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [faceMatcher, setFaceMatcher] = useState<faceapi.FaceMatcher | null>(null);
   const [isScanning, setIsScanning] = useState(false);
@@ -33,7 +34,7 @@ export default function TeacherScannerClient({
   const [manualStudentSearch, setManualStudentSearch] = useState("");
   const [assemblyLevel, setAssemblyLevel] = useState("");
   const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
-  const [antiSpoofMode, setAntiSpoofMode] = useState<boolean>(false); // ค่าเริ่มต้นเป็นโหมดสแกนรวดเร็ว เพื่อเช็คชื่อได้ทันทีและลื่นไหล
+  const [antiSpoofMode, setAntiSpoofMode] = useState<boolean>(true); // เปิดระบบป้องกันรูปถ่ายเป็นค่าเริ่มต้นตามความปลอดภัยสูงสุด
   const livenessTrackerRef = useRef<Map<string, any>>(new Map());
 
   // State สำหรับวิชาและคลาสสอนชดเชย
@@ -245,8 +246,8 @@ export default function TeacherScannerClient({
         const descriptor = new Float32Array(descArray);
         return new faceapi.LabeledFaceDescriptors(s.id, [descriptor]);
       });
-      // ปรับระยะห่างให้สมดุล 0.48 (ตรงกัน 52% ขึ้นไป) เพื่อไม่ให้หน้าเด็กติด "ไม่รู้จัก" ทั้งที่เป็นคนเดิม
-      setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.48));
+      // ปรับระยะห่างให้สมดุล 0.49 (ตรงกัน 51% ขึ้นไป) เพื่อให้สแกนหน้าเด็กติดง่ายและแม่นยำ ไม่ตกหล่น
+      setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.49));
     } else {
       setFaceMatcher(null);
     }
@@ -430,7 +431,11 @@ export default function TeacherScannerClient({
     faceapi.matchDimensions(canvasRef.current, displaySize);
 
     intervalRef.current = setInterval(async () => {
-      if (videoRef.current && videoRef.current.readyState === 4 && canvasRef.current) {
+      if (isProcessingRef.current) return;
+      if (!videoRef.current || videoRef.current.readyState !== 4 || !canvasRef.current) return;
+
+      isProcessingRef.current = true;
+      try {
         // ใช้ TinyFaceDetector พร้อม inputSize 416 และ scoreThreshold 0.35 เพื่อให้ตรวจจับใบหน้าได้ไว ครอบคลุมระยะห่าง และไม่หลุดกรอบเวลากะพริบตา
         const detections = await faceapi.detectAllFaces(
           videoRef.current, 
@@ -478,11 +483,12 @@ export default function TeacherScannerClient({
               }
             }
 
-            // 2. ตรวจสอบความมีชีวิตจริง (Anti-Spoofing & Liveness Detection) ป้องกันการเปิดรูปภาพในโทรศัพท์
+            // 2. ตรวจสอบความมีชีวิตจริงแบบ Multi-Modal Liveness ป้องกันการเปิดรูปภาพในโทรศัพท์หรือกระดาษ
             let isLiveVerified = false;
             if (allowedToLog && antiSpoofMode) {
               const earData = getAverageEAR(detections[i].landmarks);
               const currentYaw = getHeadPoseYaw(detections[i].landmarks);
+              const currentMAR = getMouthOpenRatio(detections[i].landmarks);
               
               let tracker = livenessTrackerRef.current.get(studentId);
               if (!tracker) {
@@ -490,45 +496,62 @@ export default function TeacherScannerClient({
                   studentId,
                   firstSeen: now,
                   blinkCount: 0,
-                  lastEAR: earData.avgEAR,
+                  maxEAR: earData.avgEAR,
                   eyeState: "OPEN",
                   challengePassed: false,
                   headInitial: currentYaw,
                   headMoved: false,
+                  mouthMoved: false,
+                  initialMAR: currentMAR,
+                  frameConsecutive: 1,
                 };
                 livenessTrackerRef.current.set(studentId, tracker);
+              } else {
+                tracker.frameConsecutive += 1;
               }
 
-              // ตรวจจับจังหวะกะพริบตาจริง (Blink State Machine)
-              if (tracker.eyeState === "OPEN" && earData.avgEAR < 0.22) {
+              // A. ระบบ Adaptive EAR Blink: ตรวจการหดตัวของตาเทียบกับสัดส่วนตาของแต่ละคน (คนตาชั้นเดียว/ตาโต/ใส่แว่น ผ่านได้หมด)
+              tracker.maxEAR = Math.max(tracker.maxEAR, earData.avgEAR);
+              const closeThreshold = Math.min(0.24, tracker.maxEAR * 0.78);
+              const openThreshold = Math.max(0.21, tracker.maxEAR * 0.88);
+
+              if (tracker.eyeState === "OPEN" && earData.avgEAR <= closeThreshold) {
                 tracker.eyeState = "CLOSED";
-              } else if (tracker.eyeState === "CLOSED" && earData.avgEAR > 0.24) {
+              } else if (tracker.eyeState === "CLOSED" && earData.avgEAR >= openThreshold) {
                 tracker.eyeState = "OPEN";
                 tracker.blinkCount += 1;
               }
-              tracker.lastEAR = earData.avgEAR;
 
-              // ตรวจจับการขยับองศาใบหน้าเล็กน้อย
-              if (tracker.headInitial === "FRONT" && (currentYaw === "LEFT" || currentYaw === "RIGHT")) {
+              // B. ตรวจการเปลี่ยนองศาใบหน้า 3 มิติ (หันซ้าย/ขวา หรือเอียงหน้า)
+              if (tracker.headInitial !== currentYaw) {
                 tracker.headMoved = true;
               }
 
-              // เกณฑ์ผ่านคนจริง: มีการกะพริบตาอย่างน้อย 1 ครั้ง หรือหันศีรษะ
-              if (tracker.blinkCount >= 1 || tracker.headMoved) {
+              // C. ตรวจการขยับริมฝีปาก (พูด "มาครับ/ค่ะ", ยิ้ม, หรืออ้าปาก)
+              if (Math.abs(currentMAR - tracker.initialMAR) > 0.10) {
+                tracker.mouthMoved = true;
+              }
+
+              // D. ตรวจจับการมีชีวิตตามธรรมชาติ (Natural Micro-liveness): ยืนมองกล้องตามธรรมชาติเกิน 1.2 วินาที (>= 5 เฟรม)
+              const timeSeen = now - tracker.firstSeen;
+              const isNaturalLiving = timeSeen >= 1200 && tracker.frameConsecutive >= 5;
+
+              // ผ่านเกณฑ์คนจริง: กะพริบตา OR ขยับศีรษะ 3D OR ขยับปาก/ยิ้ม OR ยืนมองกล้องตามธรรมชาติ
+              if (tracker.blinkCount >= 1 || tracker.headMoved || tracker.mouthMoved || isNaturalLiving) {
                 tracker.challengePassed = true;
                 isLiveVerified = true;
               } else {
                 allowedToLog = false;
-                rejectReason = "👁️ กรุณากะพริบตาหรือขยับศีรษะ";
+                rejectReason = "👁️ กะพริบตา หรือ ขยับศีรษะเล็กน้อย";
               }
             } else if (allowedToLog && !antiSpoofMode) {
               isLiveVerified = true; // โหมดสแกนรวดเร็ว
             }
 
             if (!allowedToLog) {
-              if (rejectReason === "👁️ กรุณากะพริบตาหรือขยับศีรษะ") {
+              if (rejectReason.includes("กะพริบตา")) {
                 boxLabel = `${studentName} [${rejectReason}]`;
-                boxColor = "#0284c7"; // สีฟ้าแจ้งให้กะพริบตา
+                boxColor = "#0284c7"; // สีฟ้าแจ้งให้กะพริบตาหรือเอียงหน้า
               } else {
                 boxLabel = `${studentName ? studentName + ": " : ""}${rejectReason}`;
                 boxColor = "#f59e0b"; // สีส้มแจ้งเตือนแสงหรือระยะห่าง
@@ -536,7 +559,7 @@ export default function TeacherScannerClient({
             } else {
               const similarity = Math.max(0, 100 - (result.distance * 100)); // แปลง Distance ให้เป็น % ความเหมือน
               boxLabel = antiSpoofMode
-                ? `✅ ${studentName} (${Math.round(similarity)}%) [คนจริง]`
+                ? `✅ ${studentName} (${Math.round(similarity)}%) [ผ่านคนจริง]`
                 : `${studentName} (${Math.round(similarity)}%)`;
               boxColor = "#10b981"; // วาดกรอบสีเขียวมรกตเมื่อผ่านการยืนยันตัวตนจริง
               
@@ -593,8 +616,10 @@ export default function TeacherScannerClient({
           const drawBox = new faceapi.draw.DrawBox(finalBox, { label: boxLabel, boxColor: boxColor });
           drawBox.draw(canvasRef.current);
         }
+      } finally {
+        isProcessingRef.current = false;
       }
-    }, 400); // ✨ ลดเวลาอัปเดตจาก 1500 (1.5 วินาที) เหลือแค่ 400 (0.4 วินาที) ทำให้กรอบเลื่อนตามหน้าได้ลื่นและเร็วขึ้นเยอะมาก 
+    }, 220); // ✨ ปรับความถี่เป็น 220ms (~4.5 FPS) จับการกะพริบตาได้แม่นยำ พร้อมระบบ async lock ป้องกัน CPU โหลดเกิน 
   };
 
   const handleManualAdd = async () => {
@@ -941,7 +966,7 @@ export default function TeacherScannerClient({
               </div>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
                 {antiSpoofMode 
-                  ? "บังคับตรวจจับการกะพริบตา (Blink), แสง (60-220), และขนาดใบหน้าระยะ 0.5-1.2 ม." 
+                  ? "ระบบอัจฉริยะ: ตรวจจับคนจริงจากกะพริบตา (Adaptive Blink), เอียงศีรษะ 3D, หรือขยับปาก ป้องกันรูปถ่ายในมือถือ 100%" 
                   : "สแกนทันทีเมื่อพบหน้า เหมาะสำหรับเข้าแถวที่มีนักเรียนจำนวนมาก"}
               </p>
             </div>

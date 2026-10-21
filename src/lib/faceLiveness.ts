@@ -121,6 +121,30 @@ export function getHeadPoseYaw(landmarks: any): "FRONT" | "LEFT" | "RIGHT" {
   }
 }
 
+/**
+ * คำนวณสัดส่วนการเปิดปาก (Mouth Open Ratio / MAR)
+ * เพื่อตรวจจับการพูด ยิ้ม หรือขยับปากของคนจริง (รูปภาพนิ่งจะทำไม่ได้)
+ */
+export function getMouthOpenRatio(landmarks: any): number {
+  try {
+    const positions = landmarks.positions || landmarks._positions;
+    if (!positions || positions.length < 68) return 0.0;
+
+    const topLip = positions[51];
+    const bottomLip = positions[57];
+    const leftCorner = positions[48];
+    const rightCorner = positions[54];
+
+    const vertical = Math.hypot(topLip.x - bottomLip.x, topLip.y - bottomLip.y);
+    const horizontal = Math.hypot(leftCorner.x - rightCorner.x, leftCorner.y - rightCorner.y);
+
+    if (horizontal === 0) return 0.0;
+    return vertical / horizontal;
+  } catch {
+    return 0.0;
+  }
+}
+
 export type FaceQualitySource =
   | CanvasRenderingContext2D
   | HTMLVideoElement
@@ -168,9 +192,9 @@ export function checkFaceQuality(
   const isScanner = options?.isScanner ?? false;
 
   // 1. ตรวจสอบขนาดใบหน้า & ระยะห่าง (ปรับเกณฑ์ให้เหมาะสมกับระยะการใช้งานจริง ไม่เข้มงวดเกินไป)
-  // ลงทะเบียน: 85px - 450px | สแกนห้องเรียน/แถว: 65px - 550px
-  const minFaceSize = options?.minFaceSize ?? (isScanner ? 65 : 85);
-  const maxFaceSize = options?.maxFaceSize ?? (isScanner ? 550 : 450);
+  // ลงทะเบียน: 85px - 450px | สแกนห้องเรียน/แถว: 50px - 650px (รองรับระยะ 0.5 - 2.5 ม.)
+  const minFaceSize = options?.minFaceSize ?? (isScanner ? 50 : 85);
+  const maxFaceSize = options?.maxFaceSize ?? (isScanner ? 650 : 450);
 
   let sizeStatus: "too_small" | "too_large" | "optimal" = "optimal";
   let distanceFeedback = "ระยะห่างเหมาะสม";
@@ -272,10 +296,10 @@ export function checkFaceQuality(
   }
 
   // ประเมินผลแสงสว่าง (ผ่อนปรนให้เหมาะกับสภาพแสงในอาคาร/ห้องเรียนจริง)
-  // ปกติ: 35 - 235 | โหมดสแกน: 28 - 245
-  const minLuminance = options?.minLuminance ?? (isScanner ? 28 : 35);
-  const maxLuminance = options?.maxLuminance ?? (isScanner ? 245 : 235);
-  const minContrast = options?.minContrast ?? (isScanner ? 6 : 8);
+  // ปกติ: 35 - 235 | โหมดสแกน: 18 - 252
+  const minLuminance = options?.minLuminance ?? (isScanner ? 18 : 35);
+  const maxLuminance = options?.maxLuminance ?? (isScanner ? 252 : 235);
+  const minContrast = options?.minContrast ?? (isScanner ? 4 : 8);
 
   if (luminance < minLuminance) {
     luminanceStatus = "too_dark";
