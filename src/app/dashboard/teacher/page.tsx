@@ -282,7 +282,7 @@ export default async function TeacherDashboard() {
             presents: 0,
             absents: 0,
             leaves: 0,
-            percent: 100,
+            percent: 0,
             isAtRisk: false
           });
         });
@@ -299,7 +299,7 @@ export default async function TeacherDashboard() {
               presents: 0,
               absents: 0,
               leaves: 0,
-              percent: 100,
+              percent: 0,
               isAtRisk: false
             });
           }
@@ -312,7 +312,7 @@ export default async function TeacherDashboard() {
 
         // คำนวณเปอร์เซ็นต์และเกณฑ์ เสี่ยง ข.ร. แต่ละวิชา
         const subjectsSummary = Array.from(subjectMap.values()).map((s: any) => {
-          const pct = s.total > 0 ? Math.round((s.presents / s.total) * 100) : 100;
+          const pct = s.total > 0 ? Math.round((s.presents / s.total) * 100) : 0;
           const isAtRisk = s.total > 0 && (s.absents >= 4 || (s.absents / s.total) >= 0.20 || pct < 80);
           return {
             ...s,
@@ -323,9 +323,12 @@ export default async function TeacherDashboard() {
           // 1. วิชาที่ เสี่ยง ข.ร. ขึ้นบนสุดเสมอ
           if (a.isAtRisk && !b.isAtRisk) return -1;
           if (!a.isAtRisk && b.isAtRisk) return 1;
-          // 2. เรียงตามเปอร์เซ็นต์เวลาน้อยไปมาก (ขาดเยอะสุดขึ้นก่อน)
+          // 2. วิชาที่มีการบันทึกเวลาเรียนแล้ว (total > 0) ขึ้นก่อนวิชาที่ยังไม่เริ่มเช็คชื่อ
+          if (a.total > 0 && b.total === 0) return -1;
+          if (a.total === 0 && b.total > 0) return 1;
+          // 3. เรียงตามเปอร์เซ็นต์เวลาน้อยไปมาก (ขาดเยอะสุดขึ้นก่อน)
           if (a.percent !== b.percent) return a.percent - b.percent;
-          // 3. ใครมีจำนวนครั้งที่ขาดมากกว่าขึ้นก่อน
+          // 4. ใครมีจำนวนครั้งที่ขาดมากกว่าขึ้นก่อน
           if (a.absents !== b.absents) return b.absents - a.absents;
           return a.code.localeCompare(b.code);
         });

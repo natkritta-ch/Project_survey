@@ -104,9 +104,12 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
       // 1. วิชาที่ เสี่ยง ข.ร. อยู่บนสุดเสมอ
       if (a.isAtRisk && !b.isAtRisk) return -1;
       if (!a.isAtRisk && b.isAtRisk) return 1;
-      // 2. เรียงตามเปอร์เซ็นต์เวลาน้อยไปมาก (ใครเวลาเรียนน้อยสุดขึ้นก่อน)
+      // 2. วิชาที่มีการบันทึกเวลาเรียนแล้ว (total > 0) ขึ้นก่อนวิชาที่ยังไม่เริ่มเช็คชื่อ
+      if (a.total > 0 && b.total === 0) return -1;
+      if (a.total === 0 && b.total > 0) return 1;
+      // 3. เรียงตามเปอร์เซ็นต์เวลาน้อยไปมาก (ใครเวลาเรียนน้อยสุดขึ้นก่อน)
       if (a.percent !== b.percent) return a.percent - b.percent;
-      // 3. ใครมีจำนวนครั้งที่ขาดมากกว่าขึ้นก่อน
+      // 4. ใครมีจำนวนครั้งที่ขาดมากกว่าขึ้นก่อน
       if (a.absents !== b.absents) return b.absents - a.absents;
       return a.code.localeCompare(b.code);
     });
@@ -904,7 +907,12 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
                       </div>
 
                       <div className="text-right shrink-0">
-                        {sub.isAtRisk ? (
+                        {sub.total === 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                            <Clock className="w-3.5 h-3.5" />
+                            ยังไม่มีการเช็คชื่อ
+                          </span>
+                        ) : sub.isAtRisk ? (
                           <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
                             <AlertCircle className="w-3.5 h-3.5" />
                             เสี่ยง ข.ร. ({sub.percent}%)
@@ -916,7 +924,11 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
                           </span>
                         )}
                         <span className="text-[10px] text-gray-400 block mt-1">
-                          มา {sub.presents} • ขาด {sub.absents} • ลา {sub.leaves} (รวม {sub.total} คาบ)
+                          {sub.total === 0 ? (
+                            "ยังไม่มีการบันทึกเวลาเรียน"
+                          ) : (
+                            `มา ${sub.presents} • ขาด ${sub.absents} • ลา ${sub.leaves} (รวม ${sub.total} คาบ)`
+                          )}
                         </span>
                       </div>
                     </div>
@@ -925,9 +937,13 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
                     <div className="mt-2.5 w-full bg-gray-100 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full transition-all duration-300 ${
-                          sub.isAtRisk ? "bg-rose-500" : "bg-emerald-500"
+                          sub.total === 0 
+                            ? "bg-gray-200 dark:bg-gray-600" 
+                            : sub.isAtRisk 
+                              ? "bg-rose-500" 
+                              : "bg-emerald-500"
                         }`}
-                        style={{ width: `${Math.min(100, sub.percent)}%` }}
+                        style={{ width: `${sub.total === 0 ? 0 : Math.min(100, sub.percent)}%` }}
                       />
                     </div>
                   </div>
