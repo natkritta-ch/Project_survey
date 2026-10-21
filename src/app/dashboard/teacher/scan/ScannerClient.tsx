@@ -33,7 +33,7 @@ export default function TeacherScannerClient({
   const [manualStudentSearch, setManualStudentSearch] = useState("");
   const [assemblyLevel, setAssemblyLevel] = useState("");
   const [cameraFacingMode, setCameraFacingMode] = useState<"user" | "environment">("user");
-  const [antiSpoofMode, setAntiSpoofMode] = useState<boolean>(true);
+  const [antiSpoofMode, setAntiSpoofMode] = useState<boolean>(false); // ค่าเริ่มต้นเป็นโหมดสแกนรวดเร็ว เพื่อเช็คชื่อได้ทันทีและลื่นไหล
   const livenessTrackerRef = useRef<Map<string, any>>(new Map());
 
   // State สำหรับวิชาและคลาสสอนชดเชย
@@ -230,11 +230,13 @@ export default function TeacherScannerClient({
     // โหลดเฉพาะหน้านักเรียนในชั้นปีนั้นๆ เข้าไปใน AI
     if (scanType === "class" && selectedSubject) {
       const sObj = subjects.find(s => s.id === selectedSubject);
-      if (sObj && sObj.level) {
-        filteredStudents = students.filter(s => s.level === sObj.level);
+      if (sObj && sObj.level && sObj.level !== "ทั้งหมด" && sObj.level !== "-") {
+        const matched = students.filter(s => s.level === sObj.level);
+        if (matched.length > 0) filteredStudents = matched;
       }
-    } else if (scanType === "assembly" && assemblyLevel) {
-      filteredStudents = students.filter(s => s.level === assemblyLevel);
+    } else if (scanType === "assembly" && assemblyLevel && assemblyLevel !== "ทั้งหมด") {
+      const matched = students.filter(s => s.level === assemblyLevel);
+      if (matched.length > 0) filteredStudents = matched;
     }
 
     if (filteredStudents.length > 0) {
@@ -243,8 +245,8 @@ export default function TeacherScannerClient({
         const descriptor = new Float32Array(descArray);
         return new faceapi.LabeledFaceDescriptors(s.id, [descriptor]);
       });
-      // ปรับให้เข้มงวดขึ้นเป็น 0.40 (ต้องเหมือน 60% ขึ้นไปถึงจะผ่าน)
-      setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.40));
+      // ปรับระยะห่างให้สมดุล 0.48 (ตรงกัน 52% ขึ้นไป) เพื่อไม่ให้หน้าเด็กติด "ไม่รู้จัก" ทั้งที่เป็นคนเดิม
+      setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.48));
     } else {
       setFaceMatcher(null);
     }
@@ -429,8 +431,11 @@ export default function TeacherScannerClient({
 
     intervalRef.current = setInterval(async () => {
       if (videoRef.current && videoRef.current.readyState === 4 && canvasRef.current) {
-        // ใช้ TinyFaceDetector แต่ตั้งค่า inputSize ขึ้นนิดหน่อยเพื่อให้แม่นกว่าค่า Default เดิม
-        const detections = await faceapi.detectAllFaces(videoRef.current, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 }))
+        // ใช้ TinyFaceDetector พร้อม inputSize 416 และ scoreThreshold 0.35 เพื่อให้ตรวจจับใบหน้าได้ไว ครอบคลุมระยะห่าง และไม่หลุดกรอบเวลากะพริบตา
+        const detections = await faceapi.detectAllFaces(
+          videoRef.current, 
+          new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.35 })
+        )
           .withFaceLandmarks()
           .withFaceDescriptors();
 
@@ -466,7 +471,7 @@ export default function TeacherScannerClient({
             if (antiSpoofMode && !quality.passed) {
               allowedToLog = false;
               rejectReason = quality.overallFeedback;
-            } else if (scanType === "assembly" && assemblyLevel) {
+            } else if (scanType === "assembly" && assemblyLevel && assemblyLevel !== "ทั้งหมด") {
               if (student?.level !== assemblyLevel) {
                 allowedToLog = false;
                 rejectReason = "คนละชั้นปี";
@@ -495,9 +500,9 @@ export default function TeacherScannerClient({
               }
 
               // ตรวจจับจังหวะกะพริบตาจริง (Blink State Machine)
-              if (tracker.eyeState === "OPEN" && earData.avgEAR < 0.19) {
+              if (tracker.eyeState === "OPEN" && earData.avgEAR < 0.22) {
                 tracker.eyeState = "CLOSED";
-              } else if (tracker.eyeState === "CLOSED" && earData.avgEAR > 0.23) {
+              } else if (tracker.eyeState === "CLOSED" && earData.avgEAR > 0.24) {
                 tracker.eyeState = "OPEN";
                 tracker.blinkCount += 1;
               }
@@ -514,14 +519,14 @@ export default function TeacherScannerClient({
                 isLiveVerified = true;
               } else {
                 allowedToLog = false;
-                rejectReason = "👁️ กรุณากะพริบตา 1 ครั้ง";
+                rejectReason = "👁️ กรุณากะพริบตาหรือขยับศีรษะ";
               }
             } else if (allowedToLog && !antiSpoofMode) {
               isLiveVerified = true; // โหมดสแกนรวดเร็ว
             }
 
             if (!allowedToLog) {
-              if (rejectReason === "👁️ กรุณากะพริบตา 1 ครั้ง") {
+              if (rejectReason === "👁️ กรุณากะพริบตาหรือขยับศีรษะ") {
                 boxLabel = `${studentName} [${rejectReason}]`;
                 boxColor = "#0284c7"; // สีฟ้าแจ้งให้กะพริบตา
               } else {
