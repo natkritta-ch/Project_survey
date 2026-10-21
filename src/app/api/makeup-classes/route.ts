@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "../../../lib/prisma";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../../lib/auth";
+import { enrichMakeupClassesWithAttendance } from "../../../lib/makeupClassHelper";
 
 // ลบข้อมูลขยะที่เกิน 7 วันโดยอัตโนมัติ
 async function autoCleanupOldTrash() {
@@ -115,7 +116,10 @@ export async function GET(request: Request) {
       return item;
     });
 
-    return NextResponse.json({ success: true, makeupClasses: processedList });
+    // เติมข้อมูลสถานะการเช็คชื่อเข้าเรียนของแต่ละคลาสสอนชดเชย
+    const enrichedList = await enrichMakeupClassesWithAttendance(processedList);
+
+    return NextResponse.json({ success: true, makeupClasses: enrichedList });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }
@@ -227,6 +231,15 @@ export async function DELETE(request: Request) {
 
     if (userRole === "TEACHER" && makeup.subject.teacherId !== userId) {
       return NextResponse.json({ success: false, message: "คุณไม่มีสิทธิ์จัดการคลาสสอนชดเชยนี้" }, { status: 403 });
+    }
+
+    // ตรวจสอบความปลอดภัย: ห้ามลบคลาสที่มีประวัติการเช็คชื่อเข้าเรียนแล้วเด็ดขาด
+    const [checkedMakeup] = await enrichMakeupClassesWithAttendance([makeup]);
+    if (checkedMakeup?.hasAttendance) {
+      return NextResponse.json({
+        success: false,
+        message: `ไม่สามารถลบคลาสสอนชดเชยนี้ได้ เนื่องจากผ่านการเปิดสแกนเช็คชื่อแล้ว (มีประวัติเข้าเรียน ${checkedMakeup.attendanceCount} คน)`
+      }, { status: 400 });
     }
 
     // 2. ถ้าสั่งลบถาวร

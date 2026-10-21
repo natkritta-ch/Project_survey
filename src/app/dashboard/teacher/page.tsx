@@ -6,6 +6,7 @@ import prisma from "../../../lib/prisma";
 import { getCurrentTermConfig } from "../../../lib/term";
 import TeacherDashboardClient from "./TeacherDashboardClient";
 import LogoutButton from "../../../components/LogoutButton";
+import { enrichMakeupClassesWithAttendance } from "../../../lib/makeupClassHelper";
 
 export default async function TeacherDashboard() {
   const session = await getServerSession(authOptions);
@@ -134,6 +135,8 @@ export default async function TeacherDashboard() {
       },
       orderBy: [{ date: 'desc' }, { startTime: 'asc' }]
     });
+
+    makeupClasses = await enrichMakeupClassesWithAttendance(makeupClasses);
 
     const rawTrashed = await (prisma as any).makeupClass.findMany({
       where: {

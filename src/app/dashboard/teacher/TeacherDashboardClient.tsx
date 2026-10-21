@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck, RotateCcw, AlertTriangle, RefreshCw, Key, Copy, Check, GraduationCap } from "lucide-react";
+import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck, RotateCcw, AlertTriangle, RefreshCw, Key, Copy, Check, GraduationCap, CheckCircle2, ShieldAlert } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm, showPromptNumber } from "@/lib/alerts";
 import TeacherAdvisoryView from "./TeacherAdvisoryView";
@@ -126,6 +126,12 @@ export default function TeacherDashboardClient({
   };
 
   const handleDeleteMakeup = async (id: string, name?: string) => {
+    const target = makeupClasses.find((m: any) => m.id === id);
+    if (target?.hasAttendance) {
+      showWarning("ไม่สามารถลบได้", `คลาสสอนชดเชยนี้ผ่านการเปิดสแกนเช็คชื่อแล้ว (มีประวัติเข้าเรียน ${target.attendanceCount || 0} คน) จึงไม่สามารถลบได้เพื่อป้องกันข้อมูลเวลาเรียนสูญหาย`);
+      return;
+    }
+
     const ok = await showConfirm({
       title: "ย้ายคลาสสอนชดเชยไปที่ถังขยะ?",
       text: `ต้องการย้ายคลาส "${name || 'นี้'}" ไปเก็บในถังขยะใช่หรือไม่? (สามารถกู้คืนได้ภายใน 7 วัน)`,
@@ -572,9 +578,16 @@ export default function TeacherDashboardClient({
                           <span className="text-[10px] font-mono text-amber-800 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/60 px-1.5 py-0.5 rounded font-bold">
                             {mc.subject?.code}
                           </span>
-                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-200/70 dark:bg-amber-900/40 px-2 py-0.5 rounded-full">
-                            สอนชดเชย
-                          </span>
+                          {mc.hasAttendance ? (
+                            <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                              เช็คชื่อแล้ว ({mc.attendanceCount} คน)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-200/70 dark:bg-amber-900/40 px-2 py-0.5 rounded-full">
+                              สอนชดเชย
+                            </span>
+                          )}
                         </div>
                         <div className="font-bold text-base text-gray-900 dark:text-white mb-2">
                           {mc.subject?.name}
@@ -591,18 +604,31 @@ export default function TeacherDashboardClient({
                         <div className="mt-auto pt-3 border-t border-amber-200 dark:border-amber-800/50 flex gap-2">
                           <Link 
                             href={`/dashboard/teacher/scan?type=class&subjectId=${mc.subjectId}`}
-                            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition"
+                            className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition ${
+                              mc.hasAttendance 
+                                ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
+                                : "bg-amber-600 hover:bg-amber-700 text-white"
+                            }`}
                           >
                             <Camera className="w-4 h-4" />
-                            สแกนเช็คชื่อ
+                            {mc.hasAttendance ? "สแกนเช็คชื่อเพิ่มเติม" : "สแกนเช็คชื่อ"}
                           </Link>
-                          <button
-                            onClick={() => handleDeleteMakeup(mc.id)}
-                            className="p-2 text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-xl transition"
-                            title="ลบคลาสนี้"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {mc.hasAttendance ? (
+                            <div 
+                              className="p-2 text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/60 rounded-xl cursor-not-allowed flex items-center justify-center"
+                              title="คลาสนี้เช็คชื่อแล้ว (ไม่สามารถลบได้ เพื่อรักษาประวัติเวลาเรียน)"
+                            >
+                              <ShieldAlert className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleDeleteMakeup(mc.id, mc.subject?.name)}
+                              className="p-2 text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30 rounded-xl transition"
+                              title="ลบคลาสนี้"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -793,9 +819,21 @@ export default function TeacherDashboardClient({
                             {mc.subject?.code}
                           </span>
                         </div>
-                        <h4 className="font-bold text-sm text-gray-900 dark:text-white mb-1">
-                          {mc.subject?.name}
-                        </h4>
+                        <div className="flex items-center justify-between mt-1 mb-1">
+                          <h4 className="font-bold text-sm text-gray-900 dark:text-white">
+                            {mc.subject?.name}
+                          </h4>
+                          {mc.hasAttendance ? (
+                            <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                              เช็คชื่อแล้ว ({mc.attendanceCount} คน)
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full shrink-0">
+                              ยังไม่เช็คชื่อ
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1 mb-2">
                           <Clock className="w-3.5 h-3.5" />
                           {mc.startTime} - {mc.endTime} น.
@@ -808,18 +846,31 @@ export default function TeacherDashboardClient({
                         <div className="mt-auto pt-2 border-t border-gray-100 dark:border-gray-800 flex gap-2">
                           <Link
                             href={`/dashboard/teacher/scan?type=class&subjectId=${mc.subjectId}`}
-                            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-1.5 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition"
+                            className={`flex-1 py-1.5 px-3 rounded-lg font-bold text-xs flex items-center justify-center gap-1 transition ${
+                              mc.hasAttendance 
+                                ? "bg-emerald-600 hover:bg-emerald-700 text-white" 
+                                : "bg-amber-600 hover:bg-amber-700 text-white"
+                            }`}
                           >
                             <Camera className="w-3.5 h-3.5" />
-                            สแกน
+                            {mc.hasAttendance ? "สแกนเพิ่มเติม" : "สแกน"}
                           </Link>
-                          <button
-                            onClick={() => handleDeleteMakeup(mc.id, mc.subject?.name)}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition"
-                            title="ย้ายไปถังขยะ (กู้คืนได้ภายใน 7 วัน)"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {mc.hasAttendance ? (
+                            <div
+                              className="p-1.5 text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/60 rounded-lg cursor-not-allowed flex items-center justify-center"
+                              title="คลาสนี้เช็คชื่อแล้ว (มีประวัติเข้าเรียน ไม่สามารถลบได้)"
+                            >
+                              <ShieldAlert className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => handleDeleteMakeup(mc.id, mc.subject?.name)}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-lg transition"
+                              title="ย้ายไปถังขยะ (กู้คืนได้ภายใน 7 วัน)"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
