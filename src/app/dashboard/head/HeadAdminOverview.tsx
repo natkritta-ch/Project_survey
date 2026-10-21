@@ -12,10 +12,102 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
   const [subjectKrSearch, setSubjectKrSearch] = useState("");
   
   const currentBEYear = new Date().getFullYear() + 543;
-  const initTerm = termConfigs.find(t => t.isCurrent) || termConfigs[0];
-  const [selectedTermConfigId, setSelectedTermConfigId] = useState(initTerm ? initTerm.id : "all");
-  const [assemblyStartDate, setAssemblyStartDate] = useState(initTerm?.startDate ? new Date(initTerm.startDate).toISOString().split('T')[0] : "");
-  const [assemblyEndDate, setAssemblyEndDate] = useState(initTerm?.endDate ? new Date(initTerm.endDate).toISOString().split('T')[0] : "");
+
+  // 1. รวมรายการภาคเรียนทั้งหมดจาก termConfigs และ subjects อย่างครบถ้วน
+  const availableTerms = useMemo(() => {
+    const map = new Map<string, {
+      id: string;
+      key: string;
+      term: string;
+      academicYear: string;
+      isCurrent: boolean;
+      startDate?: string;
+      endDate?: string;
+    }>();
+
+    // จาก termConfigs
+    termConfigs.forEach((tc: any) => {
+      const key = `${tc.term}/${tc.academicYear}`;
+      const now = new Date();
+      const isDateCurrent = tc.startDate && tc.endDate && new Date(tc.startDate) <= now && new Date(tc.endDate) >= now;
+      map.set(key, {
+        id: tc.id,
+        key,
+        term: String(tc.term),
+        academicYear: String(tc.academicYear),
+        isCurrent: !!tc.isCurrent || !!isDateCurrent,
+        startDate: tc.startDate ? new Date(tc.startDate).toISOString().split('T')[0] : undefined,
+        endDate: tc.endDate ? new Date(tc.endDate).toISOString().split('T')[0] : undefined,
+      });
+    });
+
+    // จาก subjects
+    subjects.forEach((s: any) => {
+      if (s.term && s.academicYear) {
+        const key = `${s.term}/${s.academicYear}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            id: key,
+            key,
+            term: String(s.term),
+            academicYear: String(s.academicYear),
+            isCurrent: false,
+          });
+        }
+      }
+    });
+
+    // ถ้าไม่มีข้อมูลในระบบเลย ให้ fallback เป็น 1/ปีปัจจุบัน
+    const defaultKey = `1/${currentBEYear}`;
+    if (!map.has(defaultKey)) {
+      map.set(defaultKey, {
+        id: defaultKey,
+        key: defaultKey,
+        term: "1",
+        academicYear: String(currentBEYear),
+        isCurrent: true,
+      });
+    }
+
+    const list = Array.from(map.values()).sort((a, b) => {
+      if (b.academicYear !== a.academicYear) {
+        return b.academicYear.localeCompare(a.academicYear);
+      }
+      return b.term.localeCompare(a.term);
+    });
+
+    // หากไม่มีเทอมใดถูกระบุ isCurrent ให้ถือว่าเทอมล่าสุดเป็นเทอมปัจจุบัน
+    const hasCurrent = list.some(t => t.isCurrent);
+    if (!hasCurrent && list.length > 0) {
+      list[0].isCurrent = true;
+    }
+
+    return list;
+  }, [termConfigs, subjects, currentBEYear]);
+
+  // หาเทอมปัจจุบันสำหรับเป็นค่าเริ่มต้น
+  const defaultCurrentTerm = useMemo(() => {
+    return availableTerms.find(t => t.isCurrent) || availableTerms[0];
+  }, [availableTerms]);
+
+  const [selectedTermKey, setSelectedTermKey] = useState<string>(() => {
+    return defaultCurrentTerm?.key || `1/${currentBEYear}`;
+  });
+  const [assemblyStartDate, setAssemblyStartDate] = useState<string>(() => {
+    return defaultCurrentTerm?.startDate || "";
+  });
+  const [assemblyEndDate, setAssemblyEndDate] = useState<string>(() => {
+    return defaultCurrentTerm?.endDate || "";
+  });
+
+  // ซิงค์ค่าเมื่อ defaultCurrentTerm เปลี่ยนแปลง
+  useEffect(() => {
+    if (defaultCurrentTerm && selectedTermKey !== "all" && !availableTerms.some(t => t.key === selectedTermKey)) {
+      setSelectedTermKey(defaultCurrentTerm.key);
+      if (defaultCurrentTerm.startDate) setAssemblyStartDate(defaultCurrentTerm.startDate);
+      if (defaultCurrentTerm.endDate) setAssemblyEndDate(defaultCurrentTerm.endDate);
+    }
+  }, [defaultCurrentTerm, availableTerms, selectedTermKey]);
 
   const exportXLSXByLevel = (filename: string, headers: string[], dataList: any[], levelFilter: string, mapRow: (item: any) => any[]) => {
     const wb = XLSX.utils.book_new();
@@ -51,9 +143,9 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
   };
 
   const currentSelectedTerm = useMemo(() => {
-    if (selectedTermConfigId === "all") return null;
-    return termConfigs.find(t => t.id === selectedTermConfigId) || null;
-  }, [termConfigs, selectedTermConfigId]);
+    if (selectedTermKey === "all") return null;
+    return availableTerms.find(t => t.key === selectedTermKey) || null;
+  }, [availableTerms, selectedTermKey]);
 
   const students = useMemo(() => users.filter(u => !u.deletedAt && u.role === "STUDENT" && (filterLevel === "ทั้งหมด" ? (u.level !== "จบการศึกษา" && u.level !== "พ้นสภาพ") : u.level === filterLevel)), [users, filterLevel]);
   const activeTeachers = useMemo(() => users.filter(u => !u.deletedAt && u.role === "TEACHER").length, [users]);
@@ -214,33 +306,28 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
             <Clock className="w-4 h-4 text-indigo-500 shrink-0" />
             <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">ภาคเรียน:</span>
             <select 
-              value={selectedTermConfigId} 
+              value={selectedTermKey} 
               onChange={e => {
-                const id = e.target.value;
-                setSelectedTermConfigId(id);
-                if (id === "all") {
+                const key = e.target.value;
+                setSelectedTermKey(key);
+                if (key === "all") {
                   setAssemblyStartDate("");
                   setAssemblyEndDate("");
                 } else {
-                  const tc = termConfigs.find(t => t.id === id);
-                  if (tc) {
-                    setAssemblyStartDate(new Date(tc.startDate).toISOString().split('T')[0]);
-                    setAssemblyEndDate(new Date(tc.endDate).toISOString().split('T')[0]);
+                  const t = availableTerms.find(item => item.key === key);
+                  if (t) {
+                    setAssemblyStartDate(t.startDate || "");
+                    setAssemblyEndDate(t.endDate || "");
                   }
                 }
               }} 
               className="bg-transparent text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none cursor-pointer pr-1"
             >
-              {termConfigs.map(tc => (
-                <option key={tc.id} value={tc.id} className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
-                  {tc.isCurrent ? `★ เทอม ${tc.term}/${tc.academicYear} (ปัจจุบัน)` : `เทอม ${tc.term}/${tc.academicYear}`}
+              {availableTerms.map(t => (
+                <option key={t.key} value={t.key} className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
+                  {t.isCurrent ? `★ เทอม ${t.term}/${t.academicYear} (ปัจจุบัน)` : `เทอม ${t.term}/${t.academicYear}`}
                 </option>
               ))}
-              {termConfigs.length === 0 && (
-                <option value="none" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
-                  เทอม 1/{currentBEYear} (ค่าเริ่มต้น)
-                </option>
-              )}
               <option value="all" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
                 -- ทุกช่วงเวลา (ทั้งหมด) --
               </option>
