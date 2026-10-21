@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { 
   GraduationCap, 
   ArrowRight, 
@@ -17,6 +17,38 @@ import {
 } from "lucide-react";
 import { advanceAcademicTerm, clearOldGraduates } from "./actions";
 import { showSuccess, showError, showConfirm } from "@/lib/alerts";
+
+/**
+ * คำนวณวันสิ้นสุดภาคเรียน: นับจากวันเปิดเทอมไป 19 สัปดาห์ และลงวันศุกร์ของสัปดาห์ที่ 19
+ */
+export function calculate19thWeekFriday(startDateStr: string): string {
+  if (!startDateStr) return "";
+  const parts = startDateStr.split("-").map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return "";
+  const [year, month, day] = parts;
+  const date = new Date(year, month - 1, day);
+  if (isNaN(date.getTime())) return "";
+
+  const dayOfWeek = date.getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri, 6 = Sat
+  // หาวันศุกร์ของสัปดาห์ที่ 1
+  let daysToFirstFriday = 5 - dayOfWeek;
+  if (dayOfWeek === 6) {
+    // ถ้าเริ่มวันเสาร์ นับสัปดาห์ที่ 1 ไปศุกร์ถัดไป (6 วัน)
+    daysToFirstFriday = 6;
+  } else if (dayOfWeek === 0) {
+    // ถ้าเริ่มวันอาทิตย์ นับไปวันศุกร์ของสัปดาห์ที่จะถึง (5 วัน)
+    daysToFirstFriday = 5;
+  }
+
+  // วันศุกร์ของสัปดาห์ที่ 19 = วันศุกร์สัปดาห์ที่ 1 + (18 สัปดาห์ * 7 วัน = 126 วัน)
+  const targetDate = new Date(date);
+  targetDate.setDate(date.getDate() + daysToFirstFriday + 18 * 7);
+
+  const y = targetDate.getFullYear();
+  const m = String(targetDate.getMonth() + 1).padStart(2, "0");
+  const d = String(targetDate.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 interface HeadProgressionProps {
   users: any[];
@@ -46,24 +78,36 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
   const nextYear = isCurrentlyTerm1 ? currentYear : String(parseInt(currentYear, 10) + 1);
   const willPromoteLevels = !isCurrentlyTerm1; // ถ้าอยู่เทอม 2 ต่อไปจะเป็นเทอม 1 พร้อมเลื่อนชั้นปี
 
-  // คำนวณวันเริ่มต้น - สิ้นสุดค่าเริ่มต้นของเทอมใหม่
+  // คำนวณวันเริ่มต้น - สิ้นสุดค่าเริ่มต้นของเทอมใหม่ (+19 สัปดาห์ ลงวันศุกร์อัตโนมัติ)
   const defaultDates = useMemo(() => {
     const ceYear = parseInt(nextYear, 10) - 543;
-    if (nextTerm === "2") {
-      return {
-        start: `${ceYear}-11-01`,
-        end: `${ceYear + 1}-03-15`
-      };
-    } else {
-      return {
-        start: `${ceYear}-05-16`,
-        end: `${ceYear}-10-10`
-      };
-    }
+    const start = nextTerm === "2" ? `${ceYear}-11-01` : `${ceYear}-05-16`;
+    const autoEnd = calculate19thWeekFriday(start);
+    const fallbackEnd = nextTerm === "2" ? `${ceYear + 1}-03-15` : `${ceYear}-10-10`;
+    return {
+      start,
+      end: autoEnd || fallbackEnd
+    };
   }, [nextTerm, nextYear]);
 
   const [inputStartDate, setInputStartDate] = useState(defaultDates.start);
   const [inputEndDate, setInputEndDate] = useState(defaultDates.end);
+
+  useEffect(() => {
+    setInputStartDate(defaultDates.start);
+    setInputEndDate(defaultDates.end);
+  }, [defaultDates]);
+
+  // เมื่อเปลี่ยนวันเปิดเทอม ให้คำนวณวันปิดเทอมเป็นวันศุกร์ของสัปดาห์ที่ 19 ให้อัตโนมัติ (แต่ยังคงแก้ไขเองได้)
+  const handleStartDateChange = (newStart: string) => {
+    setInputStartDate(newStart);
+    if (newStart) {
+      const autoEnd = calculate19thWeekFriday(newStart);
+      if (autoEnd) {
+        setInputEndDate(autoEnd);
+      }
+    }
+  };
 
   // สถิตินักเรียนปัจจุบันตามระดับชั้น
   const activeStudents = useMemo(() => {
@@ -320,7 +364,11 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
 
           <button
             disabled={isLoading}
-            onClick={() => setShowConfirmModal(true)}
+            onClick={() => {
+              setInputStartDate(defaultDates.start);
+              setInputEndDate(defaultDates.end);
+              setShowConfirmModal(true);
+            }}
             className={`w-full py-4 px-6 rounded-xl font-bold text-base text-white shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
               willPromoteLevels 
                 ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 shadow-amber-500/20" 
@@ -479,7 +527,7 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
                   <input
                     type="date"
                     value={inputStartDate}
-                    onChange={e => setInputStartDate(e.target.value)}
+                    onChange={e => handleStartDateChange(e.target.value)}
                     className="w-full text-xs p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
@@ -491,6 +539,9 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
                     onChange={e => setInputEndDate(e.target.value)}
                     className="w-full text-xs p-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500"
                   />
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1 block font-medium">
+                    ✨ คำนวณ +19 สัปดาห์ (วันศุกร์) ให้อัตโนมัติ (แก้ไขได้)
+                  </span>
                 </div>
               </div>
             </div>
