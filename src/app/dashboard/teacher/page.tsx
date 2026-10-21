@@ -220,21 +220,115 @@ export default async function TeacherDashboard() {
               id: true,
               type: true,
               status: true,
-              timestamp: true
+              timestamp: true,
+              subjectId: true,
+              subject: {
+                select: {
+                  id: true,
+                  name: true,
+                  code: true,
+                  teacher: {
+                    select: { name: true }
+                  }
+                }
+              }
             }
           }
         },
         orderBy: [{ level: 'asc' }, { username: 'asc' }]
       });
 
+      // ดึงรายวิชาทั้งหมดของระดับชั้นที่ครูเป็นที่ปรึกษา เพื่อแมปตารางวิชาให้ครบถ้วน
+      const levelSubjects = await prisma.subject.findMany({
+        where: {
+          level: { in: advisedLevels },
+          deletedAt: null
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          level: true,
+          teacher: { select: { name: true } }
+        }
+      });
+
       const processedAdvisedStudents = rawAdvisedStudents.map((st: any) => {
         const atts = st.attendances || [];
-        const total = atts.length;
-        const presents = atts.filter((a: any) => ["PRESENT", "LATE"].includes(a.status)).length;
-        const absents = atts.filter((a: any) => a.status === "ABSENT").length;
-        const leaves = atts.filter((a: any) => ["LEAVE_PERSONAL", "LEAVE_SICK"].includes(a.status)).length;
-        const percent = total > 0 ? Math.round((presents / total) * 100) : 100;
-        const isAtRisk = total > 0 ? (absents >= 4 || (absents / total) >= 0.20) : false;
+
+        // 1. แยกการเข้าแถวหน้าเสาธง (Assembly)
+        const assemblyAtts = atts.filter((a: any) => a.type === "assembly");
+        const assemblyTotal = assemblyAtts.length;
+        const assemblyPresents = assemblyAtts.filter((a: any) => ["PRESENT", "LATE"].includes(a.status)).length;
+        const assemblyAbsents = assemblyAtts.filter((a: any) => a.status === "ABSENT").length;
+        const assemblyLeaves = assemblyAtts.filter((a: any) => ["LEAVE_PERSONAL", "LEAVE_SICK"].includes(a.status)).length;
+        const assemblyPercent = assemblyTotal > 0 ? Math.round((assemblyPresents / assemblyTotal) * 100) : 100;
+        // เสี่ยง ม.ผ. = ขาดแถว >= 4 ครั้ง หรือ เวลาเข้าร่วม < 80%
+        const isAssemblyAtRisk = assemblyTotal > 0 && (assemblyAbsents >= 4 || (assemblyAbsents / assemblyTotal) >= 0.20 || assemblyPercent < 80);
+
+        // 2. แยกวิชาเรียนรายวิชา (Class)
+        const classAtts = atts.filter((a: any) => a.type === "class");
+        const relevantSubjects = levelSubjects.filter((s: any) => s.level === st.level);
+        
+        // รวบรวมวิชาทั้งหมดที่เด็กเคยเช็คชื่อ หรือมีในหลักสูตรระดับชั้นนี้
+        const subjectMap = new Map<string, any>();
+        relevantSubjects.forEach((s: any) => {
+          subjectMap.set(s.id, {
+            id: s.id,
+            code: s.code,
+            name: s.name,
+            teacherName: s.teacher?.name || "ไม่ระบุอาจารย์",
+            total: 0,
+            presents: 0,
+            absents: 0,
+            leaves: 0,
+            percent: 100,
+            isAtRisk: false
+          });
+        });
+
+        classAtts.forEach((a: any) => {
+          if (!a.subjectId) return;
+          if (!subjectMap.has(a.subjectId)) {
+            subjectMap.set(a.subjectId, {
+              id: a.subjectId,
+              code: a.subject?.code || "-",
+              name: a.subject?.name || "วิชาทั่วไป",
+              teacherName: a.subject?.teacher?.name || "ไม่ระบุอาจารย์",
+              total: 0,
+              presents: 0,
+              absents: 0,
+              leaves: 0,
+              percent: 100,
+              isAtRisk: false
+            });
+          }
+          const item = subjectMap.get(a.subjectId);
+          item.total += 1;
+          if (["PRESENT", "LATE"].includes(a.status)) item.presents += 1;
+          else if (a.status === "ABSENT") item.absents += 1;
+          else if (["LEAVE_PERSONAL", "LEAVE_SICK"].includes(a.status)) item.leaves += 1;
+        });
+
+        // คำนวณเปอร์เซ็นต์และเกณฑ์ เสี่ยง ข.ร. แต่ละวิชา
+        const subjectsSummary = Array.from(subjectMap.values()).map((s: any) => {
+          const pct = s.total > 0 ? Math.round((s.presents / s.total) * 100) : 100;
+          const isAtRisk = s.total > 0 && (s.absents >= 4 || (s.absents / s.total) >= 0.20 || pct < 80);
+          return {
+            ...s,
+            percent: pct,
+            isAtRisk
+          };
+        });
+
+        const atRiskSubjects = subjectsSummary.filter((s: any) => s.isAtRisk);
+
+        // ภาพรวมทั้งหมด (เข้าแถว + ทุกวิชา)
+        const totalAll = atts.length;
+        const presentsAll = atts.filter((a: any) => ["PRESENT", "LATE"].includes(a.status)).length;
+        const absentsAll = atts.filter((a: any) => a.status === "ABSENT").length;
+        const leavesAll = atts.filter((a: any) => ["LEAVE_PERSONAL", "LEAVE_SICK"].includes(a.status)).length;
+        const percentAll = totalAll > 0 ? Math.round((presentsAll / totalAll) * 100) : 100;
 
         return {
           id: st.id,
@@ -254,13 +348,25 @@ export default async function TeacherDashboard() {
             name: l.parent?.name || "ผู้ปกครอง",
             phone: l.parent?.phone || null
           })),
+          assemblySummary: {
+            total: assemblyTotal,
+            presents: assemblyPresents,
+            absents: assemblyAbsents,
+            leaves: assemblyLeaves,
+            percent: assemblyPercent,
+            isAtRisk: isAssemblyAtRisk // เสี่ยง ม.ผ.
+          },
+          subjectsSummary,
+          hasSubjectRisk: atRiskSubjects.length > 0, // เสี่ยง ข.ร.
+          atRiskSubjectCount: atRiskSubjects.length,
+          atRiskSubjectNames: atRiskSubjects.map((s: any) => s.name),
           attendanceSummary: {
-            total,
-            presents,
-            absents,
-            leaves,
-            percent,
-            isAtRisk
+            total: totalAll,
+            presents: presentsAll,
+            absents: absentsAll,
+            leaves: leavesAll,
+            percent: percentAll,
+            isAtRisk: isAssemblyAtRisk || atRiskSubjects.length > 0
           }
         };
       });

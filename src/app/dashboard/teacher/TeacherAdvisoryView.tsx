@@ -16,12 +16,28 @@ import {
   Check, 
   ExternalLink,
   ChevronRight,
-  Filter
+  Filter,
+  BookOpen,
+  X,
+  AlertCircle
 } from "lucide-react";
 import { showSuccess, showError, showConfirm, showToast } from "@/lib/alerts";
 import { verifyTwinStudent } from "../head/actions";
 
-interface StudentAdvisee {
+export interface SubjectAttendanceItem {
+  id: string;
+  code: string;
+  name: string;
+  teacherName: string;
+  total: number;
+  presents: number;
+  absents: number;
+  leaves: number;
+  percent: number;
+  isAtRisk: boolean; // เสี่ยง ข.ร.
+}
+
+export interface StudentAdvisee {
   id: string;
   name: string;
   username: string;
@@ -35,6 +51,18 @@ interface StudentAdvisee {
   twinVerified?: boolean;
   twinNote?: string | null;
   parents: Array<{ id: string; name: string; phone?: string | null }>;
+  assemblySummary?: {
+    total: number;
+    presents: number;
+    absents: number;
+    leaves: number;
+    percent: number;
+    isAtRisk: boolean; // เสี่ยง ม.ผ.
+  };
+  subjectsSummary?: SubjectAttendanceItem[];
+  hasSubjectRisk?: boolean; // เสี่ยง ข.ร.
+  atRiskSubjectCount?: number;
+  atRiskSubjectNames?: string[];
   attendanceSummary: {
     total: number;
     presents: number;
@@ -62,9 +90,10 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
   const [students, setStudents] = useState<StudentAdvisee[]>(initialStudents || []);
   const [selectedLevel, setSelectedLevel] = useState<string>(assignments[0]?.level || "ทั้งหมด");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "atRisk" | "noParent" | "twin">("all");
+  const [filterType, setFilterType] = useState<"all" | "atRiskAssembly" | "atRiskSubject" | "noParent" | "twin">("all");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState<string | null>(null);
+  const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<StudentAdvisee | null>(null);
 
   const handleCopyCode = (code: string) => {
     if (!code) return;
@@ -98,7 +127,8 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
         if (!matchName && !matchUser && !matchNick && !matchParent) return false;
       }
       // 3. กรองตามประเภท
-      if (filterType === "atRisk" && !s.attendanceSummary.isAtRisk) return false;
+      if (filterType === "atRiskAssembly" && !s.assemblySummary?.isAtRisk) return false;
+      if (filterType === "atRiskSubject" && !s.hasSubjectRisk) return false;
       if (filterType === "noParent" && s.parents.length > 0) return false;
       if (filterType === "twin" && !s.isTwin) return false;
 
@@ -114,10 +144,18 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
 
     const total = targetStudents.length;
     const withParents = targetStudents.filter(s => s.parents.length > 0).length;
-    const atRisk = targetStudents.filter(s => s.attendanceSummary.isAtRisk).length;
+    const atRiskAssembly = targetStudents.filter(s => s.assemblySummary?.isAtRisk).length;
+    const atRiskSubject = targetStudents.filter(s => s.hasSubjectRisk).length;
     const twins = targetStudents.filter(s => s.isTwin).length;
 
-    return { total, withParents, noParents: total - withParents, atRisk, twins };
+    return { 
+      total, 
+      withParents, 
+      noParents: total - withParents, 
+      atRiskAssembly, 
+      atRiskSubject, 
+      twins 
+    };
   }, [students, selectedLevel]);
 
   // อนุมัติเด็กแฝด
@@ -375,8 +413,8 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
         </div>
       )}
 
-      {/* สรุปสถิติ 4 กล่อง */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* สรุปสถิติ 5 กล่อง */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-gray-500 mb-2">
             <span className="text-xs font-bold uppercase tracking-wider">นักเรียนทั้งหมด</span>
@@ -412,12 +450,23 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
 
         <div className="bg-rose-50/60 dark:bg-rose-950/20 p-4 rounded-2xl border border-rose-100 dark:border-rose-900/40 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-rose-700 dark:text-rose-300 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">กลุ่มเสี่ยงขาดเรียน</span>
+            <span className="text-xs font-bold uppercase tracking-wider">เสี่ยง ม.ผ. (เข้าแถว)</span>
             <ShieldAlert className="w-4 h-4 text-rose-600" />
           </div>
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-rose-700 dark:text-rose-300">{stats.atRisk}</span>
-            <span className="text-xs text-rose-600/70">คน (มส.)</span>
+            <span className="text-2xl font-black text-rose-700 dark:text-rose-300">{stats.atRiskAssembly}</span>
+            <span className="text-xs text-rose-600/70">คน</span>
+          </div>
+        </div>
+
+        <div className="bg-purple-50/60 dark:bg-purple-950/20 p-4 rounded-2xl border border-purple-100 dark:border-purple-900/40 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-purple-700 dark:text-purple-300 mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider">เสี่ยง ข.ร. (วิชาเรียน)</span>
+            <AlertCircle className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl font-black text-purple-700 dark:text-purple-300">{stats.atRiskSubject}</span>
+            <span className="text-xs text-purple-600/70">คน</span>
           </div>
         </div>
       </div>
@@ -447,13 +496,23 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
           </button>
           <button
             type="button"
-            onClick={() => setFilterType("atRisk")}
+            onClick={() => setFilterType("atRiskAssembly")}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 ${
-              filterType === "atRisk" ? "bg-rose-600 text-white font-bold" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+              filterType === "atRiskAssembly" ? "bg-rose-600 text-white font-bold" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
             }`}
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            เสี่ยง มส. ({stats.atRisk})
+            เสี่ยง ม.ผ. เข้าแถว ({stats.atRiskAssembly})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterType("atRiskSubject")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 ${
+              filterType === "atRiskSubject" ? "bg-purple-600 text-white font-bold" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+            }`}
+          >
+            <AlertCircle className="w-3.5 h-3.5" />
+            เสี่ยง ข.ร. วิชาเรียน ({stats.atRiskSubject})
           </button>
           <button
             type="button"
@@ -469,7 +528,7 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
               type="button"
               onClick={() => setFilterType("twin")}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1 ${
-                filterType === "twin" ? "bg-purple-600 text-white font-bold" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
+                filterType === "twin" ? "bg-indigo-600 text-white font-bold" : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200"
               }`}
             >
               คู่แฝด ({stats.twins})
@@ -487,22 +546,24 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
                 <th className="py-3 px-4">นักเรียน</th>
                 <th className="py-3 px-4">ระดับชั้น</th>
                 <th className="py-3 px-4">ข้อมูลติดต่อ (นร./ผปค.)</th>
+                <th className="py-3 px-4">การเข้าแถวหน้าเสาธง (ม.ผ.)</th>
+                <th className="py-3 px-4">การเรียนรายวิชา (ข.ร.)</th>
+                <th className="py-3 px-4 text-center">ดูรายละเอียด</th>
                 <th className="py-3 px-4">รหัสผู้ปกครอง</th>
-                <th className="py-3 px-4">การมาเรียนรวม</th>
-                <th className="py-3 px-4 text-center">สถานะ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700 text-xs">
               {filteredStudents.length > 0 ? (
                 filteredStudents.map((st) => {
                   const isLinked = st.parents.length > 0;
-                  const isRisk = st.attendanceSummary.isAtRisk;
+                  const isAssemblyRisk = Boolean(st.assemblySummary?.isAtRisk);
+                  const isSubjectRisk = Boolean(st.hasSubjectRisk);
 
                   return (
                     <tr 
                       key={st.id}
                       className={`hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition ${
-                        isRisk ? "bg-rose-50/30 dark:bg-rose-950/10" : ""
+                        isAssemblyRisk || isSubjectRisk ? "bg-rose-50/20 dark:bg-rose-950/10" : ""
                       }`}
                     >
                       {/* ข้อมูลนักเรียน */}
@@ -574,67 +635,110 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
                         </div>
                       </td>
 
-                      {/* รหัสผู้ปกครอง (Parent Code) */}
+                      {/* การเข้าแถวหน้าเสาธง (ม.ผ.) */}
                       <td className="py-3 px-4">
-                        {st.parentCode ? (
+                        <div className="flex flex-col">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-600">
-                              {st.parentCode}
+                            <span className={`font-bold ${isAssemblyRisk ? "text-rose-600 font-black" : "text-gray-800 dark:text-gray-200"}`}>
+                              {st.assemblySummary?.percent ?? 100}%
                             </span>
-                            <button
-                              type="button"
-                              onClick={() => handleCopyCode(st.parentCode!)}
-                              className="p-1 text-gray-400 hover:text-indigo-600 rounded transition"
-                              title="คัดลอกรหัส"
-                            >
-                              {copiedCode === st.parentCode ? (
-                                <Check className="w-3.5 h-3.5 text-emerald-500" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
+                            {isAssemblyRisk ? (
+                              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                                ⚠️ เสี่ยง ม.ผ.
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                ✓ ผ่าน
+                              </span>
+                            )}
                           </div>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
-                      </td>
-
-                      {/* สถิติการมาเรียนรวม */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex flex-col">
-                            <span className={`font-bold ${isRisk ? "text-rose-600 font-black" : "text-gray-700 dark:text-gray-300"}`}>
-                              {st.attendanceSummary.percent}%
-                            </span>
-                            <span className="text-[10px] text-gray-400">
-                              มา {st.attendanceSummary.presents} • ขาด {st.attendanceSummary.absents} • ลา {st.attendanceSummary.leaves}
-                            </span>
-                          </div>
+                          <span className="text-[10px] text-gray-400">
+                            มา {st.assemblySummary?.presents ?? 0} • ขาด {st.assemblySummary?.absents ?? 0} • ลา {st.assemblySummary?.leaves ?? 0}
+                          </span>
                         </div>
                       </td>
 
-                      {/* สถานะ */}
+                      {/* การเรียนรายวิชา (ข.ร.) */}
+                      <td className="py-3 px-4">
+                        <div>
+                          {isSubjectRisk ? (
+                            <div className="flex flex-col">
+                              <span className="text-rose-600 dark:text-rose-400 font-bold text-xs flex items-center gap-1">
+                                ⚠️ เสี่ยง ข.ร. ({st.atRiskSubjectCount} วิชา)
+                              </span>
+                              <span className="text-[10px] text-rose-500/80 truncate max-w-[170px]" title={st.atRiskSubjectNames?.join(", ")}>
+                                {st.atRiskSubjectNames?.slice(0, 2).join(", ")}{st.atRiskSubjectNames && st.atRiskSubjectNames.length > 2 ? '...' : ''}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col">
+                              <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-xs flex items-center gap-1">
+                                ✓ ปกติทุกวิชา
+                              </span>
+                              <span className="text-[10px] text-gray-400">
+                                ({st.subjectsSummary?.length || 0} รายวิชา)
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* ปุ่มดูรายละเอียดรายวิชา */}
                       <td className="py-3 px-4 text-center">
-                        {isRisk ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                            <ShieldAlert className="w-3 h-3" /> เสี่ยง มส.
-                          </span>
-                        ) : isLinked ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                            <CheckCircle2 className="w-3 h-3" /> ผูกผู้ปกครองแล้ว
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                            <Clock className="w-3 h-3" /> รอผูกผู้ปกครอง
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudentForDetail(st)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-semibold text-xs transition border border-indigo-200/60 dark:border-indigo-800/60 shadow-sm active:scale-95"
+                        >
+                          <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                          ดูรายวิชา
+                        </button>
+                      </td>
+
+                      {/* รหัสผู้ปกครอง & สถานะการผูก */}
+                      <td className="py-3 px-4">
+                        <div className="space-y-1">
+                          {st.parentCode ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-600">
+                                {st.parentCode}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyCode(st.parentCode!)}
+                                className="p-1 text-gray-400 hover:text-indigo-600 rounded transition"
+                                title="คัดลอกรหัส"
+                              >
+                                {copiedCode === st.parentCode ? (
+                                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+
+                          <div>
+                            {isLinked ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                <CheckCircle2 className="w-3 h-3" /> ผูกผู้ปกครองแล้ว
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                <Clock className="w-3 h-3" /> รอผูกผู้ปกครอง
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-gray-400">
+                  <td colSpan={7} className="py-8 text-center text-gray-400">
                     ไม่พบข้อมูลนักเรียนที่ตรงกับเงื่อนไข
                   </td>
                 </tr>
@@ -643,6 +747,171 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
           </table>
         </div>
       </div>
+
+      {/* Modal ดูรายละเอียดการเข้าเรียนแยกรายวิชา */}
+      {selectedStudentForDetail && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 font-bold flex items-center justify-center text-base shrink-0 overflow-hidden">
+                  {selectedStudentForDetail.profilePicture ? (
+                    <img src={selectedStudentForDetail.profilePicture} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    selectedStudentForDetail.name.charAt(0)
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                      {selectedStudentForDetail.name}
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                      {selectedStudentForDetail.level}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5 font-mono">
+                    รหัสนักเรียน: {selectedStudentForDetail.username} {selectedStudentForDetail.nickname ? `• (${selectedStudentForDetail.nickname})` : ""}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedStudentForDetail(null)}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Summary Cards */}
+            <div className="grid grid-cols-2 gap-3 my-4">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] text-gray-500 block">การเข้าแถวหน้าเสาธง</span>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-lg font-black text-gray-900 dark:text-white">
+                      {selectedStudentForDetail.assemblySummary?.percent ?? 100}%
+                    </span>
+                    <span className="text-[11px] text-gray-400">
+                      (มา {selectedStudentForDetail.assemblySummary?.presents ?? 0} / ขาด {selectedStudentForDetail.assemblySummary?.absents ?? 0})
+                    </span>
+                  </div>
+                </div>
+                {selectedStudentForDetail.assemblySummary?.isAtRisk ? (
+                  <span className="px-2 py-1 rounded-xl text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                    ⚠️ เสี่ยง ม.ผ.
+                  </span>
+                ) : (
+                  <span className="px-2 py-1 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                    ✓ ผ่าน
+                  </span>
+                )}
+              </div>
+
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div>
+                  <span className="text-[11px] text-gray-500 block">วิชาเรียนทั้งหมด</span>
+                  <div className="flex items-baseline gap-1 mt-0.5">
+                    <span className="text-lg font-black text-gray-900 dark:text-white">
+                      {selectedStudentForDetail.subjectsSummary?.length ?? 0}
+                    </span>
+                    <span className="text-[11px] text-gray-400">รายวิชา</span>
+                  </div>
+                </div>
+                {selectedStudentForDetail.hasSubjectRisk ? (
+                  <span className="px-2 py-1 rounded-xl text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                    ⚠️ เสี่ยง ข.ร. ({selectedStudentForDetail.atRiskSubjectCount})
+                  </span>
+                ) : (
+                  <span className="px-2 py-1 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                    ✓ ปกติทุกวิชา
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Subject Breakdown List */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">
+                รายละเอียดเวลาเรียนแยกตามรายวิชา:
+              </h4>
+
+              {(!selectedStudentForDetail.subjectsSummary || selectedStudentForDetail.subjectsSummary.length === 0) ? (
+                <div className="text-center py-8 text-gray-400 text-xs">
+                  ยังไม่มีประวัติการเช็คชื่อในรายวิชา
+                </div>
+              ) : (
+                selectedStudentForDetail.subjectsSummary.map((sub) => (
+                  <div
+                    key={sub.id}
+                    className={`p-3.5 rounded-2xl border transition ${
+                      sub.isAtRisk 
+                        ? "bg-rose-50/50 dark:bg-rose-950/20 border-rose-200 dark:border-rose-900/40" 
+                        : "bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 shadow-sm"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-2 py-0.5 rounded">
+                            {sub.code}
+                          </span>
+                          <span className="text-xs font-bold text-gray-900 dark:text-white">
+                            {sub.name}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          ผู้สอน: <span className="font-medium text-gray-700 dark:text-gray-300">{sub.teacherName}</span>
+                        </p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        {sub.isAtRisk ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            เสี่ยง ข.ร. ({sub.percent}%)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            ปกติ ({sub.percent}%)
+                          </span>
+                        )}
+                        <span className="text-[10px] text-gray-400 block mt-1">
+                          มา {sub.presents} • ขาด {sub.absents} • ลา {sub.leaves} (รวม {sub.total} คาบ)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mt-2.5 w-full bg-gray-100 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-300 ${
+                          sub.isAtRisk ? "bg-rose-500" : "bg-emerald-500"
+                        }`}
+                        style={{ width: `${Math.min(100, sub.percent)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-4 mt-3 border-t border-gray-100 dark:border-gray-700 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSelectedStudentForDetail(null)}
+                className="px-5 py-2 text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-xl transition"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
