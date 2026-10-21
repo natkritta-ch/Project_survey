@@ -12,8 +12,6 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
   const [filterSubjectKr, setFilterSubjectKr] = useState("ทั้งหมด");
   const [isSubjectKrDropdownOpen, setIsSubjectKrDropdownOpen] = useState(false);
   const [subjectKrSearch, setSubjectKrSearch] = useState("");
-  const [filterLevelKr, setFilterLevelKr] = useState("ทั้งหมด");
-  const [filterLevelMz, setFilterLevelMz] = useState("ทั้งหมด");
   
   const currentBEYear = new Date().getFullYear() + 543;
   const initTerm = termConfigs.find(t => t.isCurrent) || termConfigs[0];
@@ -196,15 +194,11 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
 
   const displayKr = useMemo(() => subjectStats.khorRorStudentsList.filter((st: any) => {
     if (filterSubjectKr !== "ทั้งหมด" && st.subjectName !== filterSubjectKr) return false;
-    if (filterLevelKr !== "ทั้งหมด" && st.level !== filterLevelKr) return false;
     if (searchKr && !st.name.toLowerCase().includes(searchKr.toLowerCase()) && !st.username.toLowerCase().includes(searchKr.toLowerCase())) return false;
     return true;
-  }), [subjectStats.khorRorStudentsList, filterSubjectKr, filterLevelKr, searchKr]);
+  }), [subjectStats.khorRorStudentsList, filterSubjectKr, searchKr]);
 
-  const displayMz = useMemo(() => assemblyStats.failingStudentsList.filter((st: any) => {
-    if (filterLevelMz !== "ทั้งหมด" && st.level !== filterLevelMz) return false;
-    return true;
-  }), [assemblyStats.failingStudentsList, filterLevelMz]);
+  const displayMz = assemblyStats.failingStudentsList;
 
   return (
     <div className="space-y-6">
@@ -326,7 +320,7 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
               </span>
               <button onClick={() => {
                 const mapRowKr = (s: any) => [s.username, s.name, s.level, `${s.maxAbsents} ครั้ง`, s.targetSubjectCode || "", s.subjectName || ""];
-                exportXLSXByLevel("khor-ror-report.xlsx", ["รหัสนักเรียน", "ชื่อ-นามสกุล", "ชั้นปี", "จำนวนขาด (สูงสุด)", "รหัสวิชาที่ติด", "ชื่อวิชาที่ติด"], displayKr, filterLevelKr, mapRowKr);
+                exportXLSXByLevel("khor-ror-report.xlsx", ["รหัสนักเรียน", "ชื่อ-นามสกุล", "ชั้นปี", "จำนวนขาด (สูงสุด)", "รหัสวิชาที่ติด", "ชื่อวิชาที่ติด"], displayKr, filterLevel, mapRowKr);
               }} className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition">
                 ⬇️ Export Excel
               </button>
@@ -407,14 +401,6 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
                   )}
                 </div>
               </div>
-              <select 
-                value={filterLevelKr} 
-                onChange={e => setFilterLevelKr(e.target.value)} 
-                className="px-3 py-1.5 border border-rose-200 dark:border-slate-600 rounded-lg w-full sm:w-auto outline-none focus:border-rose-400 dark:bg-slate-900 dark:text-white max-w-[120px]"
-              >
-                <option value="ทั้งหมด">- ทุกชั้นปี -</option>
-                {levelsOptions.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
-              </select>
             </div>
           </div>
 
@@ -469,25 +455,10 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
               </span>
               <button onClick={() => {
                 const mapRowMz = (s: any) => [s.username, s.name, s.level, `${s.presents} วัน`, `${s.percent}%`];
-                exportXLSXByLevel("moph-assembly-report.xlsx", ["รหัสนักเรียน", "ชื่อ-นามสกุล", "ชั้นปี", "มาเข้าแถว", "เปอร์เซ็นต์"], displayMz, filterLevelMz, mapRowMz);
+                exportXLSXByLevel("moph-assembly-report.xlsx", ["รหัสนักเรียน", "ชื่อ-นามสกุล", "ชั้นปี", "มาเข้าแถว", "เปอร์เซ็นต์"], displayMz, filterLevel, mapRowMz);
               }} className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-xs font-bold shadow-sm transition">
                 ⬇️ Export Excel
               </button>
-            </div>
-          </div>
-
-          {/* Sub-Filters for Mz */}
-          <div className="px-5 py-3 border-b border-orange-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end items-center text-sm">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-slate-500 whitespace-nowrap text-xs">ชั้นปี:</span>
-              <select 
-                value={filterLevelMz} 
-                onChange={e => setFilterLevelMz(e.target.value)} 
-                className="px-3 py-1.5 border border-orange-200 dark:border-slate-600 rounded-lg outline-none focus:border-orange-400 dark:bg-slate-900 dark:text-white text-xs font-semibold shadow-sm"
-              >
-                <option value="ทั้งหมด">- ทุกชั้นปี -</option>
-                {levelsOptions.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
-              </select>
             </div>
           </div>
 
