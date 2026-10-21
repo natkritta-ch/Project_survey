@@ -13,7 +13,6 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
   const [isSubjectKrDropdownOpen, setIsSubjectKrDropdownOpen] = useState(false);
   const [subjectKrSearch, setSubjectKrSearch] = useState("");
   const [filterLevelKr, setFilterLevelKr] = useState("ทั้งหมด");
-  const [searchMz, setSearchMz] = useState("");
   const [filterLevelMz, setFilterLevelMz] = useState("ทั้งหมด");
   
   const currentBEYear = new Date().getFullYear() + 543;
@@ -55,9 +54,26 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
     XLSX.writeFile(wb, filename);
   };
 
+  const currentSelectedTerm = useMemo(() => {
+    if (selectedTermConfigId === "all") return null;
+    return termConfigs.find(t => t.id === selectedTermConfigId) || null;
+  }, [termConfigs, selectedTermConfigId]);
+
   const students = useMemo(() => users.filter(u => !u.deletedAt && u.role === "STUDENT" && (filterLevel === "ทั้งหมด" ? (u.level !== "จบการศึกษา" && u.level !== "พ้นสภาพ") : u.level === filterLevel)), [users, filterLevel]);
   const activeTeachers = useMemo(() => users.filter(u => !u.deletedAt && u.role === "TEACHER").length, [users]);
-  const activeSubjects = useMemo(() => subjects.filter(s => !s.deletedAt && (filterLevel === "ทั้งหมด" || s.level === filterLevel)).length, [subjects, filterLevel]);
+  
+  // วิชาที่เปิดสอน: กรองตามระดับชั้น และกรองตามภาคเรียนที่เลือก
+  const activeSubjects = useMemo(() => {
+    return subjects.filter(s => {
+      if (s.deletedAt) return false;
+      if (filterLevel !== "ทั้งหมด" && s.level !== filterLevel) return false;
+      if (currentSelectedTerm) {
+        if (s.term && s.term !== currentSelectedTerm.term) return false;
+        if (s.academicYear && s.academicYear !== currentSelectedTerm.academicYear) return false;
+      }
+      return true;
+    }).length;
+  }, [subjects, filterLevel, currentSelectedTerm]);
 
   // Assembly Stats
   const assemblyStats = useMemo(() => {
@@ -119,15 +135,35 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
     return { totalDays, failedCount, failingStudentsList };
   }, [students, users, assemblyStartDate, assemblyEndDate]);
 
-  // Subject Stats (ขร.)
+  // Subject Stats (ขร.): กรองเฉพาะวิชาและประวัติการขาดเรียนในภาคเรียนที่เลือก
   const subjectStats = useMemo(() => {
     let khorRorCount = 0;
     let warningCount = 0; // ขาด 3 ครั้ง
     const khorRorStudentsList: any[] = [];
 
+    // รายวิชาเฉพาะของภาคเรียนที่เลือก
+    const termSubjects = subjects.filter(s => {
+      if (s.deletedAt) return false;
+      if (currentSelectedTerm) {
+        if (s.term && s.term !== currentSelectedTerm.term) return false;
+        if (s.academicYear && s.academicYear !== currentSelectedTerm.academicYear) return false;
+      }
+      return true;
+    });
+    const termSubjectIds = new Set(termSubjects.map(s => s.id));
+
     students.forEach(s => {
       const subjAbsents: Record<string, number> = {};
-      (s.attendances || []).filter((a: any) => a.subjectId).forEach((a: any) => {
+      (s.attendances || []).filter((a: any) => a.subjectId && termSubjectIds.has(a.subjectId)).forEach((a: any) => {
+        if (assemblyStartDate) {
+          const start = new Date(assemblyStartDate).getTime();
+          if (new Date(a.timestamp).getTime() < start) return;
+        }
+        if (assemblyEndDate) {
+          const end = new Date(assemblyEndDate).getTime() + 86399999;
+          if (new Date(a.timestamp).getTime() > end) return;
+        }
+
         if (a.status === "ABSENT") {
           subjAbsents[a.subjectId] = (subjAbsents[a.subjectId] || 0) + 1;
         }
@@ -149,16 +185,14 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
         const subjectRef = subjects.find(sub => sub.id === targetSubjectId);
         const subjectName = subjectRef?.name || "ไม่ทราบวิชา";
         const subjectCode = subjectRef?.code || "";
-        // Bug #6 fix: เก็บ targetSubjectId และ code ไว้ใน list เพื่อใช้ตอน Export
         khorRorStudentsList.push({ ...s, maxAbsents, subjectName, targetSubjectId, targetSubjectCode: subjectCode });
       }
     });
 
-    // Sort heavily absent first
     khorRorStudentsList.sort((a, b) => b.maxAbsents - a.maxAbsents);
 
     return { khorRorCount, warningCount, khorRorStudentsList };
-  }, [students, subjects]);
+  }, [students, subjects, currentSelectedTerm, assemblyStartDate, assemblyEndDate]);
 
   const displayKr = useMemo(() => subjectStats.khorRorStudentsList.filter((st: any) => {
     if (filterSubjectKr !== "ทั้งหมด" && st.subjectName !== filterSubjectKr) return false;
@@ -169,9 +203,8 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
 
   const displayMz = useMemo(() => assemblyStats.failingStudentsList.filter((st: any) => {
     if (filterLevelMz !== "ทั้งหมด" && st.level !== filterLevelMz) return false;
-    if (searchMz && !st.name.toLowerCase().includes(searchMz.toLowerCase()) && !st.username.toLowerCase().includes(searchMz.toLowerCase())) return false;
     return true;
-  }), [assemblyStats.failingStudentsList, filterLevelMz, searchMz]);
+  }), [assemblyStats.failingStudentsList, filterLevelMz]);
 
   return (
     <div className="space-y-6">
@@ -443,21 +476,14 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
             </div>
           </div>
 
-          {/* Sub-Filters / Search for Mz */}
-          <div className="px-5 py-3 border-b border-orange-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex flex-col sm:flex-row gap-3 justify-between items-center text-sm">
-            <input 
-              type="text" 
-              placeholder="ค้นหาชื่อ หรือ รหัส..." 
-              value={searchMz} 
-              onChange={e => setSearchMz(e.target.value)} 
-              className="px-3 py-1.5 border border-orange-200 dark:border-slate-600 rounded-lg w-full sm:w-64 outline-none focus:border-orange-400 dark:bg-slate-900 dark:text-white" 
-            />
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <span className="font-semibold text-slate-500 whitespace-nowrap hidden sm:inline-block">ชั้นปี:</span>
+          {/* Sub-Filters for Mz */}
+          <div className="px-5 py-3 border-b border-orange-100 dark:border-slate-700 bg-white dark:bg-slate-800 flex justify-end items-center text-sm">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-500 whitespace-nowrap text-xs">ชั้นปี:</span>
               <select 
                 value={filterLevelMz} 
                 onChange={e => setFilterLevelMz(e.target.value)} 
-                className="px-3 py-1.5 border border-orange-200 dark:border-slate-600 rounded-lg w-full sm:w-auto outline-none focus:border-orange-400 dark:bg-slate-900 dark:text-white"
+                className="px-3 py-1.5 border border-orange-200 dark:border-slate-600 rounded-lg outline-none focus:border-orange-400 dark:bg-slate-900 dark:text-white text-xs font-semibold shadow-sm"
               >
                 <option value="ทั้งหมด">- ทุกชั้นปี -</option>
                 {levelsOptions.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
