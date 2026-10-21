@@ -1707,8 +1707,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                       type="text" 
                       value={searchUser} 
                       onChange={e => setSearchUser(e.target.value)} 
-                      placeholder="พิมพ์ชื่อ หรือ Username..." 
-                      className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border outline-none dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                      placeholder={filterUserRole === "PARENT" ? "พิมพ์ชื่อนักเรียนหรือรหัสนักเรียน..." : "พิมพ์ชื่อ หรือ Username..."} 
+                      className={`rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border outline-none dark:bg-gray-800 dark:border-gray-600 dark:text-white transition-all ${filterUserRole === "PARENT" ? "w-64" : "w-48 sm:w-56"}`}
                     />
                   </div>
                   {filterUserRole === "STUDENT" && (
