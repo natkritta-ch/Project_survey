@@ -1,17 +1,110 @@
 "use client";
 
-import { useState } from "react";
-import { Search, BookOpen, ChevronDown } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, BookOpen, ChevronDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, AlertTriangle, ShieldCheck } from "lucide-react";
 
 export default function AttendanceHistory({ attendances, subjects, schedules }: { attendances: any[], subjects: any[], schedules?: any[] }) {
+  // ค่าเริ่มต้นเป็นรายสัปดาห์ (Weekly View) ตามที่ผู้ใช้กำหนด
+  const [viewMode, setViewMode] = useState<"week" | "all">("week");
+  const [weekOffset, setWeekOffset] = useState<number>(0); // 0 = สัปดาห์ปัจจุบัน, -1 = สัปดาห์ก่อนหน้า, +1 = สัปดาห์ถัดไป
+
   const [filterSubject, setFilterSubject] = useState("all");
   const [isSubjectDropdownOpen, setIsSubjectDropdownOpen] = useState(false);
   const [subjectSearch, setSubjectSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterDate, setFilterDate] = useState("");
 
+  // คำนวณช่วงวันจันทร์ - วันอาทิตย์ ของสัปดาห์ตามเวลาประเทศไทย (Asia/Bangkok)
+  const currentWeek = useMemo(() => {
+    const now = new Date();
+    const bkkDateStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }); // "YYYY-MM-DD"
+    const [y, m, d] = bkkDateStr.split("-").map(Number);
+    const baseDate = new Date(y, m - 1, d);
+
+    // 0 = อาทิตย์, 1 = จันทร์ ... 6 = เสาร์
+    const dayOfWeek = baseDate.getDay();
+    // แปลงให้จันทร์เป็นจุดเริ่มต้น (จันทร์ = 0, อาทิตย์ = 6)
+    const distanceToMon = (dayOfWeek + 6) % 7;
+
+    const monday = new Date(baseDate);
+    monday.setDate(baseDate.getDate() - distanceToMon + (weekOffset * 7));
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const monStr = monday.toLocaleDateString("en-CA");
+    const sunStr = sunday.toLocaleDateString("en-CA");
+
+    const monFormatted = monday.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+    const sunFormatted = sunday.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+
+    return {
+      monStr,
+      sunStr,
+      monFormatted,
+      sunFormatted,
+      label: `${monFormatted} - ${sunFormatted}`
+    };
+  }, [weekOffset]);
+
+  // ประวัติการเข้าเรียนทั้งหมดของสัปดาห์นี้ (ใช้สำหรับคำนวณสถิติสรุปประจำสัปดาห์)
+  const weekAllRecords = useMemo(() => {
+    return attendances.filter(r => {
+      const dStr = new Date(r.timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+      return dStr >= currentWeek.monStr && dStr <= currentWeek.sunStr;
+    });
+  }, [attendances, currentWeek]);
+
+  // สถิติสรุปประจำสัปดาห์
+  const weekStats = useMemo(() => {
+    const classRecords = weekAllRecords.filter(r => r.subjectId || r.subject);
+    const assemblyRecords = weekAllRecords.filter(r => !r.subjectId && !r.subject);
+
+    const presents = classRecords.filter(r => r.status === "PRESENT").length;
+    const lates = classRecords.filter(r => r.status === "LATE").length;
+    const absents = classRecords.filter(r => r.status === "ABSENT").length;
+    const leaves = classRecords.filter(r => r.status === "LEAVE_PERSONAL" || r.status === "LEAVE_SICK").length;
+
+    // รวบรวมวิชาที่ขาดเรียนในสัปดาห์นี้เพื่อแสดงเตือนให้นักเรียนทราบชัดเจน
+    const absentSubjectsMap = new Map<string, { code: string; name: string; count: number }>();
+    classRecords.filter(r => r.status === "ABSENT").forEach(r => {
+      const sub = r.subject;
+      if (sub) {
+        const existing = absentSubjectsMap.get(sub.id) || { code: sub.code, name: sub.name, count: 0 };
+        existing.count += 1;
+        absentSubjectsMap.set(sub.id, existing);
+      }
+    });
+
+    // จำนวนวันที่เข้าแถวหน้าเสาธงในสัปดาห์นี้
+    const assemblyDaysAttended = new Set(
+      assemblyRecords
+        .filter(r => ["PRESENT", "LATE"].includes(r.status))
+        .map(r => new Date(r.timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }))
+    ).size;
+
+    return {
+      totalClasses: classRecords.length,
+      presents,
+      lates,
+      absents,
+      leaves,
+      absentSubjects: Array.from(absentSubjectsMap.values()),
+      assemblyDaysAttended
+    };
+  }, [weekAllRecords]);
+
   let filtered = attendances;
 
+  // 1. กรองสัปดาห์ (ถ้าเลือกมุมมองรายสัปดาห์ และไม่ได้เลือกตัวกรองวันที่เฉพาะเจาะจง)
+  if (viewMode === "week" && !filterDate) {
+    filtered = filtered.filter(r => {
+      const dStr = new Date(r.timestamp).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+      return dStr >= currentWeek.monStr && dStr <= currentWeek.sunStr;
+    });
+  }
+
+  // 2. กรองวิชา
   if (filterSubject !== "all") {
     if (filterSubject === "assembly") {
       filtered = filtered.filter(r => !r.subject);
@@ -20,15 +113,15 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
     }
   }
 
+  // 3. กรองสถานะ
   if (filterStatus !== "all") {
     filtered = filtered.filter(r => r.status === filterStatus);
   }
 
+  // 4. กรองวันที่เฉพาะเจาะจง
   if (filterDate) {
-    // Fix #7: เปรียบเทียบ date string โดยแปลง timestamp เป็น Thai timezone ก่อน
-    // new Date("2025-01-15") จะ parse เป็น UTC midnight ซึ่งต่างจาก local time +7 ชั่วโมง
     filtered = filtered.filter(r => {
-      const thaiDateStr = new Date(r.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); // คืน YYYY-MM-DD
+      const thaiDateStr = new Date(r.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
       return thaiDateStr === filterDate;
     });
   }
@@ -252,6 +345,120 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
              )}
            </div>
         </div>
+      </div>
+
+      {/* 📊 หัวข้อและแถบสรุปรายสัปดาห์ (Weekly View Section) ตามที่ผู้ใช้กำหนด */}
+      <div className="mb-6 pt-2 pb-1 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-indigo-500" />
+              {viewMode === "week" ? "ประวัติเข้าเรียนรายสัปดาห์" : "ประวัติเข้าเรียนทั้งหมด"}
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              {viewMode === "week" ? (
+                <>
+                  ช่วงวันที่ <strong className="text-gray-700 dark:text-gray-200">{currentWeek.label}</strong>
+                  {weekOffset === 0 && <span className="ml-1.5 text-indigo-600 dark:text-indigo-400 font-bold">(สัปดาห์ปัจจุบัน)</span>}
+                </>
+              ) : (
+                "แสดงรายการประวัติการเข้าเรียนทั้งหมดตั้งแต่ต้นภาคเรียน"
+              )}
+            </p>
+          </div>
+
+          {/* สวิตช์สลับมุมมองและปุ่มเลื่อนสัปดาห์ */}
+          <div className="flex flex-wrap items-center gap-2">
+            {viewMode === "week" ? (
+              <>
+                <div className="inline-flex items-center rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-1 shadow-2xs">
+                  <button
+                    onClick={() => setWeekOffset(prev => prev - 1)}
+                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 transition"
+                    title="สัปดาห์ก่อนหน้า"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setWeekOffset(0)}
+                    className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${
+                      weekOffset === 0
+                        ? "bg-indigo-50 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300 font-bold"
+                        : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    }`}
+                  >
+                    สัปดาห์นี้
+                  </button>
+                  <button
+                    onClick={() => setWeekOffset(prev => prev + 1)}
+                    className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 transition"
+                    title="สัปดาห์ถัดไป"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => setViewMode("all")}
+                  className="text-xs font-medium px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                >
+                  ดูทั้งหมดทั้งเทอม
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => { setViewMode("week"); setWeekOffset(0); }}
+                className="text-xs font-bold px-3 py-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition flex items-center gap-1.5 shadow-2xs"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                กลับสู่มุมมองรายสัปดาห์
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* กล่องสรุปย่อประจำสัปดาห์ (Weekly Stat Chips) */}
+        {viewMode === "week" && (
+          <div className="space-y-3 pb-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              <div className="p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800/50 rounded-xl">
+                <span className="text-[11px] font-bold text-green-700 dark:text-green-300 block">มาเรียน</span>
+                <span className="text-xl font-extrabold text-green-800 dark:text-green-200">{weekStats.presents} คาบ</span>
+              </div>
+              <div className={`p-3 rounded-xl border transition-all ${
+                weekStats.absents > 0 
+                  ? "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800 ring-1 ring-red-400/20" 
+                  : "bg-gray-50 dark:bg-gray-800/40 border-gray-200 dark:border-gray-700"
+              }`}>
+                <span className={`text-[11px] font-bold block ${weekStats.absents > 0 ? "text-red-700 dark:text-red-300" : "text-gray-500"}`}>ขาดเรียน</span>
+                <span className={`text-xl font-extrabold ${weekStats.absents > 0 ? "text-red-600 dark:text-red-400" : "text-gray-700 dark:text-gray-300"}`}>{weekStats.absents} คาบ</span>
+              </div>
+              <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800/50 rounded-xl">
+                <span className="text-[11px] font-bold text-orange-700 dark:text-orange-300 block">มาสาย</span>
+                <span className="text-xl font-extrabold text-orange-800 dark:text-orange-200">{weekStats.lates} คาบ</span>
+              </div>
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800/50 rounded-xl">
+                <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 block">ลากิจ/ป่วย</span>
+                <span className="text-xl font-extrabold text-blue-800 dark:text-blue-200">{weekStats.leaves} คาบ</span>
+              </div>
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/50 rounded-xl col-span-2 sm:col-span-1">
+                <span className="text-[11px] font-bold text-amber-700 dark:text-amber-300 block">เข้าแถวหน้าเสาธง</span>
+                <span className="text-xl font-extrabold text-amber-800 dark:text-amber-200">{weekStats.assemblyDaysAttended} วัน</span>
+              </div>
+            </div>
+
+            {/* แถบแจ้งเตือนพิเศษหากสัปดาห์นี้มีการขาดเรียน */}
+            {weekStats.absents > 0 && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 rounded-xl flex items-center gap-2.5 text-xs text-rose-800 dark:text-rose-200">
+                <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+                <div>
+                  <strong className="font-bold">สัปดาห์นี้มีรายการขาดเรียน:</strong>{" "}
+                  {weekStats.absentSubjects.map(s => `[${s.code}] ${s.name} (${s.count} คาบ)`).join(", ")}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* List */}

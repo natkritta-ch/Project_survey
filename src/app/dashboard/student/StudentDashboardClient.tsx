@@ -7,6 +7,7 @@ import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
 import { User, Users, Calendar, Clock, BookOpen, Menu, X, Settings, Camera, GraduationCap, Phone, MapPin, Sparkles } from "lucide-react";
 import { showError, showToast, showConfirm } from "@/lib/alerts";
+import StudentDailyLiveStatus from "../../../components/StudentDailyLiveStatus";
 
 export default function StudentDashboardClient({
   session,
@@ -184,53 +185,13 @@ export default function StudentDashboardClient({
                 <p className="text-muted-foreground text-sm md:text-base">ตรวจสอบข้อมูลส่วนตัวและจัดการการผูกบัญชีผู้ปกครอง</p>
               </div>
 
-              {/* แจ้งเตือนคลาสสอนชดเชยวันนี้ */}
-              {todaysMakeups.length > 0 && (
-                <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border-2 border-amber-400 dark:border-amber-600 shadow-sm animate-in fade-in">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-amber-500 text-white shadow-xs">
-                        <Sparkles className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-extrabold text-base sm:text-lg text-amber-950 dark:text-amber-100 flex items-center gap-2">
-                          วันนี้คุณมีคลาสสอนชดเชย!
-                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500 text-white">
-                            {todaysMakeups.length} วิชา
-                          </span>
-                        </h3>
-                        <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
-                          มีกำหนดการสอนชดเชยในวันนี้ กรุณาตรวจสอบเวลาและห้องเรียน
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setActiveTab("schedule")}
-                      className="self-start sm:self-auto text-xs font-bold px-3.5 py-2 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl transition shadow-xs flex items-center gap-1.5"
-                    >
-                      <Calendar className="w-3.5 h-3.5" />
-                      ดูตารางเรียน →
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                    {todaysMakeups.map((mc: any) => (
-                      <div key={mc.id} className="p-3 bg-white/90 dark:bg-gray-900/90 rounded-xl border border-amber-200 dark:border-amber-900/60 flex items-center justify-between shadow-2xs">
-                        <div className="min-w-0 pr-2">
-                          <p className="font-bold text-sm text-foreground truncate">{mc.subject?.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            ห้อง: <strong className="text-foreground">{mc.subject?.room || "-"}</strong>
-                            {mc.subject?.teacher?.name && ` • อ.${mc.subject.teacher.name}`}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800">
-                          {mc.startTime} - {mc.endTime} น.
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* 🌟 การ์ดสถานะการเรียนและเข้าแถววันนี้แบบ Real-time (ตามที่ผู้ใช้กำหนด) */}
+              <StudentDailyLiveStatus 
+                mySchedules={mySchedules}
+                makeupClasses={makeupClasses}
+                attendances={attendances}
+                onNavigateToSchedule={() => setActiveTab("schedule")}
+              />
 
               <div className="bg-card p-6 rounded-2xl shadow-sm border border-border mb-8 transition-shadow hover:shadow-md">
                 <h3 className="font-bold text-lg mb-5 text-foreground flex items-center gap-2">
