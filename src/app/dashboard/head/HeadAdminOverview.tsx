@@ -165,18 +165,21 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
 
   // Assembly Stats
   const assemblyStats = useMemo(() => {
-    let allAssemblyLogs = users.filter((u: any) => u.role === "STUDENT").flatMap((s: any) => s.attendances?.filter((a: any) => a.type === "assembly" || !a.subjectId) || []);
+    const rawLogs = users.filter((u: any) => u.role === "STUDENT").flatMap((s: any) => s.attendances?.filter((a: any) => a.type === "assembly" || !a.subjectId) || []);
     
+    let filteredLogs = rawLogs;
     if (assemblyStartDate) {
       const start = new Date(assemblyStartDate).getTime();
-      allAssemblyLogs = allAssemblyLogs.filter((a: any) => new Date(a.timestamp).getTime() >= start);
+      const logsAfter = filteredLogs.filter((a: any) => new Date(a.timestamp).getTime() >= start);
+      if (logsAfter.length > 0) filteredLogs = logsAfter;
     }
     if (assemblyEndDate) {
       const end = new Date(assemblyEndDate).getTime() + 86399999;
-      allAssemblyLogs = allAssemblyLogs.filter((a: any) => new Date(a.timestamp).getTime() <= end);
+      const logsBefore = filteredLogs.filter((a: any) => new Date(a.timestamp).getTime() <= end);
+      if (logsBefore.length > 0) filteredLogs = logsBefore;
     }
 
-    const uniqueAssemblyDates = new Set(allAssemblyLogs.map((a: any) => 
+    const uniqueAssemblyDates = new Set(filteredLogs.map((a: any) => 
       new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' })
     ));
     const totalDays = uniqueAssemblyDates.size;
@@ -188,11 +191,13 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
       let myAsmLogs = (s.attendances || []).filter((a: any) => (!a.subjectId || a.type === "assembly"));
       if (assemblyStartDate) {
         const start = new Date(assemblyStartDate).getTime();
-        myAsmLogs = myAsmLogs.filter((a: any) => new Date(a.timestamp).getTime() >= start);
+        const logsAfter = myAsmLogs.filter((a: any) => new Date(a.timestamp).getTime() >= start);
+        if (logsAfter.length > 0) myAsmLogs = logsAfter;
       }
       if (assemblyEndDate) {
         const end = new Date(assemblyEndDate).getTime() + 86399999;
-        myAsmLogs = myAsmLogs.filter((a: any) => new Date(a.timestamp).getTime() <= end);
+        const logsBefore = myAsmLogs.filter((a: any) => new Date(a.timestamp).getTime() <= end);
+        if (logsBefore.length > 0) myAsmLogs = logsBefore;
       }
 
       if (totalDays === 0) return;
@@ -212,7 +217,8 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
 
       const presents = Array.from(dayStatusMap.values()).filter((status: string) => ["PRESENT", "LATE"].includes(status)).length;
       const percent = Math.round((presents / totalDays) * 100);
-      if (percent < 60) {
+      // เกณฑ์ สอศ. ม.ผ. คือเวลาเข้าร่วม < 80%
+      if (percent < 80) {
         failedCount++;
         failingStudentsList.push({ ...s, percent, presents });
       }
@@ -243,15 +249,6 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
     students.forEach(s => {
       const subjAbsents: Record<string, number> = {};
       (s.attendances || []).filter((a: any) => a.subjectId && termSubjectIds.has(a.subjectId)).forEach((a: any) => {
-        if (assemblyStartDate) {
-          const start = new Date(assemblyStartDate).getTime();
-          if (new Date(a.timestamp).getTime() < start) return;
-        }
-        if (assemblyEndDate) {
-          const end = new Date(assemblyEndDate).getTime() + 86399999;
-          if (new Date(a.timestamp).getTime() > end) return;
-        }
-
         if (a.status === "ABSENT") {
           subjAbsents[a.subjectId] = (subjAbsents[a.subjectId] || 0) + 1;
         }
@@ -280,7 +277,7 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
     khorRorStudentsList.sort((a, b) => b.maxAbsents - a.maxAbsents);
 
     return { khorRorCount, warningCount, khorRorStudentsList };
-  }, [students, subjects, currentSelectedTerm, assemblyStartDate, assemblyEndDate]);
+  }, [students, subjects, currentSelectedTerm]);
 
   const displayKr = useMemo(() => subjectStats.khorRorStudentsList.filter((st: any) => {
     if (filterSubjectKr !== "ทั้งหมด" && st.subjectName !== filterSubjectKr) return false;
@@ -532,7 +529,7 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
               <div className="p-2 bg-orange-100 text-orange-600 rounded-full dark:bg-orange-900/40">
                 <BadgeCheck className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-orange-900 dark:text-orange-200 text-lg">รายชื่อนักเรียนติด มผ. (เข้าแถว {"<"} 60%)</h3>
+              <h3 className="font-bold text-orange-900 dark:text-orange-200 text-lg">รายชื่อนักเรียนติด มผ. (เข้าแถว {"<"} 80%)</h3>
             </div>
             <div className="flex items-center gap-2">
               <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold shadow-sm whitespace-nowrap">

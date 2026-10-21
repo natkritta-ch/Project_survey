@@ -253,18 +253,53 @@ export default async function TeacherDashboard() {
         }
       });
 
+      // หาจำนวนวันเข้าแถวหน้าเสาธงทั้งหมดที่มีการบันทึกในระบบของระดับชั้นที่ครูดูแล
+      const allClassAssemblyLogs = await prisma.attendance.findMany({
+        where: {
+          type: "assembly",
+          student: { level: { in: advisedLevels }, deletedAt: null }
+        },
+        select: { timestamp: true }
+      });
+      const uniqueClassAssemblyDates = new Set(
+        allClassAssemblyLogs.map(a => new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }))
+      );
+      const totalClassAssemblyDays = uniqueClassAssemblyDates.size;
+
       const processedAdvisedStudents = rawAdvisedStudents.map((st: any) => {
         const atts = st.attendances || [];
 
         // 1. แยกการเข้าแถวหน้าเสาธง (Assembly)
         const assemblyAtts = atts.filter((a: any) => a.type === "assembly");
-        const assemblyTotal = assemblyAtts.length;
-        const assemblyPresents = assemblyAtts.filter((a: any) => ["PRESENT", "LATE"].includes(a.status)).length;
-        const assemblyAbsents = assemblyAtts.filter((a: any) => a.status === "ABSENT").length;
-        const assemblyLeaves = assemblyAtts.filter((a: any) => ["LEAVE_PERSONAL", "LEAVE_SICK"].includes(a.status)).length;
-        const assemblyPercent = assemblyTotal > 0 ? Math.round((assemblyPresents / assemblyTotal) * 100) : 100;
-        // เสี่ยง ม.ผ. = ขาดแถว >= 4 ครั้ง หรือ เวลาเข้าร่วม < 80%
-        const isAssemblyAtRisk = assemblyTotal > 0 && (assemblyAbsents >= 4 || (assemblyAbsents / assemblyTotal) >= 0.20 || assemblyPercent < 80);
+        
+        // จัดกลุ่มวันเข้าแถวของนักเรียนคนนี้ เพื่อป้องกันการนับซ้ำในวันเดียวกัน
+        const studentAssemblyDayMap = new Map<string, string>();
+        assemblyAtts.forEach((a: any) => {
+          const dStr = new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+          if (!studentAssemblyDayMap.has(dStr)) {
+            studentAssemblyDayMap.set(dStr, a.status);
+          } else {
+            const prev = studentAssemblyDayMap.get(dStr);
+            if (prev !== 'PRESENT' && a.status === 'PRESENT') studentAssemblyDayMap.set(dStr, a.status);
+            else if (prev === 'ABSENT' && a.status === 'LATE') studentAssemblyDayMap.set(dStr, a.status);
+          }
+        });
+
+        const assemblyPresents = Array.from(studentAssemblyDayMap.values()).filter(status => ["PRESENT", "LATE"].includes(status)).length;
+        const assemblyLeaves = Array.from(studentAssemblyDayMap.values()).filter(status => ["LEAVE_PERSONAL", "LEAVE_SICK"].includes(status)).length;
+        
+        // ฐานจำนวนวันเข้าแถว: ใช้วันเปิดเช็คแถวของห้อง/ระดับชั้น ถ้าไม่มีให้ใช้วันของนักเรียน
+        const effectiveTotalDays = totalClassAssemblyDays > 0 ? totalClassAssemblyDays : studentAssemblyDayMap.size;
+        
+        // จำนวนวันที่ขาด = วันที่เปิดเช็คทั้งหมด - วันที่มา - วันที่ลา
+        const assemblyAbsents = Math.max(0, effectiveTotalDays - assemblyPresents - assemblyLeaves);
+        
+        // คำนวณเปอร์เซ็นต์จริง
+        const hasAssemblyRecords = effectiveTotalDays > 0;
+        const assemblyPercent = hasAssemblyRecords ? Math.round((assemblyPresents / effectiveTotalDays) * 100) : 0;
+        
+        // เสี่ยง ม.ผ. ตามเกณฑ์ สอศ. (เวลาเข้าร่วม < 80% หรือ ขาด >= 4 ครั้ง หรือ ขาด >= 20%)
+        const isAssemblyAtRisk = hasAssemblyRecords && (assemblyAbsents >= 4 || (effectiveTotalDays > 0 && (assemblyAbsents / effectiveTotalDays) >= 0.20) || assemblyPercent < 80);
 
         // 2. แยกวิชาเรียนรายวิชา (Class)
         const classAtts = atts.filter((a: any) => a.type === "class");
@@ -361,7 +396,7 @@ export default async function TeacherDashboard() {
             phone: l.parent?.phone || null
           })),
           assemblySummary: {
-            total: assemblyTotal,
+            total: effectiveTotalDays,
             presents: assemblyPresents,
             absents: assemblyAbsents,
             leaves: assemblyLeaves,

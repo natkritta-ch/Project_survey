@@ -672,23 +672,29 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
                       {/* การเข้าแถวหน้าเสาธง (ม.ผ.) */}
                       <td className="py-3 px-4">
                         <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5">
-                            <span className={`font-bold ${isAssemblyRisk ? "text-rose-600 font-black" : "text-gray-800 dark:text-gray-200"}`}>
-                              {st.assemblySummary?.percent ?? 100}%
-                            </span>
-                            {isAssemblyRisk ? (
-                              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                                ⚠️ เสี่ยง ม.ผ.
+                          {st.assemblySummary && st.assemblySummary.total > 0 ? (
+                            <>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`font-bold ${isAssemblyRisk ? "text-rose-600 font-black" : "text-gray-800 dark:text-gray-200"}`}>
+                                  {st.assemblySummary.percent}%
+                                </span>
+                                {isAssemblyRisk ? (
+                                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                                    ⚠️ เสี่ยง ม.ผ.
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                    ✓ ผ่าน
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] text-gray-400">
+                                มา {st.assemblySummary.presents} • ขาด {st.assemblySummary.absents} • ลา {st.assemblySummary.leaves}
                               </span>
-                            ) : (
-                              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                                ✓ ผ่าน
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[10px] text-gray-400">
-                            มา {st.assemblySummary?.presents ?? 0} • ขาด {st.assemblySummary?.absents ?? 0} • ลา {st.assemblySummary?.leaves ?? 0}
-                          </span>
+                            </>
+                          ) : (
+                            <span className="text-gray-400 text-xs italic">ยังไม่มีการเช็คชื่อ</span>
+                          )}
                         </div>
                       </td>
 
@@ -824,22 +830,34 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
               <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                 <div>
                   <span className="text-[11px] text-gray-500 block">การเข้าแถวหน้าเสาธง</span>
-                  <div className="flex items-baseline gap-1 mt-0.5">
-                    <span className="text-lg font-black text-gray-900 dark:text-white">
-                      {selectedStudentForDetail.assemblySummary?.percent ?? 100}%
-                    </span>
-                    <span className="text-[11px] text-gray-400">
-                      (มา {selectedStudentForDetail.assemblySummary?.presents ?? 0} / ขาด {selectedStudentForDetail.assemblySummary?.absents ?? 0})
-                    </span>
-                  </div>
+                  {selectedStudentForDetail.assemblySummary && selectedStudentForDetail.assemblySummary.total > 0 ? (
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-lg font-black text-gray-900 dark:text-white">
+                        {selectedStudentForDetail.assemblySummary.percent}%
+                      </span>
+                      <span className="text-[11px] text-gray-400">
+                        (มา {selectedStudentForDetail.assemblySummary.presents} / ขาด {selectedStudentForDetail.assemblySummary.absents} / ลา {selectedStudentForDetail.assemblySummary.leaves})
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic mt-0.5">
+                      ยังไม่มีการเช็คชื่อ
+                    </div>
+                  )}
                 </div>
-                {selectedStudentForDetail.assemblySummary?.isAtRisk ? (
-                  <span className="px-2 py-1 rounded-xl text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                    ⚠️ เสี่ยง ม.ผ.
-                  </span>
+                {selectedStudentForDetail.assemblySummary && selectedStudentForDetail.assemblySummary.total > 0 ? (
+                  selectedStudentForDetail.assemblySummary.isAtRisk ? (
+                    <span className="px-2 py-1 rounded-xl text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                      ⚠️ เสี่ยง ม.ผ.
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                      ✓ ผ่าน
+                    </span>
+                  )
                 ) : (
-                  <span className="px-2 py-1 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                    ✓ ผ่าน
+                  <span className="px-2 py-1 rounded-xl text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                    ยังไม่มีข้อมูล
                   </span>
                 )}
               </div>
