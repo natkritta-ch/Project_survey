@@ -273,15 +273,24 @@ export default async function TeacherDashboard() {
         const assemblyAtts = atts.filter((a: any) => a.type === "assembly");
         
         // จัดกลุ่มวันเข้าแถวของนักเรียนคนนี้ เพื่อป้องกันการนับซ้ำในวันเดียวกัน
+        // ลำดับความสำคัญ: PRESENT (1) > LATE (2) > LEAVE (3) > ABSENT (4)
+        const getPriority = (s: string) => {
+          if (s === "PRESENT") return 1;
+          if (s === "LATE") return 2;
+          if (s && s.startsWith("LEAVE")) return 3;
+          return 4;
+        };
+
         const studentAssemblyDayMap = new Map<string, string>();
         assemblyAtts.forEach((a: any) => {
           const dStr = new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
           if (!studentAssemblyDayMap.has(dStr)) {
             studentAssemblyDayMap.set(dStr, a.status);
           } else {
-            const prev = studentAssemblyDayMap.get(dStr);
-            if (prev !== 'PRESENT' && a.status === 'PRESENT') studentAssemblyDayMap.set(dStr, a.status);
-            else if (prev === 'ABSENT' && a.status === 'LATE') studentAssemblyDayMap.set(dStr, a.status);
+            const prev = studentAssemblyDayMap.get(dStr)!;
+            if (getPriority(a.status) < getPriority(prev)) {
+              studentAssemblyDayMap.set(dStr, a.status);
+            }
           }
         });
 
@@ -348,7 +357,8 @@ export default async function TeacherDashboard() {
         // คำนวณเปอร์เซ็นต์และเกณฑ์ เสี่ยง ข.ร. แต่ละวิชา
         const subjectsSummary = Array.from(subjectMap.values()).map((s: any) => {
           const pct = s.total > 0 ? Math.round((s.presents / s.total) * 100) : 0;
-          const isAtRisk = s.total > 0 && (s.absents >= 4 || (s.absents / s.total) >= 0.20 || pct < 80);
+          // เสี่ยง ข.ร. ตามเกณฑ์ สอศ. (ขาดเรียน >= 4 ครั้ง หรือ เตือนเมื่อขาด >= 3 ครั้ง / ขาด >= 20% โดยไม่รวมการลากิจลาป่วยที่มีใบลา)
+          const isAtRisk = s.total > 0 && (s.absents >= 3 || (s.total >= 5 && (s.absents / s.total) >= 0.20));
           return {
             ...s,
             percent: pct,

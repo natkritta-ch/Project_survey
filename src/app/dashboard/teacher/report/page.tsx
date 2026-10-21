@@ -90,15 +90,24 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
       // 3. ปั้นข้อมูลเข้าตาราง (กฎ ผ. / มผ.)
       summaryData = students.map(st => {
         // จัดกลุ่มประวัติตามวันที่ในเวลาไทย เพื่อป้องกันการนับซ้ำในวันเดียวกัน
+        // ลำดับความสำคัญ: PRESENT (1) > LATE (2) > LEAVE (3) > ABSENT (4)
+        const getPriority = (s: string) => {
+          if (s === "PRESENT") return 1;
+          if (s === "LATE") return 2;
+          if (s && s.startsWith("LEAVE")) return 3;
+          return 4;
+        };
+
         const dayStatusMap = new Map<string, string>();
         st.attendances.forEach((a: any) => {
           const dStr = new Date(a.timestamp).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
           if (!dayStatusMap.has(dStr)) {
             dayStatusMap.set(dStr, a.status);
           } else {
-            const prev = dayStatusMap.get(dStr);
-            if (prev !== 'PRESENT' && a.status === 'PRESENT') dayStatusMap.set(dStr, a.status);
-            else if (prev === 'ABSENT' && a.status === 'LATE') dayStatusMap.set(dStr, a.status);
+            const prev = dayStatusMap.get(dStr)!;
+            if (getPriority(a.status) < getPriority(prev)) {
+              dayStatusMap.set(dStr, a.status);
+            }
           }
         });
 

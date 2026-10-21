@@ -36,6 +36,7 @@ export async function updateAttendanceStatus(id: string, status: string, remark?
   }
   
   revalidatePath("/dashboard/teacher/report");
+  revalidatePath("/dashboard/teacher");
   revalidatePath("/dashboard/student");
   revalidatePath("/dashboard/parent");
   revalidatePath("/dashboard/head");
