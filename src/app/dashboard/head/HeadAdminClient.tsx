@@ -32,7 +32,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [teacherSearchQuery, setTeacherSearchQuery] = useState("");
   const [isSubjectSuggestOpen, setIsSubjectSuggestOpen] = useState(false);
   const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
-  const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
+  const [filterLevel, setFilterLevel] = useState("ปวช.1");
   const levelsOptions = ["ปวช.1", "ปวช.2", "ปวช.3", "ปวส.1", "ปวส.2", "ปวส.1(ม.6)", "ปวส.2(ม.6)", "ไม่ระบุ"];
   const groupOptions = ["ก.1", "ก.2", "ก.1,2"];
   const roomOptions: Record<string, string[]> = {
@@ -46,8 +46,13 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const teachers = users.filter(u => u.role === "TEACHER" || u.role === "HEAD");
 
   // ---------- Schedules State ----------
+  const currentTermConfig = termConfigs.find((t: any) => t.isCurrent) || termConfigs[0];
+  const [schedFilterTermConfigId, setSchedFilterTermConfigId] = useState<string>(
+    currentTermConfig ? currentTermConfig.id : "all"
+  );
   const [schedFilterLevel, setSchedFilterLevel] = useState("ปวช.1");
   const [schedFilterGroup, setSchedFilterGroup] = useState("ทั้งหมด");
+  const [isAddScheduleOpen, setIsAddScheduleOpen] = useState(false);
   const [schedId, setSchedId] = useState("");
   const [schedSubjId, setSchedSubjId] = useState("");
   const [schedDay, setSchedDay] = useState("1");
@@ -177,6 +182,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       } else {
         await createSchedule({ subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
         showToast("เพิ่มคาบเรียนลงในตารางสำเร็จ", "success");
+        setIsAddScheduleOpen(false);
       }
       resetScheduleForm();
     } catch (err: any) {
@@ -413,6 +419,10 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     }
   };
 
+  const selectedSchedTermConfig = termConfigs.find((t: any) => t.id === schedFilterTermConfigId);
+  const targetSchedTerm = selectedSchedTermConfig ? selectedSchedTermConfig.term : (schedFilterTermConfigId === "all" ? null : null);
+  const targetSchedYear = selectedSchedTermConfig ? selectedSchedTermConfig.academicYear : (schedFilterTermConfigId === "all" ? null : null);
+
   const displaySubjects = filterLevel === "ทั้งหมด" ? activeSubjects : activeSubjects.filter(s => s.level === filterLevel);
   const displaySchedules = activeSchedules.filter(sc => {
     if (schedFilterLevel !== "ทั้งหมด" && (sc.subject?.level || "ไม่ระบุ") !== schedFilterLevel) return false;
@@ -420,6 +430,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       const grp = sc.subject?.group || "";
       if (grp !== schedFilterGroup && !grp.includes(schedFilterGroup)) return false;
     }
+    if (targetSchedTerm && sc.subject?.term && sc.subject.term !== targetSchedTerm) return false;
+    if (targetSchedYear && sc.subject?.academicYear && sc.subject.academicYear !== targetSchedYear) return false;
     return true;
   });
   const displayUsers = activeUsers.filter(u => {
@@ -810,7 +822,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 <span className="text-sm dark:text-gray-300 whitespace-nowrap flex-shrink-0">ตัวกรองชั้นปี:</span>
                 <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border">
                   <option value="ทั้งหมด">ทั้งหมด</option>
-                  {levelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
+                  {levelsOptions.map(l => <option key={l} value={l}>{l}{l === "ปวช.1" ? " (ค่าเริ่มต้น)" : ""}</option>)}
                 </select>
               </div>
             </div>
@@ -890,23 +902,47 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         {/* ================= Schedules Tab ================= */}
         {activeTab === "schedules" && (
           <div className="space-y-6">
-            <div className="flex justify-between items-center bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-800">
               <div>
                 <h3 className="text-lg font-bold text-indigo-900 dark:text-indigo-300">จัดการตารางเรียนแยกตามชั้นปี</h3>
-                <p className="text-sm text-indigo-700 dark:text-indigo-400">เลือกชั้นปีเพื่อดูและเพิ่มตารางเรียน</p>
+                <p className="text-sm text-indigo-700 dark:text-indigo-400">เลือกภาคเรียนและชั้นปีเพื่อดูและเพิ่มตารางเรียน</p>
               </div>
               <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-gray-800 p-2 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                {/* ภาคเรียน */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">ภาคเรียน:</span>
+                  <select 
+                    value={schedFilterTermConfigId} 
+                    onChange={e => setSchedFilterTermConfigId(e.target.value)} 
+                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2.5 py-1 border font-medium outline-none bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400"
+                  >
+                    {termConfigs.map(tc => (
+                      <option key={tc.id} value={tc.id}>
+                        {tc.isCurrent ? `★ เทอม ${tc.term}/${tc.academicYear} (ปัจจุบัน)` : `เทอม ${tc.term}/${tc.academicYear}`}
+                      </option>
+                    ))}
+                    {termConfigs.length === 0 && (
+                      <option value={`1-${currentBEYear}`}>
+                        เทอม 1/{currentBEYear} (ปัจจุบัน)
+                      </option>
+                    )}
+                    <option value="all">ทุกภาคเรียน</option>
+                  </select>
+                </div>
+                <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+                {/* ชั้นปี */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">ชั้นปี:</span>
-                  <select value={schedFilterLevel} onChange={e => setSchedFilterLevel(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium outline-none">
+                  <select value={schedFilterLevel} onChange={e => setSchedFilterLevel(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium outline-none bg-white dark:bg-gray-700 dark:text-white">
                     {levelsOptions.map(l => <option key={l} value={l}>{l}</option>)}
                     <option value="ทั้งหมด">แสดงทั้งหมด</option>
                   </select>
                 </div>
                 <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+                {/* กลุ่มเรียน */}
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">กลุ่มเรียน:</span>
-                  <select value={schedFilterGroup} onChange={e => setSchedFilterGroup(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium outline-none">
+                  <select value={schedFilterGroup} onChange={e => setSchedFilterGroup(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium outline-none bg-white dark:bg-gray-700 dark:text-white">
                     <option value="ทั้งหมด">ทุกกลุ่มเรียน</option>
                     {groupOptions.map(g => <option key={g} value={g}>กลุ่ม {g}</option>)}
                   </select>
@@ -914,14 +950,66 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 shadow-sm">
-              <h3 className="text-md font-bold mb-4 dark:text-white">เพิ่มวิชาเรียนลงตาราง</h3>
-              <form onSubmit={handleSaveSchedule} className="flex gap-4 items-end flex-wrap">
-                <div className="flex-1 min-w-[250px] relative">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    วิชา {schedFilterLevel !== "ทั้งหมด" ? `(เฉพาะ ${schedFilterLevel}` : "("}
-                    {schedFilterGroup !== "ทั้งหมด" ? ` | กลุ่ม ${schedFilterGroup})` : (schedFilterLevel !== "ทั้งหมด" ? ")" : "ทั้งหมด)")}
-                  </label>
+            {/* เพิ่มวิชาเรียนลงตาราง (Collapsible) */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden transition-all duration-200">
+              <div 
+                onClick={() => setIsAddScheduleOpen(!isAddScheduleOpen)}
+                className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors select-none"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                    isAddScheduleOpen 
+                      ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/60 dark:text-indigo-300' 
+                      : 'bg-indigo-50 text-indigo-600 dark:bg-gray-700 dark:text-indigo-400'
+                  }`}>
+                    <svg className={`w-4 h-4 transition-transform duration-200 ${isAddScheduleOpen ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      เพิ่มวิชาเรียนลงตาราง
+                      {targetSchedTerm && targetSchedYear && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
+                          เทอม {targetSchedTerm}/{targetSchedYear}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {isAddScheduleOpen ? "คลิกเพื่อซ่อนแบบฟอร์ม" : "คลิกเพื่อเปิดแบบฟอร์มจัดคาบเรียนลงในตาราง"}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsAddScheduleOpen(!isAddScheduleOpen);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    isAddScheduleOpen
+                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                  }`}
+                >
+                  <span>{isAddScheduleOpen ? "ซ่อนแบบฟอร์ม" : "+ เพิ่มวิชาเรียนลงตาราง"}</span>
+                  <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddScheduleOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+
+              {isAddScheduleOpen && (
+                <div className="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/40">
+                  <form onSubmit={handleSaveSchedule} className="flex gap-4 items-end flex-wrap">
+                    <div className="flex-1 min-w-[250px] relative">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        วิชา {schedFilterLevel !== "ทั้งหมด" ? `(เฉพาะ ${schedFilterLevel}` : "("}
+                        {schedFilterGroup !== "ทั้งหมด" ? ` | กลุ่ม ${schedFilterGroup}` : ""}
+                        {targetSchedTerm && targetSchedYear ? ` | เทอม ${targetSchedTerm}/${targetSchedYear}` : ""}
+                        {")"}
+                      </label>
                   
                   {isSchedDropdownOpen && (
                     <div className="fixed inset-0 z-40" onClick={() => setIsSchedDropdownOpen(false)}></div>
@@ -972,6 +1060,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                                  const grp = s.group || "";
                                  if (grp !== schedFilterGroup && !grp.includes(schedFilterGroup)) return false;
                                }
+                               if (targetSchedTerm && s.term && s.term !== targetSchedTerm) return false;
+                               if (targetSchedYear && s.academicYear && s.academicYear !== targetSchedYear) return false;
                                if (!schedSearchQuery) return true;
                                const q = schedSearchQuery.toLowerCase();
                                return (
@@ -1086,19 +1176,52 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     </select>
                   </div>
                 </div>
-                <button disabled={isLoading} type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50 font-medium h-[38px] shadow-sm">
-                  {schedId ? "บันทึก" : "เพิ่ม"}
-                </button>
-                {schedId && (
-                  <button type="button" onClick={resetScheduleForm} className="bg-gray-300 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-400 font-medium h-[38px] shadow-sm">
-                    ยกเลิก
+                <div className="flex items-center gap-2">
+                  <button disabled={isLoading} type="submit" className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium text-sm shadow-sm transition">
+                    {schedId ? "บันทึก" : "เพิ่ม"}
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      resetScheduleForm();
+                      setIsAddScheduleOpen(false);
+                    }}
+                    className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium transition"
+                  >
+                    ยกเลิก / ซ่อน
+                  </button>
+                </div>
               </form>
             </div>
+          )}
+        </div>
 
             <div className="space-y-4">
-              <h3 className="text-md font-bold mb-4 dark:text-white">แผนผังตารางเรียน</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-700 pb-3">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">แผนผังตารางเรียน</h3>
+                  {targetSchedTerm && targetSchedYear ? (
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-800 flex items-center gap-1.5 shadow-sm">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                      ภาคเรียนที่ {targetSchedTerm}/{targetSchedYear}
+                    </span>
+                  ) : (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                      แสดงทุกภาคเรียน
+                    </span>
+                  )}
+                  {schedFilterLevel !== "ทั้งหมด" && (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                      ชั้นปี: {schedFilterLevel}
+                    </span>
+                  )}
+                  {schedFilterGroup !== "ทั้งหมด" && (
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                      กลุ่ม: {schedFilterGroup}
+                    </span>
+                  )}
+                </div>
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 {[1, 2, 3, 4, 5].map(day => {
