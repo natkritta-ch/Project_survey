@@ -31,6 +31,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [isTeacherDropdownOpen, setIsTeacherDropdownOpen] = useState(false);
   const [teacherSearchQuery, setTeacherSearchQuery] = useState("");
   const [isSubjectSuggestOpen, setIsSubjectSuggestOpen] = useState(false);
+  const [isAddSubjectOpen, setIsAddSubjectOpen] = useState(false);
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
   const levelsOptions = ["ปวช.1", "ปวช.2", "ปวช.3", "ปวส.1", "ปวส.2", "ปวส.1(ม.6)", "ปวส.2(ม.6)", "ไม่ระบุ"];
   const groupOptions = ["ก.1", "ก.2", "ก.1,2"];
@@ -119,6 +120,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       } else {
         await createSubject(payload);
         showToast("เพิ่มรายวิชาใหม่เรียบร้อยแล้ว", "success");
+        setIsAddSubjectOpen(false);
       }
       resetSubjectForm();
     } catch {
@@ -478,9 +480,53 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         {activeTab === "subjects" && (
           <div className="space-y-6">
             {!isEditSubjectModalOpen && (
-              <>
-              <h3 className="text-lg font-bold dark:text-white">เพิ่มรายวิชาใหม่</h3>
-              <form onSubmit={handleSaveSubject} className="flex gap-4 items-end flex-wrap p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-600">
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden transition-all duration-200">
+                <div 
+                  onClick={() => setIsAddSubjectOpen(!isAddSubjectOpen)}
+                  className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors select-none"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                      isAddSubjectOpen 
+                        ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/60 dark:text-indigo-300' 
+                        : 'bg-indigo-50 text-indigo-600 dark:bg-gray-700 dark:text-indigo-400'
+                    }`}>
+                      <svg className={`w-4 h-4 transition-transform duration-200 ${isAddSubjectOpen ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        เพิ่มรายวิชาใหม่
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {isAddSubjectOpen ? "คลิกเพื่อซ่อนแบบฟอร์ม" : "คลิกเพื่อเปิดแบบฟอร์มเพิ่มรายวิชาใหม่"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsAddSubjectOpen(!isAddSubjectOpen);
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                      isAddSubjectOpen
+                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                    }`}
+                  >
+                    <span>{isAddSubjectOpen ? "ซ่อนแบบฟอร์ม" : "+ เพิ่มรายวิชาใหม่"}</span>
+                    <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddSubjectOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                </div>
+
+                {isAddSubjectOpen && (
+                  <div className="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/40">
+                    <form onSubmit={handleSaveSubject} className="flex gap-4 items-end flex-wrap">
               {/* ช่องรหัสวิชา พร้อม Live Suggestion */}
               <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -736,14 +782,29 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   )}
                 </div>
               </div>
-              <button disabled={isLoading} type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 disabled:opacity-50">
-                เพิ่มวิชา
-              </button>
-            </form>
-            </>
+                      <div className="flex items-center gap-2">
+                        <button disabled={isLoading} type="submit" className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium shadow-sm transition flex items-center gap-1.5">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                          เพิ่มวิชา
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetSubjectForm();
+                            setIsAddSubjectOpen(false);
+                          }}
+                          className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium transition"
+                        >
+                          ยกเลิก / ซ่อน
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
             )}
 
-            <div className="flex justify-between items-end mt-8 border-t pt-6">
+            <div className="flex justify-between items-center mt-2">
               <h3 className="text-lg font-bold dark:text-white">รายวิชาทั้งหมด</h3>
               <div className="flex items-center gap-2">
                 <span className="text-sm dark:text-gray-300 whitespace-nowrap flex-shrink-0">ตัวกรองชั้นปี:</span>
