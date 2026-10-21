@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck, RotateCcw, AlertTriangle, RefreshCw, Key, Copy, Check } from "lucide-react";
+import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck, RotateCcw, AlertTriangle, RefreshCw, Key, Copy, Check, GraduationCap } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm, showPromptNumber } from "@/lib/alerts";
+import TeacherAdvisoryView from "./TeacherAdvisoryView";
 
 export default function TeacherDashboardClient({ 
   schedules, 
@@ -15,7 +16,8 @@ export default function TeacherDashboardClient({
   weeklyStats,
   subjects = [],
   initialMakeupClasses = [],
-  initialTrashedMakeupClasses = []
+  initialTrashedMakeupClasses = [],
+  advisoryData = null
 }: any) {
   const [activeTab, setActiveTab] = useState("overview");
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
@@ -333,8 +335,19 @@ export default function TeacherDashboardClient({
     1: "วันจันทร์", 2: "วันอังคาร", 3: "วันพุธ", 4: "วันพฤหัสบดี", 5: "วันศุกร์", 6: "วันเสาร์", 7: "วันอาทิตย์"
   };
 
+  const pendingTwinsCount = useMemo(() => {
+    if (!advisoryData?.students) return 0;
+    return advisoryData.students.filter((s: any) => s.isTwin && !s.twinVerified).length;
+  }, [advisoryData]);
+
   const tabs = [
     { id: "overview", label: "ภาพรวมวันนี้", icon: <Home className="w-5 h-5" /> },
+    ...(advisoryData && advisoryData.assignments && advisoryData.assignments.length > 0 ? [{
+      id: "advisees",
+      label: "ห้องในที่ปรึกษาของฉัน",
+      icon: <GraduationCap className="w-5 h-5" />,
+      badge: pendingTwinsCount > 0 ? pendingTwinsCount : null
+    }] : []),
     { id: "schedule", label: "ตารางสอนทั้งหมด", icon: <Calendar className="w-5 h-5" /> },
     { id: "students", label: "รายชื่อนักเรียนและผู้ปกครอง", icon: <Users className="w-5 h-5" /> },
     { 
@@ -1166,6 +1179,11 @@ export default function TeacherDashboardClient({
               </div>
             )}
           </div>
+        )}
+
+        {/* Tab 5: Advisees (ห้องในที่ปรึกษาของฉัน) */}
+        {activeTab === "advisees" && advisoryData && (
+          <TeacherAdvisoryView advisoryData={advisoryData} />
         )}
 
       </div>

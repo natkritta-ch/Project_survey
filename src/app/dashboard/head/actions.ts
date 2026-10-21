@@ -419,8 +419,15 @@ export async function advanceAcademicTerm(data: {
   startDate: string;
   endDate: string;
   promoteLevels: boolean;
+  promoteAdvisors?: boolean;
 }) {
   await requireHeadAuth();
+
+  // หาปีการศึกษาเดิมก่อนหน้าเพื่อใช้ในการเลื่อนอาจารย์ที่ปรึกษาตามรุ่น
+  const currentActiveTerm = await prisma.termConfig.findFirst({
+    where: { isCurrent: true }
+  });
+  const previousYear = currentActiveTerm?.academicYear;
 
   const start = new Date(data.startDate);
   const end = new Date(data.endDate);
@@ -488,6 +495,15 @@ export async function advanceAcademicTerm(data: {
 
     if (transactions.length > 0) {
       await prisma.$transaction(transactions);
+    }
+
+    // เลื่อนอาจารย์ที่ปรึกษาตามรุ่นชั้นปี (ถ้าติ๊กเลือก)
+    if (data.promoteAdvisors && previousYear && previousYear !== data.nextYear) {
+      try {
+        await promoteAdvisorsToNextYear(previousYear, data.nextYear);
+      } catch (err) {
+        console.error("Failed to auto-promote advisors:", err);
+      }
     }
   }
 
@@ -573,3 +589,170 @@ export async function getUserDetails(userId: string) {
   });
   return user;
 }
+
+// ================= CLASSROOM ADVISOR MANAGEMENT =================
+
+export async function getClassroomAdvisors(academicYear: string) {
+  await requireHeadAuth();
+  try {
+    const advisors = await (prisma as any).classroomAdvisor.findMany({
+      where: { academicYear },
+      include: {
+        primaryAdvisor: { select: { id: true, name: true, username: true, nickname: true, phone: true } },
+        coAdvisor: { select: { id: true, name: true, username: true, nickname: true, phone: true } }
+      }
+    });
+    return advisors;
+  } catch (e: any) {
+    console.error("Error fetching classroom advisors:", e);
+    return [];
+  }
+}
+
+export async function bulkSaveClassroomAdvisors(
+  academicYear: string,
+  assignments: Array<{
+    level: string;
+    primaryAdvisorId?: string | null;
+    coAdvisorId?: string | null;
+  }>
+) {
+  await requireHeadAuth();
+  
+  for (const item of assignments) {
+    await (prisma as any).classroomAdvisor.upsert({
+      where: {
+        academicYear_level: {
+          academicYear,
+          level: item.level
+        }
+      },
+      update: {
+        primaryAdvisorId: item.primaryAdvisorId || null,
+        coAdvisorId: item.coAdvisorId || null,
+        updatedAt: new Date()
+      },
+      create: {
+        academicYear,
+        level: item.level,
+        primaryAdvisorId: item.primaryAdvisorId || null,
+        coAdvisorId: item.coAdvisorId || null
+      }
+    });
+  }
+
+  revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/teacher");
+  revalidatePath("/dashboard/student");
+  return { success: true };
+}
+
+export async function copyAdvisorsFromPreviousYear(fromYear: string, toYear: string) {
+  await requireHeadAuth();
+  const source = await (prisma as any).classroomAdvisor.findMany({
+    where: { academicYear: fromYear }
+  });
+
+  if (!source || source.length === 0) {
+    throw new Error(`ไม่พบข้อมูลการแต่งตั้งครูที่ปรึกษาของปีการศึกษา ${fromYear}`);
+  }
+
+  for (const item of source) {
+    await (prisma as any).classroomAdvisor.upsert({
+      where: {
+        academicYear_level: {
+          academicYear: toYear,
+          level: item.level
+        }
+      },
+      update: {
+        primaryAdvisorId: item.primaryAdvisorId,
+        coAdvisorId: item.coAdvisorId,
+        updatedAt: new Date()
+      },
+      create: {
+        academicYear: toYear,
+        level: item.level,
+        primaryAdvisorId: item.primaryAdvisorId,
+        coAdvisorId: item.coAdvisorId
+      }
+    });
+  }
+
+  revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/teacher");
+  return { success: true, count: source.length };
+}
+
+export async function promoteAdvisorsToNextYear(fromYear: string, toYear: string) {
+  await requireHeadAuth();
+  const source = await (prisma as any).classroomAdvisor.findMany({
+    where: { academicYear: fromYear }
+  });
+
+  if (!source || source.length === 0) {
+    throw new Error(`ไม่พบข้อมูลการแต่งตั้งครูที่ปรึกษาของปีการศึกษา ${fromYear}`);
+  }
+
+  const levelPromotionMap: Record<string, string> = {
+    "ปวช.1": "ปวช.2",
+    "ปวช.2": "ปวช.3",
+    "ปวส.1": "ปวส.2",
+    "ปวส.1(ม.6)": "ปวส.2(ม.6)"
+  };
+
+  let promotedCount = 0;
+  for (const item of source) {
+    const nextLevel = levelPromotionMap[item.level];
+    if (nextLevel) {
+      await (prisma as any).classroomAdvisor.upsert({
+        where: {
+          academicYear_level: {
+            academicYear: toYear,
+            level: nextLevel
+          }
+        },
+        update: {
+          primaryAdvisorId: item.primaryAdvisorId,
+          coAdvisorId: item.coAdvisorId,
+          updatedAt: new Date()
+        },
+        create: {
+          academicYear: toYear,
+          level: nextLevel,
+          primaryAdvisorId: item.primaryAdvisorId,
+          coAdvisorId: item.coAdvisorId
+        }
+      });
+      promotedCount++;
+    }
+  }
+
+  revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/teacher");
+  return { success: true, count: promotedCount };
+}
+
+// ================= TWIN VERIFICATION =================
+
+export async function verifyTwinStudent(studentId: string, approved: boolean) {
+  const session = await getServerSession(authOptions);
+  const role = (session?.user as any)?.role;
+  if (role !== "HEAD" && role !== "TEACHER") {
+    throw new Error("Unauthorized: Only HEAD or TEACHER can verify twins");
+  }
+
+  await prisma.user.update({
+    where: { id: studentId },
+    data: {
+      twinVerified: approved,
+      updatedAt: new Date()
+    }
+  });
+
+  revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/teacher");
+  revalidatePath("/dashboard/student");
+  return { success: true };
+}
+

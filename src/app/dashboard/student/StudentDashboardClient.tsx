@@ -5,7 +5,7 @@ import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Users, Calendar, Clock, BookOpen, Menu, X, Settings, Camera } from "lucide-react";
+import { User, Users, Calendar, Clock, BookOpen, Menu, X, Settings, Camera, GraduationCap, Phone } from "lucide-react";
 import { showError, showToast, showConfirm } from "@/lib/alerts";
 
 export default function StudentDashboardClient({
@@ -17,7 +17,8 @@ export default function StudentDashboardClient({
   groupedSchedules,
   dayColors,
   daysMap,
-  initialParentLinks
+  initialParentLinks,
+  advisorInfo = null
 }: any) {
   const [activeTab, setActiveTab] = useState("overview"); // overview, schedule, attendance
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -180,6 +181,35 @@ export default function StudentDashboardClient({
                   <div><p className="text-xs text-muted-foreground mb-1">เบอร์โทรติดต่อ</p><p className="font-semibold text-foreground">{myInfo?.phone || "-"}</p></div>
                   <div className="col-span-2 sm:col-span-1"><p className="text-xs text-muted-foreground mb-1">อีเมล</p><p className="font-semibold text-foreground truncate" title={myInfo?.email}>{myInfo?.email || "-"}</p></div>
                 </div>
+
+                {/* อาจารย์ที่ปรึกษาประจำชั้นปี */}
+                {advisorInfo && (advisorInfo.primaryAdvisor || advisorInfo.coAdvisor) && (
+                  <div className="p-4 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-sm shrink-0">
+                        <GraduationCap className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
+                          อาจารย์ที่ปรึกษาประจำชั้น ({myInfo?.level || "-"})
+                        </span>
+                        <p className="font-bold text-sm text-foreground">
+                          {advisorInfo.primaryAdvisor?.name || "แผนกวิชา"}
+                          {advisorInfo.coAdvisor && ` และ อ.${advisorInfo.coAdvisor.name}`}
+                        </p>
+                      </div>
+                    </div>
+                    {advisorInfo.primaryAdvisor?.phone && (
+                      <a
+                        href={`tel:${advisorInfo.primaryAdvisor.phone}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-bold border border-indigo-200 dark:border-indigo-800 shadow-xs hover:bg-indigo-50 transition shrink-0"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-500" />
+                        โทร: {advisorInfo.primaryAdvisor.phone}
+                      </a>
+                    )}
+                  </div>
+                )}
 
                 {/* Parent Links Section */}
                 <div className="mt-8 border-t border-border pt-6">

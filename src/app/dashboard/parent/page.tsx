@@ -77,6 +77,39 @@ export default async function ParentDashboard() {
       allSubjects[childId] = Array.from(uniqueSubjectsMap.values());
       allSchedules[childId] = childSchedules;
     }
+
+    let childAdvisors: Record<string, any> = {};
+    try {
+      const currentAcademicYear = currentTerm?.academicYear || String(new Date().getFullYear() + 543);
+      const childLevels = Array.from(new Set(approvedChildren.map((c: any) => c.level).filter(Boolean)));
+      const advisors = await (prisma as any).classroomAdvisor.findMany({
+        where: {
+          academicYear: currentAcademicYear,
+          level: { in: childLevels }
+        },
+        include: {
+          primaryAdvisor: { select: { name: true, phone: true } },
+          coAdvisor: { select: { name: true, phone: true } }
+        }
+      });
+      advisors.forEach((a: any) => {
+        childAdvisors[a.level] = a;
+      });
+    } catch {
+      childAdvisors = {};
+    }
+
+    return (
+      <ParentDashboardClient 
+        session={session}
+        parentData={parentData}
+        childrenData={childrenData}
+        allAttendances={allAttendances}
+        allSubjects={allSubjects}
+        allSchedules={allSchedules}
+        childAdvisors={childAdvisors}
+      />
+    );
   }
 
   return (
@@ -87,6 +120,7 @@ export default async function ParentDashboard() {
       allAttendances={allAttendances}
       allSubjects={allSubjects}
       allSchedules={allSchedules}
+      childAdvisors={{}}
     />
   );
 }

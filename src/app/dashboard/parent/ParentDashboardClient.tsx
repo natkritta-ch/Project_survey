@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Clock, Menu, X, Users, Home, ChevronDown, Search, Loader2, Sparkles } from "lucide-react";
+import { User, Clock, Menu, X, Users, Home, ChevronDown, Search, Loader2, Sparkles, GraduationCap, Phone } from "lucide-react";
 import { showSuccess, showError } from "@/lib/alerts";
 
 export default function ParentDashboardClient({
@@ -13,7 +13,8 @@ export default function ParentDashboardClient({
   childrenData,
   allAttendances,
   allSubjects,
-  allSchedules
+  allSchedules,
+  childAdvisors = {}
 }: any) {
   const [activeTab, setActiveTab] = useState("overview"); // overview, attendance
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -284,6 +285,29 @@ export default function ParentDashboardClient({
                           <p className="text-xs text-primary/70 mb-1 font-semibold uppercase">ชั้นปี</p>
                           <p className="font-bold text-lg text-primary">{activeChild.level || "ไม่ระบุ"}</p>
                         </div>
+
+                        {/* ข้อมูลอาจารย์ที่ปรึกษาประจำชั้น */}
+                        {childAdvisors[activeChild.level] && (
+                          <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/20 rounded-xl border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs text-indigo-600 dark:text-indigo-400 mb-1 font-bold uppercase flex items-center gap-1">
+                                <GraduationCap className="w-3.5 h-3.5" /> อาจารย์ที่ปรึกษาประจำชั้น
+                              </p>
+                              <p className="font-bold text-sm text-foreground">
+                                {childAdvisors[activeChild.level].primaryAdvisor?.name || "แผนกวิชา"}
+                                {childAdvisors[activeChild.level].coAdvisor && ` และ อ.${childAdvisors[activeChild.level].coAdvisor.name}`}
+                              </p>
+                            </div>
+                            {childAdvisors[activeChild.level].primaryAdvisor?.phone && (
+                              <a
+                                href={`tel:${childAdvisors[activeChild.level].primaryAdvisor.phone}`}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-gray-800 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-bold border border-indigo-200 dark:border-indigo-800 shadow-xs hover:bg-indigo-50 transition shrink-0"
+                              >
+                                <Phone className="w-3.5 h-3.5 text-emerald-500" /> โทร
+                              </a>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                     

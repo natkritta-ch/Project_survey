@@ -170,6 +170,116 @@ export default async function TeacherDashboard() {
     trashedMakeupClasses = [];
   }
 
+  // 7. ข้อมูลห้องในที่ปรึกษา (Classroom Advisor)
+  const currentAcademicYear = currentTerm?.academicYear || String(new Date().getFullYear() + 543);
+  let advisoryData: any = null;
+
+  try {
+    const advisorAssignments = await (prisma as any).classroomAdvisor.findMany({
+      where: {
+        academicYear: currentAcademicYear,
+        OR: [
+          { primaryAdvisorId: userId },
+          { coAdvisorId: userId }
+        ]
+      },
+      include: {
+        primaryAdvisor: { select: { id: true, name: true, phone: true } },
+        coAdvisor: { select: { id: true, name: true, phone: true } }
+      }
+    });
+
+    if (advisorAssignments && advisorAssignments.length > 0) {
+      const advisedLevels = advisorAssignments.map((a: any) => a.level);
+
+      const rawAdvisedStudents = await prisma.user.findMany({
+        where: {
+          role: "STUDENT",
+          level: { in: advisedLevels },
+          deletedAt: null
+        },
+        select: {
+          id: true,
+          username: true,
+          name: true,
+          level: true,
+          nickname: true,
+          phone: true,
+          parentCode: true,
+          nationalId: true,
+          profilePicture: true,
+          isTwin: true,
+          twinVerified: true,
+          twinNote: true,
+          studentLinks: {
+            where: { status: "APPROVED" },
+            include: { parent: { select: { id: true, name: true, phone: true } } }
+          },
+          attendances: {
+            select: {
+              id: true,
+              type: true,
+              status: true,
+              timestamp: true
+            }
+          }
+        },
+        orderBy: [{ level: 'asc' }, { username: 'asc' }]
+      });
+
+      const processedAdvisedStudents = rawAdvisedStudents.map((st: any) => {
+        const atts = st.attendances || [];
+        const total = atts.length;
+        const presents = atts.filter((a: any) => ["PRESENT", "LATE"].includes(a.status)).length;
+        const absents = atts.filter((a: any) => a.status === "ABSENT").length;
+        const leaves = atts.filter((a: any) => ["LEAVE_PERSONAL", "LEAVE_SICK"].includes(a.status)).length;
+        const percent = total > 0 ? Math.round((presents / total) * 100) : 100;
+        const isAtRisk = total > 0 ? (absents >= 4 || (absents / total) >= 0.20) : false;
+
+        return {
+          id: st.id,
+          name: st.name,
+          username: st.username,
+          level: st.level || "",
+          nickname: st.nickname,
+          phone: st.phone,
+          parentCode: st.parentCode,
+          nationalId: st.nationalId,
+          profilePicture: st.profilePicture,
+          isTwin: Boolean(st.isTwin),
+          twinVerified: Boolean(st.twinVerified),
+          twinNote: st.twinNote,
+          parents: (st.studentLinks || []).map((l: any) => ({
+            id: l.parent?.id,
+            name: l.parent?.name || "ผู้ปกครอง",
+            phone: l.parent?.phone || null
+          })),
+          attendanceSummary: {
+            total,
+            presents,
+            absents,
+            leaves,
+            percent,
+            isAtRisk
+          }
+        };
+      });
+
+      advisoryData = {
+        academicYear: currentAcademicYear,
+        assignments: advisorAssignments.map((a: any) => ({
+          level: a.level,
+          isPrimary: a.primaryAdvisorId === userId,
+          coAdvisorName: a.primaryAdvisorId === userId ? a.coAdvisor?.name : a.primaryAdvisor?.name
+        })),
+        students: processedAdvisedStudents
+      };
+    }
+  } catch (err) {
+    console.error("Error fetching advisory data:", err);
+    advisoryData = null;
+  }
+
   // เตรียมรายชื่อวิชาสำหรับ Modal สร้างคลาสสอนชดเชย
   const simpleSubjects = subjects.map(s => ({
     id: s.id,
@@ -191,6 +301,7 @@ export default async function TeacherDashboard() {
         subjects={simpleSubjects}
         initialMakeupClasses={makeupClasses}
         initialTrashedMakeupClasses={trashedMakeupClasses}
+        advisoryData={advisoryData}
       />
     </div>
   );

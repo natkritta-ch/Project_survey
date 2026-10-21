@@ -92,6 +92,7 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
 
   const [inputStartDate, setInputStartDate] = useState(defaultDates.start);
   const [inputEndDate, setInputEndDate] = useState(defaultDates.end);
+  const [promoteAdvisors, setPromoteAdvisors] = useState(true);
 
   useEffect(() => {
     setInputStartDate(defaultDates.start);
@@ -151,7 +152,8 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
         nextYear,
         startDate: inputStartDate,
         endDate: inputEndDate,
-        promoteLevels: willPromoteLevels
+        promoteLevels: willPromoteLevels,
+        promoteAdvisors: willPromoteLevels ? promoteAdvisors : false
       });
 
       setShowConfirmModal(false);
@@ -512,6 +514,27 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                     ✓ นักเรียนทุกคนยังคงอยู่ชั้นปีเดิม (ปวช.1 ยังเป็น ปวช.1)
                   </p>
+                )}
+
+                {willPromoteLevels && (
+                  <div className="mt-3 pt-2.5 border-t border-gray-200 dark:border-gray-700">
+                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={promoteAdvisors}
+                        onChange={e => setPromoteAdvisors(e.target.checked)}
+                        className="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <div>
+                        <span className="font-semibold text-gray-800 dark:text-gray-200">
+                          เลื่อนอาจารย์ที่ปรึกษาตามรุ่นชั้นปีด้วย
+                        </span>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          ครูที่ปรึกษา ปวช.1 ➡️ ปวช.2, ปวช.2 ➡️ ปวช.3, ปวส.1 ➡️ ปวส.2 อัตโนมัติในปีการศึกษาใหม่
+                        </p>
+                      </div>
+                    </label>
+                  </div>
                 )}
               </div>
             </div>

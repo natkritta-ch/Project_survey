@@ -28,12 +28,18 @@ export default async function TeacherScanPage({ searchParams }: { searchParams: 
       faceDescriptor: {
         not: null
       },
-      // บล็อกสถานะที่ไม่อยู่ในการเรียนปกติ เพื่อป้องกัน AI สแกนหน้าไปติดบัญชีเก่าที่จบไปแล้ว
-      NOT: {
-        level: {
-          in: ["จบการศึกษา", "ดรอปเรียน", "พ้นสภาพ"]
+      // บล็อกสถานะที่ไม่อยู่ในการเรียนปกติ และบล็อกคู่แฝดที่รออนุมัติ
+      NOT: [
+        {
+          level: {
+            in: ["จบการศึกษา", "ดรอปเรียน", "พ้นสภาพ"]
+          }
+        },
+        {
+          isTwin: true,
+          twinVerified: false
         }
-      }
+      ]
     },
     select: {
       id: true,

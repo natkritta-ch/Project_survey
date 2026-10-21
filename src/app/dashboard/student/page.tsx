@@ -9,6 +9,7 @@ import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentDashboardClient from "./StudentDashboardClient";
+import TwinPendingApproval from "./TwinPendingApproval";
 
 export const dynamic = 'force-dynamic';
 
@@ -35,13 +36,48 @@ export default async function StudentDashboard() {
       phone: true,
       email: true,
       parentCode: true,
-      isTwoFactorEnabled: true
+      isTwoFactorEnabled: true,
+      isTwin: true,
+      twinVerified: true,
+      twinNote: true
     }
   });
 
   // Fix #5: ถ้า user ถูกลบใน DB แต่ session ยังอยู่ → redirect ออกทันที ป้องกัน crash
   if (!myInfo) {
     redirect("/login");
+  }
+
+  // 1. หาเทอมปัจจุบันอัตโนมัติจากวันที่ปัจจุบัน
+  const currentTerm = await getCurrentTermConfig();
+  const currentAcademicYear = currentTerm?.academicYear || String(new Date().getFullYear() + 543);
+
+  // ดึงข้อมูลครูที่ปรึกษาประจำชั้นปีของนักเรียน
+  let advisorInfo: any = null;
+  try {
+    const advisorRecord = await (prisma as any).classroomAdvisor.findFirst({
+      where: {
+        academicYear: currentAcademicYear,
+        level: myInfo.level || ""
+      },
+      include: {
+        primaryAdvisor: { select: { id: true, name: true, phone: true } },
+        coAdvisor: { select: { id: true, name: true, phone: true } }
+      }
+    });
+    if (advisorRecord) {
+      advisorInfo = {
+        primaryAdvisor: advisorRecord.primaryAdvisor,
+        coAdvisor: advisorRecord.coAdvisor
+      };
+    }
+  } catch {
+    advisorInfo = null;
+  }
+
+  // หากเป็นนักเรียนคู่แฝดที่ยังไม่ได้รับการอนุมัติจากครูที่ปรึกษา ให้แสดงหน้า Pending
+  if (myInfo.isTwin && !myInfo.twinVerified) {
+    return <TwinPendingApproval student={myInfo} advisorInfo={advisorInfo} />;
   }
 
   // สร้าง Parent Code ให้นักเรียนอัตโนมัติหากยังไม่มี
@@ -75,8 +111,6 @@ export default async function StudentDashboard() {
     orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
   });
 
-  // 1. หาเทอมปัจจุบันอัตโนมัติจากวันที่ปัจจุบัน
-  const currentTerm = await getCurrentTermConfig();
 
   // 2. กรองเฉพาะตารางเรียนของชั้นปีตัวเอง และ ต้องอยู่ในเทอมปัจจุบัน (ถ้ามีข้อมูลเทอมกำหนดไว้)
   const mySchedules = schedules.filter(sc => {
@@ -133,6 +167,7 @@ export default async function StudentDashboard() {
       dayColors={dayColors}
       daysMap={daysMap}
       initialParentLinks={parentLinks}
+      advisorInfo={advisorInfo}
     />
   );
 }

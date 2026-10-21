@@ -124,8 +124,29 @@ model user {
   parentLinks        ParentStudentLink[] @relation("ParentLinks")
   studentLinks       ParentStudentLink[] @relation("StudentLinks")
 
+  primaryAdvisories  ClassroomAdvisor[]  @relation("PrimaryAdvisor")
+  coAdvisories       ClassroomAdvisor[]  @relation("CoAdvisor")
+
   @@index([studentId], map: "User_studentId_fkey")
   @@index([role, deletedAt])
+}
+
+model ClassroomAdvisor {
+  id               String   @id @default(cuid())
+  academicYear     String
+  level            String   // ปวช.1, ปวช.2, ปวช.3, ปวส.1, ปวส.2, ปวส.1(ม.6), ปวส.2(ม.6)
+  primaryAdvisorId String?
+  coAdvisorId      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  primaryAdvisor   user?    @relation("PrimaryAdvisor", fields: [primaryAdvisorId], references: [id], onDelete: SetNull)
+  coAdvisor        user?    @relation("CoAdvisor", fields: [coAdvisorId], references: [id], onDelete: SetNull)
+
+  @@unique([academicYear, level])
+  @@index([primaryAdvisorId])
+  @@index([coAdvisorId])
+  @@map("classroom_advisor")
 }
 
 model ParentStudentLink {

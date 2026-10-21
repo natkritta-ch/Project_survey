@@ -5,6 +5,7 @@ import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restor
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import HeadAdminOverview from "./HeadAdminOverview";
 import HeadProgressionManagement from "./HeadProgressionManagement";
+import HeadAdvisorManagement from "./HeadAdvisorManagement";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -812,6 +813,10 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         <button onClick={() => {setActiveTab("subjects"); resetSubjectForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'subjects' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>จัดการวิชา</button>
         <button onClick={() => {setActiveTab("schedules"); resetScheduleForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'schedules' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>ตารางเรียน</button>
         <button onClick={() => {setActiveTab("users"); resetUserForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'users' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>จัดการผู้ใช้งาน</button>
+        <button onClick={() => {setActiveTab("advisors");}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${activeTab === 'advisors' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
+          <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+          แต่งตั้งครูที่ปรึกษา
+        </button>
         <button onClick={() => {setActiveTab("progression");}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${activeTab === 'progression' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
           <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
           เลื่อนภาคเรียน & เลื่อนชั้น
@@ -2251,6 +2256,11 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
             </div>
             
           </div>
+        )}
+
+        {/* ================= Advisors Tab ================= */}
+        {activeTab === "advisors" && (
+          <HeadAdvisorManagement teachers={teachers} users={users} termConfigs={termConfigs} />
         )}
 
         {/* ================= Progression Tab ================= */}
