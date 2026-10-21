@@ -306,6 +306,137 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setIsEditUserModalOpen(false);
   };
 
+  const handlePrintParentCodes = () => {
+    const studentsToPrint = users
+      .filter((u: any) => u.role === "STUDENT" && !u.deletedAt)
+      .filter((u: any) => {
+        if (!parentCodeSearch) return true;
+        const q = parentCodeSearch.toLowerCase().trim();
+        return (
+          u.name?.toLowerCase().includes(q) ||
+          u.username?.toLowerCase().includes(q) ||
+          u.level?.toLowerCase().includes(q) ||
+          u.parentCode?.toLowerCase().includes(q)
+        );
+      });
+
+    if (studentsToPrint.length === 0) {
+      showWarning("ไม่พบข้อมูล", "ไม่มีข้อมูลนักเรียนที่ตรงกับเงื่อนไขการพิมพ์");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      showError("ไม่สามารถเปิดหน้าต่างพิมพ์ได้", "กรุณาอนุญาตป็อปอัป (Pop-up) ในเบราว์เซอร์");
+      return;
+    }
+
+    const rowsHtml = studentsToPrint
+      .map(
+        (st: any, idx: number) => `
+        <tr>
+          <td style="text-align: center; border: 1px solid #d1d5db; padding: 6px 8px;">${idx + 1}</td>
+          <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-family: monospace; font-weight: bold;">${st.username}</td>
+          <td style="border: 1px solid #d1d5db; padding: 6px 8px; font-weight: 500;">${st.name}</td>
+          <td style="text-align: center; border: 1px solid #d1d5db; padding: 6px 8px;">
+            <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; background-color: #eff6ff; border: 1px solid #bfdbfe; font-size: 11px; font-weight: bold; color: #1e40af;">
+              ${st.level || "-"}
+            </span>
+          </td>
+          <td style="text-align: center; border: 1px solid #d1d5db; padding: 6px 8px;">
+            <span style="font-family: monospace; font-size: 13px; font-weight: bold; letter-spacing: 1px; color: #92400e; background-color: #fef3c7; border: 1px dashed #d97706; padding: 3px 8px; border-radius: 4px; display: inline-block;">
+              ${st.parentCode || "ยังไม่มีรหัส"}
+            </span>
+          </td>
+        </tr>`
+      )
+      .join("");
+
+    const nowStr = new Date().toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>รหัสผูกผู้ปกครอง (Parent Codes)</title>
+          <style>
+            @page { size: A4 portrait; margin: 12mm 15mm 15mm 15mm; }
+            body { 
+              font-family: 'Sarabun', 'Segoe UI', Tahoma, Arial, sans-serif; 
+              color: #111827; 
+              margin: 0; 
+              padding: 0;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .header { text-align: center; margin-bottom: 16px; border-bottom: 2px solid #374151; padding-bottom: 10px; }
+            h1 { margin: 0 0 4px 0; font-size: 18px; color: #111827; }
+            .subtitle { margin: 0; font-size: 12px; color: #4b5563; }
+            .meta { display: flex; justify-content: space-between; font-size: 11px; color: #6b7280; margin-top: 8px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
+            th { border: 1px solid #d1d5db; background-color: #f3f4f6 !important; padding: 7px 8px; text-align: left; font-weight: bold; color: #374151; font-size: 12px; }
+            .notice {
+              margin-top: 18px;
+              padding: 10px 14px;
+              background-color: #f9fafb !important;
+              border: 1px dashed #9ca3af;
+              border-radius: 6px;
+              font-size: 11px;
+              color: #374151;
+              line-height: 1.5;
+            }
+            .footer { margin-top: 12px; text-align: right; font-size: 10px; color: #9ca3af; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>รายการรหัสผูกผู้ปกครอง (Parent Codes)</h1>
+            <p class="subtitle">ระบบสารสนเทศและการเช็กชื่อเข้าเรียน</p>
+            <div class="meta">
+              <span>จำนวนนักเรียน: ${studentsToPrint.length} คน</span>
+              <span>วันที่พิมพ์: ${nowStr} น.</span>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 45px; text-align: center;">ลำดับ</th>
+                <th style="width: 125px;">รหัสนักศึกษา</th>
+                <th>ชื่อ - นามสกุล</th>
+                <th style="width: 85px; text-align: center;">ระดับชั้น</th>
+                <th style="width: 165px; text-align: center;">รหัสผูกผู้ปกครอง (Parent Code)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="notice">
+            <strong>📌 คำแนะนำสำหรับผู้ปกครอง:</strong> นำรหัส <strong>Parent Code</strong> ของบุตรหลานไปลงทะเบียนที่เว็บไซต์ของสถานศึกษา (เลือกเมนู <em>"ลงทะเบียนผู้ปกครอง"</em>) เมื่อกรอกรหัสถูกต้อง บัญชีจะเชื่อมต่อกับบุตรหลานและอนุมัติทันที
+          </div>
+
+          <div class="footer">พิมพ์จากระบบโดย: หัวหน้าแผนก / ฝ่ายบริหาร</div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
   const handleDeleteSelectedUsers = async () => {
     if (selectedUsers.length === 0) return;
     const confirmed = await showConfirm({
@@ -2772,7 +2903,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     )}
                     <button
                       type="button"
-                      onClick={() => window.print()}
+                      onClick={handlePrintParentCodes}
                       className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
                     >
                       🖨️ พิมพ์รายการ
