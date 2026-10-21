@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, Phone, ShieldCheck, Menu, X, BarChart, Settings, CalendarPlus, Trash2, Sparkles, BookOpen, ChevronDown, FileCheck, RotateCcw, AlertTriangle, RefreshCw } from "lucide-react";
 import { signOut } from "next-auth/react";
@@ -21,6 +21,18 @@ export default function TeacherDashboardClient({
   const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
   const [filterTerm, setFilterTerm] = useState(initialTerm || "ทั้งหมด");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // ล็อกการเลื่อนหน้าจอข้างหลังเมื่อเปิดเมนูมือถือ
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
 
   // State สำหรับคลาสสอนชดเชย
   const [makeupClasses, setMakeupClasses] = useState<any[]>(initialMakeupClasses || []);
@@ -339,7 +351,7 @@ export default function TeacherDashboardClient({
 
       {/* Sidebar */}
       <div className={`
-        fixed md:static inset-0 z-30 bg-indigo-900 text-white w-64 flex-shrink-0 flex flex-col transition-transform duration-300
+        fixed md:static inset-y-0 left-0 z-50 bg-indigo-900 text-white w-64 flex-shrink-0 flex flex-col transition-transform duration-300
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="p-6 hidden md:block">
@@ -1215,6 +1227,14 @@ export default function TeacherDashboardClient({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Overlay for mobile menu */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-xs"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
       )}
     </>
   );

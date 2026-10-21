@@ -70,10 +70,10 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
         <div className="relative">
           <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">วิชา / กิจกรรม</label>
           {isSubjectDropdownOpen && (
-            <div className="fixed inset-0 z-40" onClick={() => setIsSubjectDropdownOpen(false)}></div>
+            <div className="fixed inset-0 z-20" onClick={() => setIsSubjectDropdownOpen(false)}></div>
           )}
 
-          <div className="relative z-40">
+          <div className="relative z-20">
             <div
               onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
               className={`flex items-center justify-between w-full rounded-lg border shadow-sm sm:text-sm px-3 py-2.5 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
@@ -82,7 +82,7 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
                   : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
               }`}
             >
-              <div className="flex items-center gap-2 truncate text-gray-900 dark:text-white font-medium">
+              <div className="flex items-center gap-2 min-w-0 flex-1 truncate text-gray-900 dark:text-white font-medium">
                 <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
                 <span className="truncate">
                   {filterSubject === "all" && `ดูทั้งหมด (${attendances.length} รายการ)`}
@@ -94,11 +94,11 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
                   })()}
                 </span>
               </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ml-2 ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} />
             </div>
 
             {isSubjectDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1.5 w-full sm:w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+              <div className="absolute left-0 top-full mt-1.5 w-full sm:w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-30 animate-in fade-in zoom-in-95">
                 <div className="p-2.5 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
                   <div className="relative">
                     <input

@@ -38,6 +38,19 @@ export default function ParentDashboardClient({
   const [selectedStudentInfo, setSelectedStudentInfo] = useState<any | null>(null);
   const searchTimeoutRef = useRef<any>(null);
 
+  // ล็อกการเลื่อนหน้าจอข้างหลังเมื่อเปิดเมนูมือถือ และปิดดรอปดาวน์ที่อาจเปิดค้างอยู่
+  React.useEffect(() => {
+    if (isMobileMenuOpen) {
+      setIsStudentDropdownOpen(false);
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
   const handleStudentSearchChange = (query: string) => {
     setStudentSearch(query);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
@@ -127,7 +140,7 @@ export default function ParentDashboardClient({
 
       {/* Sidebar (Desktop) / Dropdown Menu (Mobile) */}
       <div className={`
-        fixed inset-y-0 left-0 z-30 w-72 bg-card shadow-2xl md:shadow-none border-r border-border flex flex-col transition-transform duration-300 ease-in-out md:static md:translate-x-0 md:w-64
+        fixed inset-y-0 left-0 z-50 w-72 bg-card shadow-2xl md:shadow-none border-r border-border flex flex-col transition-transform duration-300 ease-in-out md:static md:translate-x-0 md:w-64
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="p-6 border-b border-border hidden md:block bg-primary text-primary-foreground">
@@ -272,10 +285,10 @@ export default function ParentDashboardClient({
               {/* Searchable Select Combobox สำหรับค้นหาและเลือกนักเรียน */}
               <div className="flex-1 relative">
                 {isStudentDropdownOpen && (
-                  <div className="fixed inset-0 z-40" onClick={() => setIsStudentDropdownOpen(false)}></div>
+                  <div className="fixed inset-0 z-20" onClick={() => setIsStudentDropdownOpen(false)}></div>
                 )}
 
-                <div className="relative z-40">
+                <div className="relative z-20">
                   <div
                     onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
                     className={`flex items-center justify-between w-full px-4 py-2 bg-background border rounded-xl text-sm cursor-pointer transition-colors ${
@@ -284,20 +297,20 @@ export default function ParentDashboardClient({
                         : 'border-border hover:border-primary/50'
                     }`}
                   >
-                    <div className="flex items-center gap-2 truncate">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 truncate">
                       <Users className="w-4 h-4 text-primary shrink-0" />
-                      <span className={addStudentUsername ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                      <span className={`truncate ${addStudentUsername ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
                         {selectedStudentInfo 
                           ? `${selectedStudentInfo.name} (${selectedStudentInfo.username}) - ชั้น ${selectedStudentInfo.level || "ไม่ระบุ"}`
                           : (addStudentUsername || "-- ค้นหาและเลือกนักเรียน --")
                         }
                       </span>
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform shrink-0 ml-2 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} />
                   </div>
 
                   {isStudentDropdownOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-full sm:w-96 bg-card border border-border rounded-xl shadow-2xl max-h-60 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
+                    <div className="absolute left-0 top-full mt-1.5 w-full sm:w-96 max-w-[calc(100vw-2rem)] bg-card border border-border rounded-xl shadow-2xl max-h-60 overflow-y-auto z-30 animate-in fade-in zoom-in-95">
                       <div className="p-2.5 sticky top-0 bg-card border-b border-border z-10 shadow-sm">
                         <div className="relative">
                           <input
@@ -477,7 +490,7 @@ export default function ParentDashboardClient({
       {/* Overlay for mobile menu */}
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-20 md:hidden backdrop-blur-sm"
+          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-xs"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}

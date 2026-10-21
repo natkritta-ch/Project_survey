@@ -27,6 +27,18 @@ export default function StudentDashboardClient({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [parentLinks, setParentLinks] = useState(initialParentLinks || []);
 
+  // ล็อกการเลื่อนหน้าจอข้างหลังเมื่อเปิดเมนูมือถือ
+  React.useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMobileMenuOpen]);
+
   const handleUpdateLinkStatus = async (linkId: string, status: string, parentName?: string) => {
     if (status === "REJECTED") {
       const isConfirmed = await showConfirm({
