@@ -319,6 +319,15 @@ export default async function TeacherDashboard() {
             percent: pct,
             isAtRisk
           };
+        }).sort((a: any, b: any) => {
+          // 1. วิชาที่ เสี่ยง ข.ร. ขึ้นบนสุดเสมอ
+          if (a.isAtRisk && !b.isAtRisk) return -1;
+          if (!a.isAtRisk && b.isAtRisk) return 1;
+          // 2. เรียงตามเปอร์เซ็นต์เวลาน้อยไปมาก (ขาดเยอะสุดขึ้นก่อน)
+          if (a.percent !== b.percent) return a.percent - b.percent;
+          // 3. ใครมีจำนวนครั้งที่ขาดมากกว่าขึ้นก่อน
+          if (a.absents !== b.absents) return b.absents - a.absents;
+          return a.code.localeCompare(b.code);
         });
 
         const atRiskSubjects = subjectsSummary.filter((s: any) => s.isAtRisk);

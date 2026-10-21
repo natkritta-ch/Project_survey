@@ -95,6 +95,21 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
   const [isVerifying, setIsVerifying] = useState<string | null>(null);
   const [selectedStudentForDetail, setSelectedStudentForDetail] = useState<StudentAdvisee | null>(null);
 
+  // เรียงวิชาที่มีปัญหา / เสี่ยง ข.ร. / ขาดเรียนมากที่สุดขึ้นก่อนเสมอในหน้าต่าง Modal
+  const sortedModalSubjects = useMemo(() => {
+    if (!selectedStudentForDetail?.subjectsSummary) return [];
+    return [...selectedStudentForDetail.subjectsSummary].sort((a, b) => {
+      // 1. วิชาที่ เสี่ยง ข.ร. อยู่บนสุดเสมอ
+      if (a.isAtRisk && !b.isAtRisk) return -1;
+      if (!a.isAtRisk && b.isAtRisk) return 1;
+      // 2. เรียงตามเปอร์เซ็นต์เวลาน้อยไปมาก (ใครเวลาเรียนน้อยสุดขึ้นก่อน)
+      if (a.percent !== b.percent) return a.percent - b.percent;
+      // 3. ใครมีจำนวนครั้งที่ขาดมากกว่าขึ้นก่อน
+      if (a.absents !== b.absents) return b.absents - a.absents;
+      return a.code.localeCompare(b.code);
+    });
+  }, [selectedStudentForDetail]);
+
   const handleCopyCode = (code: string) => {
     if (!code) return;
     navigator.clipboard.writeText(code);
@@ -834,16 +849,21 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
 
             {/* Subject Breakdown List */}
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2">
-                รายละเอียดเวลาเรียนแยกตามรายวิชา:
-              </h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                  รายละเอียดเวลาเรียนแยกตามรายวิชา:
+                </h4>
+                <span className="text-[11px] text-rose-600 dark:text-rose-400 font-medium">
+                  * เรียงวิชาที่เสี่ยง ข.ร. / ขาดเรียนขึ้นก่อน
+                </span>
+              </div>
 
-              {(!selectedStudentForDetail.subjectsSummary || selectedStudentForDetail.subjectsSummary.length === 0) ? (
+              {sortedModalSubjects.length === 0 ? (
                 <div className="text-center py-8 text-gray-400 text-xs">
                   ยังไม่มีประวัติการเช็คชื่อในรายวิชา
                 </div>
               ) : (
-                selectedStudentForDetail.subjectsSummary.map((sub) => (
+                sortedModalSubjects.map((sub) => (
                   <div
                     key={sub.id}
                     className={`p-3.5 rounded-2xl border transition ${
