@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Save, Search, ChevronDown } from "lucide-react";
+import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Search, ChevronDown, Clock } from "lucide-react";
 import * as XLSX from "xlsx";
-import { createOrUpdateTermConfig, resetAllFaces } from "./actions";
+import { resetAllFaces } from "./actions";
 import { showSuccess, showError, showConfirm } from "@/lib/alerts";
 
 export default function HeadAdminOverview({ subjects, users, levelsOptions, termConfigs = [] }: { subjects: any[], users: any[], levelsOptions: string[], termConfigs?: any[] }) {
@@ -18,13 +18,9 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
   
   const currentBEYear = new Date().getFullYear() + 543;
   const initTerm = termConfigs.find(t => t.isCurrent) || termConfigs[0];
-  const [selectedTermConfigId, setSelectedTermConfigId] = useState(initTerm ? initTerm.id : "custom");
-  const [assemblyStartDate, setAssemblyStartDate] = useState(initTerm ? new Date(initTerm.startDate).toISOString().split('T')[0] : "");
-  const [assemblyEndDate, setAssemblyEndDate] = useState(initTerm ? new Date(initTerm.endDate).toISOString().split('T')[0] : "");
-  const [showConfigModal, setShowConfigModal] = useState(false);
-  const [configYear, setConfigYear] = useState(String(currentBEYear));
-  const [configTerm, setConfigTerm] = useState("1");
-  const [isSaving, setIsSaving] = useState(false);
+  const [selectedTermConfigId, setSelectedTermConfigId] = useState(initTerm ? initTerm.id : "all");
+  const [assemblyStartDate, setAssemblyStartDate] = useState(initTerm?.startDate ? new Date(initTerm.startDate).toISOString().split('T')[0] : "");
+  const [assemblyEndDate, setAssemblyEndDate] = useState(initTerm?.endDate ? new Date(initTerm.endDate).toISOString().split('T')[0] : "");
 
   const exportXLSXByLevel = (filename: string, headers: string[], dataList: any[], levelFilter: string, mapRow: (item: any) => any[]) => {
     const wb = XLSX.utils.book_new();
@@ -187,8 +183,11 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
           <p className="text-[var(--text-sm)] text-muted-foreground">ข้อมูลอัปเดตแบบเรียลไทม์ ครอบคลุมการเข้าแถวและการเข้าเรียนรายวิชา</p>
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-100 dark:border-slate-700">
-            <span className="text-xs font-bold text-slate-500 uppercase">ตัดรอบประเมินเข้าแถว:</span>
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-700">
+            <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5 whitespace-nowrap">
+              <Clock className="w-4 h-4 text-indigo-500" />
+              ภาคเรียนประเมิน:
+            </span>
             <select 
               value={selectedTermConfigId} 
               onChange={e => {
@@ -197,7 +196,7 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
                 if (id === "all") {
                   setAssemblyStartDate("");
                   setAssemblyEndDate("");
-                } else if (id !== "custom") {
+                } else {
                   const tc = termConfigs.find(t => t.id === id);
                   if (tc) {
                     setAssemblyStartDate(new Date(tc.startDate).toISOString().split('T')[0]);
@@ -205,29 +204,24 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
                   }
                 }
               }} 
-              className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500"
+              className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm font-bold text-indigo-700 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm"
             >
-              <option value="custom">-- กำหนดวันที่เอง --</option>
-              <option value="all">-- ไม่กรองวันที่ (ทั้งหมด) --</option>
               {termConfigs.map(tc => (
-                <option key={tc.id} value={tc.id}>เทอม {tc.term}/{tc.academicYear}</option>
+                <option key={tc.id} value={tc.id}>
+                  {tc.isCurrent ? `★ ภาคเรียนที่ ${tc.term}/${tc.academicYear} (ปัจจุบัน)` : `ภาคเรียนที่ ${tc.term}/${tc.academicYear}`}
+                </option>
               ))}
-            </select>
-            
-            <div className="flex items-center gap-1">
-              <input disabled={selectedTermConfigId !== "custom"} type="date" value={assemblyStartDate} onChange={e => {setAssemblyStartDate(e.target.value); setSelectedTermConfigId("custom");}} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:text-gray-500 dark:disabled:bg-gray-800" title="วันเริ่มต้น" />
-              <span className="text-xs font-bold text-slate-400">-</span>
-              <input disabled={selectedTermConfigId !== "custom"} type="date" value={assemblyEndDate} onChange={e => {setAssemblyEndDate(e.target.value); setSelectedTermConfigId("custom");}} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:text-gray-500 dark:disabled:bg-gray-800" title="วันสิ้นสุด" />
-              {selectedTermConfigId === "custom" && (assemblyStartDate || assemblyEndDate) && (
-                <button onClick={() => { setAssemblyStartDate(""); setAssemblyEndDate(""); }} className="ml-1 text-slate-400 hover:text-rose-500 transition-colors" title="ล้างวันที่">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
+              {termConfigs.length === 0 && (
+                <option value="none">เทอม 1/{currentBEYear} (ค่าเริ่มต้น)</option>
               )}
-            </div>
+              <option value="all">-- ข้อมูลทั้งหมด (ไม่จำกัดช่วงเวลา) --</option>
+            </select>
 
-            <button onClick={() => setShowConfigModal(true)} className="flex items-center justify-center p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg transition" title="บันทึกเทอมเก็บไว้ให้ระบบอัตโนมัติ">
-              <Save className="w-5 h-5" />
-            </button>
+            {assemblyStartDate && assemblyEndDate && (
+              <span className="text-[11px] text-slate-400 hidden lg:inline-block ml-1">
+                ({new Date(assemblyStartDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {new Date(assemblyEndDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })})
+              </span>
+            )}
           </div>
           <div className="hidden sm:block h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
           <div className="flex items-center gap-2">
@@ -541,69 +535,7 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
         </div>
       </div>
 
-      {/* Save Config Modal */}
-      {showConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-md p-6 shadow-xl animate-in zoom-in-95">
-            <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-4">บันทึกจับคู่ วันที่ กับ เทอม</h3>
-            <p className="text-sm text-slate-500 mb-6">เพื่อให้ครั้งต่อไปสามารถเลือกเทอมจากเมนู Dropdown ได้ทันที ระบบและอาจารย์ที่เข้าเช็คชื่อจะอ้างอิงช่วงวันที่นี้ในการสรุป % เทอมนั้นๆ ด้วย</p>
-            
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">ปีการศึกษา (พ.ศ.)</label>
-                  <input type="text" value={configYear} onChange={e => setConfigYear(e.target.value)} className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">ภาคเรียน</label>
-                  <select value={configTerm} onChange={e => setConfigTerm(e.target.value)} className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3 (ฤดูร้อน)</option>
-                  </select>
-                </div>
-              </div>
 
-              <div className="flex gap-4">
-                 <div className="flex-1">
-                    <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">วันเริ่มเทอม</label>
-                    <input type="date" value={assemblyStartDate} onChange={e => setAssemblyStartDate(e.target.value)} className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                 </div>
-                 <div className="flex-1">
-                    <label className="block text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">วันสิ้นสุดเทอม</label>
-                    <input type="date" value={assemblyEndDate} onChange={e => setAssemblyEndDate(e.target.value)} className="w-full px-3 py-2 border border-slate-200 dark:border-slate-600 dark:bg-slate-900 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required />
-                 </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-8">
-               <button type="button" onClick={() => setShowConfigModal(false)} className="px-4 py-2 bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200 rounded-lg font-medium hover:bg-slate-200 dark:hover:bg-slate-600 transition">ยกเลิก</button>
-               <button 
-                 disabled={isSaving || !assemblyStartDate || !assemblyEndDate} 
-                 onClick={async () => {
-                   setIsSaving(true);
-                   try {
-                     await createOrUpdateTermConfig({
-                       academicYear: configYear,
-                       term: configTerm,
-                       startDate: new Date(assemblyStartDate),
-                       endDate: new Date(assemblyEndDate)
-                     });
-                     setShowConfigModal(false);
-                     showSuccess("บันทึกการตั้งค่าเทอมสำเร็จ!", `ปีการศึกษา ${configYear} ภาคเรียนที่ ${configTerm}`);
-                   } catch(err) {
-                     showError("เกิดข้อผิดพลาดในการบันทึก");
-                   }
-                   setIsSaving(false);
-                 }}
-                 className="px-5 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition disabled:opacity-50 flex items-center gap-2"
-               >
-                 {isSaving ? "กำลังบันทึก..." : "บันทึกเทอม"}
-               </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
