@@ -5,7 +5,7 @@ import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Users, Calendar, Clock, BookOpen, Menu, X, Settings, Camera, GraduationCap, Phone, MapPin, Sparkles } from "lucide-react";
+import { User, Users, Calendar, Clock, BookOpen, Menu, X, Settings, Camera, GraduationCap, Phone, MapPin, Sparkles, LayoutDashboard } from "lucide-react";
 import { showError, showToast, showConfirm } from "@/lib/alerts";
 import StudentDailyLiveStatus from "../../../components/StudentDailyLiveStatus";
 
@@ -22,7 +22,7 @@ export default function StudentDashboardClient({
   advisorInfo = null,
   makeupClasses = []
 }: any) {
-  const [activeTab, setActiveTab] = useState("overview"); // overview, schedule, attendance
+  const [activeTab, setActiveTab] = useState("overview"); // overview, schedule, attendance, profile
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [parentLinks, setParentLinks] = useState(initialParentLinks || []);
 
@@ -98,9 +98,10 @@ export default function StudentDashboardClient({
   };
 
   const tabs = [
-    { id: "overview", label: "ข้อมูลของฉัน", icon: <User className="w-5 h-5" /> },
+    { id: "overview", label: "ภาพรวมแดชบอร์ด", icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: "schedule", label: "ตารางเรียน", icon: <Calendar className="w-5 h-5" /> },
-    { id: "attendance", label: "ประวัติเข้าเรียน", icon: <Clock className="w-5 h-5" /> }
+    { id: "attendance", label: "ประวัติเข้าเรียน", icon: <Clock className="w-5 h-5" /> },
+    { id: "profile", label: "ข้อมูลบัญชี", icon: <User className="w-5 h-5" /> },
   ];
 
   const handleTabClick = (id: string) => {
@@ -129,7 +130,11 @@ export default function StudentDashboardClient({
           <p className="text-primary-foreground/80 text-sm font-medium mt-1">{myInfo?.level || 'ไม่ระบุชั้นปี'}</p>
         </div>
         
-        <div className="p-4 border-b border-border flex items-center gap-3">
+        <div 
+          onClick={() => handleTabClick("profile")}
+          className="p-4 border-b border-border flex items-center gap-3 cursor-pointer hover:bg-accent/50 transition-colors"
+          title="คลิกเพื่อดูข้อมูลบัญชี"
+        >
           <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold">
             {myInfo?.name?.charAt(0) || "U"}
           </div>
@@ -177,15 +182,15 @@ export default function StudentDashboardClient({
         {/* Active Tab Content */}
         <div className="max-w-4xl mx-auto space-y-6 pb-24 md:pb-0">
           
-          {/* Overview Tab */}
+          {/* Overview Tab (แดชบอร์ดสรุปผลสำหรับนักเรียนโดยเฉพาะ) */}
           {activeTab === "overview" && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both">
-              <div className="mb-8">
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both space-y-6">
+              <div>
                 <h1 className="text-2xl md:text-[var(--text-3xl)] font-extrabold text-foreground mb-2 tracking-tight">ยินดีต้อนรับ, <span className="text-primary">{myInfo?.nickname || myInfo?.name?.split(' ')[0]}</span> 👋</h1>
-                <p className="text-muted-foreground text-sm md:text-base">ตรวจสอบข้อมูลส่วนตัวและจัดการการผูกบัญชีผู้ปกครอง</p>
+                <p className="text-muted-foreground text-sm md:text-base">สรุปสถานะการเข้าเรียน ไทม์ไลน์รายวัน และผลการประเมินสิทธิ์สอบ (ข.ร. / ม.ผ.)</p>
               </div>
 
-              {/* 🌟 การ์ดสถานะการเรียนและเข้าแถววันนี้แบบ Real-time (ตามที่ผู้ใช้กำหนด) */}
+              {/* 🌟 การ์ดสถานะการเรียนและเข้าแถววันนี้แบบ Real-time */}
               <StudentDailyLiveStatus 
                 mySchedules={mySchedules}
                 makeupClasses={makeupClasses}
@@ -193,11 +198,29 @@ export default function StudentDashboardClient({
                 onNavigateToSchedule={() => setActiveTab("schedule")}
               />
 
-              <div className="bg-card p-6 rounded-2xl shadow-sm border border-border mb-8 transition-shadow hover:shadow-md">
+              {/* 🌟 ผลสรุปสถานะการเข้าเรียน สิทธิ์สอบ ข.ร. และกิจกรรมหน้าเสาธง ม.ผ. */}
+              <StudentStatusOverview attendances={attendances} subjects={mySubjects} />
+            </div>
+          )}
+
+          {/* Profile Tab (เมนูข้อมูลบัญชีแยกเฉพาะ) */}
+          {activeTab === "profile" && (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 fill-mode-both space-y-6">
+              <div>
+                <h2 className="text-2xl md:text-[var(--text-3xl)] font-extrabold text-foreground mb-2 tracking-tight">
+                  ข้อมูลบัญชี
+                </h2>
+                <p className="text-muted-foreground text-sm md:text-base">
+                  ตรวจสอบข้อมูลส่วนตัว อาจารย์ที่ปรึกษาประจำชั้น และการเชื่อมต่อผู้ปกครอง
+                </p>
+              </div>
+
+              {/* ข้อมูลบัญชีนักเรียน */}
+              <div className="bg-card p-6 rounded-2xl shadow-sm border border-border transition-shadow hover:shadow-md">
                 <h3 className="font-bold text-lg mb-5 text-foreground flex items-center gap-2">
-                  <User className="w-5 h-5 text-primary" /> ข้อมูลบัญชี
+                  <User className="w-5 h-5 text-primary" /> ข้อมูลทั่วไป
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
                   <div className="p-5 bg-primary/5 rounded-xl border border-primary/10 hover:-translate-y-1 transition-transform duration-200">
                     <p className="text-xs text-primary/70 font-bold mb-1.5 uppercase tracking-wider">รหัสนักเรียน</p>
                     <p className="font-extrabold text-2xl text-primary">{myInfo?.username}</p>
@@ -205,11 +228,6 @@ export default function StudentDashboardClient({
                   <div className="p-5 bg-accent/50 rounded-xl border border-border hover:-translate-y-1 transition-transform duration-200">
                     <p className="text-xs text-muted-foreground font-bold mb-1.5 uppercase tracking-wider">ชั้นปี</p>
                     <p className="font-extrabold text-2xl text-foreground">{myInfo?.level || "ไม่ระบุ"}</p>
-                  </div>
-                  <div className="p-5 bg-orange-50 dark:bg-orange-950/20 rounded-xl border border-orange-100 dark:border-orange-900/30 sm:col-span-2 lg:col-span-1 hover:-translate-y-1 transition-transform duration-200">
-                    <p className="text-xs text-orange-600/70 dark:text-orange-400/70 font-bold mb-1.5 uppercase tracking-wider">รหัสผูกบัญชีผู้ปกครอง</p>
-                    <p className="font-extrabold text-2xl font-mono text-orange-900 dark:text-orange-100 tracking-wider">{myInfo?.parentCode || "-"}</p>
-                    <p className="text-[11px] font-medium text-orange-700/80 dark:text-orange-500/80 mt-2">รหัสสำหรับให้ผู้ปกครองใช้ลงทะเบียนเชื่อมต่อข้อมูล</p>
                   </div>
                 </div>
 
@@ -257,7 +275,7 @@ export default function StudentDashboardClient({
                   </h4>
                   {parentLinks.length === 0 ? (
                     <div className="text-sm text-muted-foreground p-4 bg-muted/30 rounded-xl border border-border text-center">
-                      ยังไม่มีบัญชีผู้ปกครองเชื่อมต่อกับบัญชีของคุณ (ผู้ปกครองสามารถใช้รหัส Parent Code ด้านบนเพื่อลงทะเบียนเชื่อมต่อได้ทันที)
+                      ยังไม่มีบัญชีผู้ปกครองเชื่อมต่อกับบัญชีของคุณ (สามารถติดต่อขอรับรหัสเชื่อมต่อผู้ปกครองได้ที่แผนกวิชา)
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -279,9 +297,8 @@ export default function StudentDashboardClient({
                 </div>
               </div>
 
-              <StudentStatusOverview attendances={attendances} subjects={mySubjects} />
-
-              <div className="bg-card p-6 rounded-2xl shadow-sm border border-border transition-shadow hover:shadow-md mt-8">
+              {/* อัปเดตข้อมูลใบหน้า */}
+              <div className="bg-card p-6 rounded-2xl shadow-sm border border-border transition-shadow hover:shadow-md">
                 <h3 className="font-bold text-lg mb-5 text-foreground flex items-center gap-2">
                   <Camera className="w-5 h-5 text-primary" /> อัปเดตข้อมูลใบหน้า
                 </h3>
