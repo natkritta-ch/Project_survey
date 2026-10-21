@@ -123,7 +123,57 @@ export default async function StudentDashboard() {
     return isSameLevel && isCurrentTerm;
   });
 
-  // 3. ดึงรายชื่อวิชาทั้งหมดที่เคยเช็คชื่อไว้ หรือมีในตารางสอน มาใส่ใน Dropdown
+  // ดึงคลาสสอนชดเชยของระดับชั้นนักเรียนคนนี้
+  let makeupClasses: any[] = [];
+  try {
+    const rawMakeups = await (prisma as any).makeupClass.findMany({
+      where: {
+        deletedAt: null,
+        subject: {
+          deletedAt: null,
+          level: myInfo?.level || ""
+        }
+      },
+      include: {
+        subject: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            level: true,
+            room: true,
+            group: true,
+            academicYear: true,
+            term: true,
+            teacher: {
+              select: {
+                id: true,
+                name: true,
+                phone: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: [
+        { date: "asc" },
+        { startTime: "asc" }
+      ]
+    });
+
+    makeupClasses = rawMakeups.filter((mc: any) => {
+      if (!mc.subject) return false;
+      if (!currentTerm) return true;
+      return (
+        mc.subject.academicYear === currentTerm.academicYear &&
+        mc.subject.term === currentTerm.term
+      );
+    });
+  } catch (err) {
+    console.error("Failed to fetch student makeup classes:", err);
+  }
+
+  // 3. ดึงรายชื่อวิชาทั้งหมดที่เคยเช็คชื่อไว้ หรือมีในตารางสอน/คลาสชดเชย มาใส่ใน Dropdown
   const uniqueSubjectsMap = new Map();
   mySchedules.forEach(sc => {
     if (sc.subject) uniqueSubjectsMap.set(sc.subject.id, sc.subject);
@@ -131,6 +181,11 @@ export default async function StudentDashboard() {
   attendances.forEach(a => {
     if (a.subject && !uniqueSubjectsMap.has(a.subject.id)) {
       uniqueSubjectsMap.set(a.subject.id, a.subject);
+    }
+  });
+  makeupClasses.forEach(mc => {
+    if (mc.subject && !uniqueSubjectsMap.has(mc.subject.id)) {
+      uniqueSubjectsMap.set(mc.subject.id, mc.subject);
     }
   });
   const mySubjects = Array.from(uniqueSubjectsMap.values());
@@ -168,6 +223,7 @@ export default async function StudentDashboard() {
       daysMap={daysMap}
       initialParentLinks={parentLinks}
       advisorInfo={advisorInfo}
+      makeupClasses={makeupClasses}
     />
   );
 }

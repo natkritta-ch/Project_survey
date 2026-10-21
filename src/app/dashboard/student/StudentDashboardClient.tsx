@@ -5,7 +5,7 @@ import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Users, Calendar, Clock, BookOpen, Menu, X, Settings, Camera, GraduationCap, Phone } from "lucide-react";
+import { User, Users, Calendar, Clock, BookOpen, Menu, X, Settings, Camera, GraduationCap, Phone, MapPin, Sparkles } from "lucide-react";
 import { showError, showToast, showConfirm } from "@/lib/alerts";
 
 export default function StudentDashboardClient({
@@ -18,11 +18,34 @@ export default function StudentDashboardClient({
   dayColors,
   daysMap,
   initialParentLinks,
-  advisorInfo = null
+  advisorInfo = null,
+  makeupClasses = []
 }: any) {
   const [activeTab, setActiveTab] = useState("overview"); // overview, schedule, attendance
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [parentLinks, setParentLinks] = useState(initialParentLinks || []);
+
+  // หาวันที่ปัจจุบันตามเวลาประเทศไทย (Asia/Bangkok)
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+
+  const todaysMakeups = (makeupClasses || []).filter((mc: any) => {
+    const dStr = new Date(mc.date).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+    return dStr === todayStr;
+  });
+
+  const sortedMakeups = [...(makeupClasses || [])].sort((a: any, b: any) => {
+    const aStr = new Date(a.date).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+    const bStr = new Date(b.date).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+    const aIsUpcoming = aStr >= todayStr;
+    const bIsUpcoming = bStr >= todayStr;
+    if (aIsUpcoming && !bIsUpcoming) return -1;
+    if (!aIsUpcoming && bIsUpcoming) return 1;
+    if (aIsUpcoming) {
+      return aStr.localeCompare(bStr) || a.startTime.localeCompare(b.startTime);
+    } else {
+      return bStr.localeCompare(aStr) || b.startTime.localeCompare(a.startTime);
+    }
+  });
 
   // ล็อกการเลื่อนหน้าจอข้างหลังเมื่อเปิดเมนูมือถือ
   React.useEffect(() => {
@@ -120,17 +143,24 @@ export default function StudentDashboardClient({
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 font-medium text-left group
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 font-medium text-left group
                 ${activeTab === tab.id 
                   ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20' 
                   : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 }
               `}
             >
-              <span className={`transition-transform duration-200 ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`}>
-                {tab.icon}
-              </span>
-              {tab.label}
+              <div className="flex items-center gap-3">
+                <span className={`transition-transform duration-200 ${activeTab === tab.id ? 'scale-110' : 'group-hover:scale-110'}`}>
+                  {tab.icon}
+                </span>
+                <span>{tab.label}</span>
+              </div>
+              {tab.id === "schedule" && todaysMakeups.length > 0 && (
+                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">
+                  มีชดเชย
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -153,6 +183,54 @@ export default function StudentDashboardClient({
                 <h1 className="text-2xl md:text-[var(--text-3xl)] font-extrabold text-foreground mb-2 tracking-tight">ยินดีต้อนรับ, <span className="text-primary">{myInfo?.nickname || myInfo?.name?.split(' ')[0]}</span> 👋</h1>
                 <p className="text-muted-foreground text-sm md:text-base">ตรวจสอบข้อมูลส่วนตัวและจัดการการผูกบัญชีผู้ปกครอง</p>
               </div>
+
+              {/* แจ้งเตือนคลาสสอนชดเชยวันนี้ */}
+              {todaysMakeups.length > 0 && (
+                <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 border-2 border-amber-400 dark:border-amber-600 shadow-sm animate-in fade-in">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-amber-500 text-white shadow-xs">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-base sm:text-lg text-amber-950 dark:text-amber-100 flex items-center gap-2">
+                          วันนี้คุณมีคลาสสอนชดเชย!
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-500 text-white">
+                            {todaysMakeups.length} วิชา
+                          </span>
+                        </h3>
+                        <p className="text-xs text-amber-800/80 dark:text-amber-200/80">
+                          มีกำหนดการสอนชดเชยในวันนี้ กรุณาตรวจสอบเวลาและห้องเรียน
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab("schedule")}
+                      className="self-start sm:self-auto text-xs font-bold px-3.5 py-2 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white rounded-xl transition shadow-xs flex items-center gap-1.5"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      ดูตารางเรียน →
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    {todaysMakeups.map((mc: any) => (
+                      <div key={mc.id} className="p-3 bg-white/90 dark:bg-gray-900/90 rounded-xl border border-amber-200 dark:border-amber-900/60 flex items-center justify-between shadow-2xs">
+                        <div className="min-w-0 pr-2">
+                          <p className="font-bold text-sm text-foreground truncate">{mc.subject?.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            ห้อง: <strong className="text-foreground">{mc.subject?.room || "-"}</strong>
+                            {mc.subject?.teacher?.name && ` • อ.${mc.subject.teacher.name}`}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-200 dark:border-amber-800">
+                          {mc.startTime} - {mc.endTime} น.
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="bg-card p-6 rounded-2xl shadow-sm border border-border mb-8 transition-shadow hover:shadow-md">
                 <h3 className="font-bold text-lg mb-5 text-foreground flex items-center gap-2">
@@ -254,9 +332,125 @@ export default function StudentDashboardClient({
           {/* Schedule Tab */}
           {activeTab === "schedule" && (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-6">ตารางเรียน {myInfo?.level ? `(${myInfo.level})` : ""}</h2>
-              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                <div>
+                  <h2 className="text-[var(--text-2xl)] font-bold text-foreground">
+                    ตารางเรียน {myInfo?.level ? `(${myInfo.level})` : ""}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    ตรวจสอบตารางเรียนประจำสัปดาห์และคลาสสอนชดเชย
+                  </p>
+                </div>
+              </div>
+
+              {/* Make-up Classes Section */}
+              {sortedMakeups.length > 0 && (
+                <div className="mb-8 bg-card rounded-2xl overflow-hidden shadow-sm border border-amber-300 dark:border-amber-800/80">
+                  <div className="p-4 sm:p-5 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent border-b border-amber-200 dark:border-amber-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 rounded-xl bg-amber-500 text-white shadow-xs">
+                        <Calendar className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
+                          คลาสสอนชดเชย
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 border border-amber-300 dark:border-amber-800">
+                            {sortedMakeups.length} คลาส
+                          </span>
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          กำหนดการสอนชดเชยที่อาจารย์ผู้สอนบันทึกไว้ในระบบ
+                        </p>
+                      </div>
+                    </div>
+                    {todaysMakeups.length > 0 && (
+                      <span className="self-start sm:self-auto text-xs font-extrabold px-3 py-1 rounded-full bg-amber-500 text-white shadow-xs animate-pulse">
+                        ✨ มีเรียนวันนี้ {todaysMakeups.length} คลาส
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="p-4 sm:p-5 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                      {sortedMakeups.map((mc: any) => {
+                        const mcDateStr = new Date(mc.date).toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" });
+                        const isToday = mcDateStr === todayStr;
+                        const isPast = mcDateStr < todayStr;
+                        const dateFormatted = new Date(mc.date).toLocaleDateString("th-TH", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric"
+                        });
+
+                        return (
+                          <div
+                            key={mc.id}
+                            className={`p-4 rounded-xl border transition-all ${
+                              isToday
+                                ? "bg-amber-50/80 dark:bg-amber-950/20 border-amber-300 dark:border-amber-700 shadow-xs ring-1 ring-amber-400/30"
+                                : isPast
+                                ? "bg-muted/10 border-border opacity-70"
+                                : "bg-card border-border hover:border-amber-400 dark:hover:border-amber-700 shadow-2xs"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full ${
+                                isToday
+                                  ? "bg-amber-500 text-white shadow-2xs"
+                                  : isPast
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                              }`}>
+                                {isToday ? "✨ วันนี้" : isPast ? "ผ่านมาแล้ว" : "เร็วๆ นี้"}
+                              </span>
+                              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                                <Clock className="w-3.5 h-3.5 opacity-70" />
+                                <span>{mc.startTime} - {mc.endTime} น.</span>
+                              </div>
+                            </div>
+
+                            <h4 className="font-bold text-base text-foreground mb-1">
+                              {mc.subject?.name}
+                            </h4>
+
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground mb-3">
+                              <span>รหัสวิชา: <strong className="text-foreground">{mc.subject?.code}</strong></span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-muted-foreground" />
+                                ห้อง: <strong className="text-foreground">{mc.subject?.room || "-"}</strong>
+                              </span>
+                              {mc.subject?.teacher?.name && (
+                                <>
+                                  <span>•</span>
+                                  <span>อ.{mc.subject.teacher.name}</span>
+                                </>
+                              )}
+                            </div>
+
+                            <div className="pt-2.5 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                              <span className="font-medium text-foreground flex items-center gap-1.5">
+                                🗓️ {dateFormatted}
+                              </span>
+                              {mc.remark && (
+                                <span className="text-[11px] italic text-muted-foreground truncate max-w-[150px]" title={mc.remark}>
+                                  หมายเหตุ: {mc.remark}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-4">
+                <div className="flex items-center gap-2 pt-2">
+                  <h3 className="font-bold text-lg text-foreground">ตารางเรียนประจำสัปดาห์</h3>
+                </div>
                 {groupedSchedules.length === 0 ? (
                   <div className="text-center text-muted-foreground py-12 bg-card rounded-2xl border border-dashed border-border">
                     ไม่มีข้อมูลตารางเรียนในระบบ
