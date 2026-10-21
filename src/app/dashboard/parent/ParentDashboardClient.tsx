@@ -2,10 +2,9 @@
 
 import React, { useState, useRef } from "react";
 import AttendanceHistory from "../../../components/AttendanceHistory";
-import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Clock, GraduationCap, Menu, X, Users, Home, ChevronDown, Search, Loader2, Sparkles } from "lucide-react";
+import { User, Clock, Menu, X, Users, Home, ChevronDown, Search, Loader2, Sparkles } from "lucide-react";
 import { showSuccess, showError } from "@/lib/alerts";
 
 export default function ParentDashboardClient({
@@ -14,11 +13,9 @@ export default function ParentDashboardClient({
   childrenData,
   allAttendances,
   allSubjects,
-  allSchedules,
-  allGrades,
-  allSubmissions = {}
+  allSchedules
 }: any) {
-  const [activeTab, setActiveTab] = useState("overview"); // overview, attendance, transcript
+  const [activeTab, setActiveTab] = useState("overview"); // overview, attendance
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const approvedChildren = childrenData?.filter((c: any) => c.linkStatus === "APPROVED") || [];
@@ -108,8 +105,7 @@ export default function ParentDashboardClient({
 
   const tabs = [
     { id: "overview", label: "ข้อมูลทั่วไป", icon: <Home className="w-5 h-5" /> },
-    { id: "attendance", label: "ประวัติเข้าเรียน", icon: <Clock className="w-5 h-5" /> },
-    { id: "transcript", label: "ผลการเรียน", icon: <GraduationCap className="w-5 h-5" /> }
+    { id: "attendance", label: "ประวัติเข้าเรียน", icon: <Clock className="w-5 h-5" /> }
   ];
 
   const handleTabClick = (id: string) => {
@@ -121,8 +117,6 @@ export default function ParentDashboardClient({
   const attendances = activeChildId ? (allAttendances[activeChildId] || []) : [];
   const childSubjects = activeChildId ? (allSubjects[activeChildId] || []) : [];
   const childSchedules = activeChildId ? (allSchedules[activeChildId] || []) : [];
-  const childGrades = activeChildId ? (allGrades[activeChildId] || []) : [];
-  const childSubmissions = activeChildId ? (allSubmissions[activeChildId] || []) : [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row font-sans">
@@ -394,7 +388,7 @@ export default function ParentDashboardClient({
               <Users className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
               <p className="font-bold text-foreground text-base">ยังไม่มีข้อมูลนักเรียนที่ได้รับการอนุมัติ</p>
               <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-                เมื่อนักเรียนกดยืนยันอนุมัติคำขอ ข้อมูลส่วนตัว ผลการเรียน ประวัติการเข้าเรียน และตารางเรียนจะปรากฏที่หน้านี้โดยอัตโนมัติ
+                เมื่อนักเรียนกดยืนยันอนุมัติคำขอ ข้อมูลส่วนตัว ประวัติการเข้าเรียน และตารางเรียนจะปรากฏที่หน้านี้โดยอัตโนมัติ
               </p>
             </div>
           ) : activeChild && (
@@ -460,25 +454,6 @@ export default function ParentDashboardClient({
                   <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-6">ประวัติการสแกนเข้าเรียนของ {activeChild.name}</h2>
                   <div className="bg-card p-2 sm:p-6 rounded-2xl shadow-sm border border-border">
                     <AttendanceHistory attendances={attendances} subjects={childSubjects} schedules={childSchedules} />
-                  </div>
-                </div>
-              )}
-
-              {/* Transcript Tab */}
-              {activeTab === "transcript" && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 mt-6">
-                  <div className="mb-6">
-                    <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-2">ระเบียนแสดงผลการเรียน (Transcript)</h2>
-                    <p className="text-muted-foreground">ผลการเรียนรวมของ {activeChild.name}</p>
-                  </div>
-                  <div className="bg-card p-4 sm:p-8 rounded-2xl shadow-sm border border-border print:shadow-none print:border-none print:bg-transparent print:p-0">
-                    <TranscriptView 
-                      grades={childGrades} 
-                      submissions={childSubmissions} 
-                      studentName={activeChild?.name} 
-                      studentUsername={activeChild?.username} 
-                      studentLevel={activeChild?.level} 
-                    />
                   </div>
                 </div>
               )}

@@ -3,7 +3,7 @@ import { authOptions } from "../../../../lib/auth";
 import { redirect } from "next/navigation";
 import prisma from "../../../../lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, Database, Activity, CheckCircle, XCircle, HardDrive, Users, FileText, ClipboardCheck, BookOpen } from "lucide-react";
+import { ArrowLeft, Database, Activity, CheckCircle, XCircle, HardDrive, Users, ClipboardCheck, BookOpen } from "lucide-react";
 
 export const dynamic = 'force-dynamic';
 
@@ -29,13 +29,12 @@ export default async function SystemStatusPage() {
   }
 
   // Get some basic stats if connected
-  let stats = { users: 0, attendances: 0, grades: 0, subjects: 0 };
+  let stats = { users: 0, attendances: 0, subjects: 0 };
   
   if (dbStatus === "CONNECTED") {
     try {
       stats.users = await prisma.user.count();
       stats.attendances = await prisma.attendance.count();
-      stats.grades = await prisma.grade.count();
       stats.subjects = await prisma.subject.count();
     } catch (e) {}
   }
@@ -142,7 +141,7 @@ export default async function SystemStatusPage() {
               <Database className="w-5 h-5 mr-2 text-indigo-500" />
               ปริมาณข้อมูลในฐานข้อมูลปัจจุบัน
             </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <Users className="w-8 h-8 text-blue-500 mb-2 opacity-80" />
                 <p className="text-sm text-slate-500 font-medium mb-1">จำนวนผู้ใช้งาน</p>
@@ -152,11 +151,6 @@ export default async function SystemStatusPage() {
                 <ClipboardCheck className="w-8 h-8 text-emerald-500 mb-2 opacity-80" />
                 <p className="text-sm text-slate-500 font-medium mb-1">ประวัติเข้าเรียน</p>
                 <p className="text-3xl font-extrabold text-slate-800 dark:text-white">{stats.attendances}</p>
-              </div>
-              <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                <FileText className="w-8 h-8 text-amber-500 mb-2 opacity-80" />
-                <p className="text-sm text-slate-500 font-medium mb-1">ประวัติผลการเรียน</p>
-                <p className="text-3xl font-extrabold text-slate-800 dark:text-white">{stats.grades}</p>
               </div>
               <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <BookOpen className="w-8 h-8 text-purple-500 mb-2 opacity-80" />

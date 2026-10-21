@@ -34,7 +34,6 @@ export default async function HeadDashboard() {
       email: true,
       nationalId: true,
       canEditProfile: true,
-      canSubmitGrades: true,
       isTwin: true,
       twinNote: true,
       twinVerified: true,

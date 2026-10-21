@@ -6,8 +6,6 @@ import { getCurrentTermConfig } from "../../../lib/term";
 import Link from "next/link";
 import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
-import StudentGrades from "./StudentGrades";
-import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentDashboardClient from "./StudentDashboardClient";
 
@@ -30,7 +28,6 @@ export default async function StudentDashboard() {
       username: true, 
       level: true, 
       canEditProfile: true,
-      canSubmitGrades: true, // Bug #8: เพิ่ม field นี้
       nickname: true,
       gender: true,
       bloodType: true,
@@ -48,7 +45,6 @@ export default async function StudentDashboard() {
   if (!myInfo.isTwoFactorEnabled) {
     redirect("/dashboard/2fa?forced=true");
   }
-
 
   // ดึงประวัติเข้าเรียนของนักเรียนคนนี้
   const attendances = await prisma.attendance.findMany({
@@ -86,22 +82,7 @@ export default async function StudentDashboard() {
     return isSameLevel && isCurrentTerm;
   });
 
-  const myGrades = await prisma.grade.findMany({
-    where: { studentId: userId },
-    include: { subject: true },
-    orderBy: [{ subject: { academicYear: 'desc' } }, { subject: { term: 'desc' } }]
-  });
-
-  // ดึงข้อมูลใบรายงานผลการศึกษาทางการที่ผ่านการอนุมัติแล้ว (APPROVED หรือ TEACHER_APPROVED)
-  const mySubmissions = await (prisma as any).gradeSubmission.findMany({
-    where: { 
-      studentId: userId,
-      status: { in: ["APPROVED", "TEACHER_APPROVED"] }
-    },
-    orderBy: [{ academicYear: 'desc' }, { term: 'desc' }]
-  });
-
-  // 3. (แก้ปัญหาที่ 2) ดึงรายชื่อวิชาทั้งหมดที่เคยเช็คชื่อไว้ หรือมีเกรด มาใส่ใน Dropdown
+  // 3. ดึงรายชื่อวิชาทั้งหมดที่เคยเช็คชื่อไว้ หรือมีในตารางสอน มาใส่ใน Dropdown
   const uniqueSubjectsMap = new Map();
   mySchedules.forEach(sc => {
     if (sc.subject) uniqueSubjectsMap.set(sc.subject.id, sc.subject);
@@ -109,11 +90,6 @@ export default async function StudentDashboard() {
   attendances.forEach(a => {
     if (a.subject && !uniqueSubjectsMap.has(a.subject.id)) {
       uniqueSubjectsMap.set(a.subject.id, a.subject);
-    }
-  });
-  myGrades.forEach(g => {
-    if (g.subject && !uniqueSubjectsMap.has(g.subject.id)) {
-      uniqueSubjectsMap.set(g.subject.id, g.subject);
     }
   });
   const mySubjects = Array.from(uniqueSubjectsMap.values());
@@ -146,8 +122,6 @@ export default async function StudentDashboard() {
       attendances={attendances}
       mySubjects={mySubjects}
       mySchedules={mySchedules}
-      myGrades={myGrades}
-      mySubmissions={JSON.parse(JSON.stringify(mySubmissions))}
       groupedSchedules={groupedSchedules}
       dayColors={dayColors}
       daysMap={daysMap}

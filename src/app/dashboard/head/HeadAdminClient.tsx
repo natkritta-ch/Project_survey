@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restoreSubject, hardDeleteSubject, restoreAllSubjects, hardDeleteAllSubjects, createSchedule, updateSchedule, deleteSchedule, deleteManySchedules, restoreSchedule, hardDeleteSchedule, restoreAllSchedules, hardDeleteAllSchedules, createUser, updateUser, deleteUser, deleteManyUsers, restoreUser, hardDeleteUser, restoreAllUsers, hardDeleteAllUsers, toggleEditPermission, toggleGradeSubmission, toggleAllStudentsGradeSubmission, promoteStudents, clearOldGraduates, getUserDetails } from "./actions";
+import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restoreSubject, hardDeleteSubject, restoreAllSubjects, hardDeleteAllSubjects, createSchedule, updateSchedule, deleteSchedule, deleteManySchedules, restoreSchedule, hardDeleteSchedule, restoreAllSchedules, hardDeleteAllSchedules, createUser, updateUser, deleteUser, deleteManyUsers, restoreUser, hardDeleteUser, restoreAllUsers, hardDeleteAllUsers, toggleEditPermission, promoteStudents, clearOldGraduates, getUserDetails } from "./actions";
 import AttendanceHistory from "../../../components/AttendanceHistory";
-import TranscriptView from "../../../components/TranscriptView";
 import HeadAdminOverview from "./HeadAdminOverview";
-import HeadGradesManagement from "./HeadGradesManagement";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -81,8 +79,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [filterUserLevel, setFilterUserLevel] = useState("ทั้งหมด");
   const [searchUser, setSearchUser] = useState("");
   
-  // ---------- Grades & Attendance State ----------
-  const [viewGradesUser, setViewGradesUser] = useState<any>(null);
+  // ---------- Attendance State ----------
   const [viewAttendanceUser, setViewAttendanceUser] = useState<any>(null);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [isEditSubjectModalOpen, setIsEditSubjectModalOpen] = useState(false);
@@ -496,10 +493,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         <button onClick={() => {setActiveTab("subjects"); resetSubjectForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'subjects' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>จัดการวิชา</button>
         <button onClick={() => {setActiveTab("schedules"); resetScheduleForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'schedules' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>ตารางเรียน</button>
         <button onClick={() => {setActiveTab("users"); resetUserForm();}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap ${activeTab === 'users' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>จัดการผู้ใช้งาน</button>
-        <button onClick={() => {setActiveTab("grades");}} className={`px-6 py-3 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${activeTab === 'grades' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}>
-          <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-          ผลการเรียนและใบเกรด
-        </button>
         <button onClick={() => {setActiveTab("trash");}} className={`ml-auto px-6 py-3 font-medium text-sm whitespace-nowrap flex items-center gap-2 ${activeTab === 'trash' ? 'border-b-2 border-red-500 text-red-600' : 'text-red-400 hover:text-red-600'}`}>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           ถังขยะ
@@ -1508,11 +1501,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                         </div>
                       </div>
 
-                      <div className="flex justify-between border-t border-gray-200/60 dark:border-gray-700 pt-3">
-                        <a href={`/dashboard/head/transcript/${u.id}`} target="_blank" className="text-purple-700 hover:text-purple-900 text-xs font-bold border shadow-sm border-purple-200 bg-purple-50 hover:bg-purple-100 dark:bg-purple-900/30 dark:border-purple-800 dark:text-purple-300 px-3 py-1.5 rounded-md transition flex items-center gap-1">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-                          ดูผลการเรียน
-                        </a>
+                      <div className="flex justify-end border-t border-gray-200/60 dark:border-gray-700 pt-3">
                         <div className="flex gap-2">
                            <button disabled={isLoading} onClick={() => handleEditUser(u)} className="text-slate-600 hover:text-slate-900 border text-xs font-bold border-slate-200 bg-white hover:bg-slate-50 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 px-3 py-1.5 rounded-md transition shadow-sm">แก้ไข</button>
                            <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบผู้ใช้?", text: `ต้องการย้าย "${u.name}" ออกจากระบบใช่หรือไม่? (ข้อมูลจะถูกย้ายไปถังขยะ)`, isDanger: true }); if(ok) deleteUser(u.id); }} className="text-red-600 hover:text-red-800 border text-xs font-bold border-red-200 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300 px-3 py-1.5 rounded-md transition shadow-sm">ลบ</button>
@@ -1619,9 +1608,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                             </>
                           ) : (
                             <>
-                              {u.role === "STUDENT" && (
-                                <a href={`/dashboard/head/transcript/${u.id}`} target="_blank" className="text-green-600 hover:text-green-900 mr-4 disabled:opacity-50 inline-block">ดูเกรด</a>
-                              )}
                               <button disabled={isLoading} onClick={() => handleEditUser(u)} className="text-indigo-600 hover:text-indigo-900 disabled:opacity-50">แก้ไข</button>
                               <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบผู้ใช้?", text: `ต้องการย้าย "${u.name}" ไปที่ถังขยะใช่หรือไม่?`, isDanger: true }); if(ok) deleteUser(u.id); }} className="text-red-600 hover:text-red-900 ml-4 disabled:opacity-50">ลบ</button>
                             </>
@@ -1828,10 +1814,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
           </div>
         )}
 
-        {/* ================= Grades & Deadlines Tab ================= */}
-        {activeTab === "grades" && (
-          <HeadGradesManagement users={users} />
-        )}
+
       </div>
 
       {/* ================= End Tabs ================= */}

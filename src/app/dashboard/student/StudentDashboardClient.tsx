@@ -3,11 +3,9 @@
 import React, { useState } from "react";
 import StudentEditProfile from "./StudentEditProfile";
 import AttendanceHistory from "../../../components/AttendanceHistory";
-import StudentGrades from "./StudentGrades";
-import TranscriptView from "../../../components/TranscriptView";
 import LogoutButton from "../../../components/LogoutButton";
 import StudentStatusOverview from "../../../components/StudentStatusOverview";
-import { User, Calendar, Clock, BookOpen, GraduationCap, Menu, X, Settings, Camera } from "lucide-react";
+import { User, Calendar, Clock, BookOpen, Menu, X, Settings, Camera } from "lucide-react";
 import { showError, showToast, showConfirm } from "@/lib/alerts";
 
 export default function StudentDashboardClient({
@@ -16,14 +14,12 @@ export default function StudentDashboardClient({
   attendances,
   mySubjects,
   mySchedules,
-  myGrades,
-  mySubmissions = [],
   groupedSchedules,
   dayColors,
   daysMap,
   initialParentLinks
 }: any) {
-  const [activeTab, setActiveTab] = useState("overview"); // overview, schedule, attendance, grades, transcript
+  const [activeTab, setActiveTab] = useState("overview"); // overview, schedule, attendance
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [parentLinks, setParentLinks] = useState(initialParentLinks || []);
 
@@ -79,9 +75,7 @@ export default function StudentDashboardClient({
   const tabs = [
     { id: "overview", label: "ข้อมูลของฉัน", icon: <User className="w-5 h-5" /> },
     { id: "schedule", label: "ตารางเรียน", icon: <Calendar className="w-5 h-5" /> },
-    { id: "attendance", label: "ประวัติเข้าเรียน", icon: <Clock className="w-5 h-5" /> },
-    { id: "grades", label: "ผลการเรียน", icon: <BookOpen className="w-5 h-5" /> },
-    { id: "transcript", label: "Transcript", icon: <GraduationCap className="w-5 h-5" /> }
+    { id: "attendance", label: "ประวัติเข้าเรียน", icon: <Clock className="w-5 h-5" /> }
   ];
 
   const handleTabClick = (id: string) => {
@@ -291,35 +285,6 @@ export default function StudentDashboardClient({
               <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-6">ประวัติการเข้าเรียน</h2>
               <div className="bg-card p-2 sm:p-6 rounded-2xl shadow-sm border border-border">
                 <AttendanceHistory attendances={attendances} subjects={mySubjects} schedules={mySchedules} />
-              </div>
-            </div>
-          )}
-
-          {/* Grades Tab */}
-          {activeTab === "grades" && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <div className="mb-6">
-                <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-2">ผลการเรียน (เกรด)</h2>
-                <p className="text-muted-foreground">ตรวจสอบและอัปเดตเกรดรายวิชา หากได้รับอนุญาตให้แก้ไขได้</p>
-              </div>
-              <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-sm border border-border">
-                <StudentGrades subjects={mySubjects} initialGrades={myGrades} canSubmitGrades={myInfo?.canSubmitGrades || false} />
-              </div>
-            </div>
-          )}
-
-          {/* Transcript Tab */}
-          {activeTab === "transcript" && (
-            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <h2 className="text-[var(--text-2xl)] font-bold text-foreground mb-6 no-print">ระเบียนแสดงผลการเรียน (Transcript)</h2>
-              <div className="bg-card p-4 sm:p-8 rounded-2xl shadow-sm border border-border print:shadow-none print:border-none print:bg-transparent print:p-0">
-                <TranscriptView 
-                  grades={myGrades} 
-                  submissions={mySubmissions} 
-                  studentName={myInfo?.name} 
-                  studentUsername={myInfo?.username} 
-                  studentLevel={myInfo?.level} 
-                />
               </div>
             </div>
           )}

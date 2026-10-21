@@ -373,21 +373,6 @@ export async function toggleEditPermission(id: string, canEditProfile: boolean) 
   revalidatePath("/dashboard/head");
 }
 
-export async function toggleGradeSubmission(id: string, canSubmitGrades: boolean) {
-  await requireHeadAuth();
-  await prisma.user.update({ where: { id }, data: { canSubmitGrades } });
-  revalidatePath("/dashboard/head");
-}
-
-export async function toggleAllStudentsGradeSubmission(canSubmitGrades: boolean) {
-  await requireHeadAuth();
-  await prisma.user.updateMany({
-    where: { role: "STUDENT", deletedAt: null },
-    data: { canSubmitGrades }
-  });
-  revalidatePath("/dashboard/head");
-}
-
 export async function createOrUpdateTermConfig(data: { academicYear: string; term: string; startDate: Date; endDate: Date }) {
   await requireHeadAuth();
   const existing = await prisma.termConfig.findUnique({
@@ -464,7 +449,6 @@ export async function getUserDetails(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
-      grades: { include: { subject: true } },
       attendances: { include: { subject: true }, orderBy: { timestamp: 'desc' } }
     }
   });
