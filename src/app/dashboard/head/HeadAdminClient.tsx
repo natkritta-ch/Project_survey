@@ -2736,44 +2736,51 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
             </div>
 
             {/* Actions Bar */}
-            <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-750 flex flex-wrap items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-                <input 
-                  type="text" 
-                  value={parentCodeSearch}
-                  onChange={e => setParentCodeSearch(e.target.value)}
-                  placeholder="ค้นหาชื่อ, รหัสนักศึกษา, ชั้นปี หรือรหัสโค้ด..." 
-                  className="w-full sm:w-72 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={async () => {
-                    setIsLoading(true);
-                    try {
-                      const res = await generateParentCodesForAllStudents();
-                      showToast(`สร้างรหัสผู้ปกครองสำเร็จ (${res.count} คน)`, "success");
-                    } catch (e: any) {
-                      showError("เกิดข้อผิดพลาด", e.message);
-                    } finally {
-                      setIsLoading(false);
-                    }
-                  }}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  ⚡ สร้างรหัสให้อัตโนมัติ (คนที่ยังไม่มี)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
-                >
-                  🖨️ พิมพ์รายการ
-                </button>
-              </div>
-            </div>
+            {(() => {
+              const missingCount = users.filter((u: any) => u.role === "STUDENT" && !u.deletedAt && (!u.parentCode || !u.parentCode.trim())).length;
+              return (
+                <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-750 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                  <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                    <input 
+                      type="text" 
+                      value={parentCodeSearch}
+                      onChange={e => setParentCodeSearch(e.target.value)}
+                      placeholder="ค้นหาชื่อ, รหัสนักศึกษา, ชั้นปี หรือรหัสโค้ด..." 
+                      className="w-full sm:w-72 px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {missingCount > 0 && (
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        onClick={async () => {
+                          setIsLoading(true);
+                          try {
+                            const res = await generateParentCodesForAllStudents();
+                            showToast(`สร้างรหัสผู้ปกครองสำเร็จ (${res.count} คน)`, "success");
+                          } catch (e: any) {
+                            showError("เกิดข้อผิดพลาด", e.message);
+                          } finally {
+                            setIsLoading(false);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        ⚡ สร้างรหัสให้อัตโนมัติ ({missingCount} คนที่ยังไม่มี)
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => window.print()}
+                      className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                    >
+                      🖨️ พิมพ์รายการ
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Students Table */}
             <div className="overflow-y-auto flex-1 p-4">
