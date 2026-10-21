@@ -5,7 +5,7 @@ import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Sea
 import * as XLSX from "xlsx";
 
 export default function HeadAdminOverview({ subjects, users, levelsOptions, termConfigs = [] }: { subjects: any[], users: any[], levelsOptions: string[], termConfigs?: any[] }) {
-  const [filterLevel, setFilterLevel] = useState("ทั้งหมด");
+  const [filterLevel, setFilterLevel] = useState("ปวช.1");
   const [searchKr, setSearchKr] = useState("");
   const [filterSubjectKr, setFilterSubjectKr] = useState("ทั้งหมด");
   const [isSubjectKrDropdownOpen, setIsSubjectKrDropdownOpen] = useState(false);
@@ -256,9 +256,11 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
               onChange={e => setFilterLevel(e.target.value)} 
               className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer pr-1"
             >
-              <option value="ทั้งหมด" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">🌍 ทุกระดับชั้น (ค่าเริ่มต้น)</option>
+              <option value="ทั้งหมด" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">🌍 ทุกระดับชั้น</option>
               {levelsOptions.map(lvl => (
-                <option key={lvl} value={lvl} className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">{lvl}</option>
+                <option key={lvl} value={lvl} className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
+                  {lvl}{lvl === "ปวช.1" ? " (ค่าเริ่มต้น)" : ""}
+                </option>
               ))}
             </select>
           </div>
