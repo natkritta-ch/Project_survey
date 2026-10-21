@@ -190,8 +190,8 @@ export default function HeadAdvisorManagement({
     const prevYear = String(parseInt(selectedYear, 10) - 1);
     const ok = await showConfirm({
       title: `เลื่อนครูตามรุ่นชั้นปีจากปี ${prevYear}?`,
-      text: `ระบบจะเลื่อนครูที่ปรึกษาตามรุ่นนักเรียน (ปวช.1 ➡️ ปวช.2, ปวช.2 ➡️ ปวช.3, ปวส.1 ➡️ ปวส.2) มาใส่ในปี ${selectedYear} ใช่หรือไม่?`,
-      confirmText: "เลื่อนตามรุ่นชั้นปี",
+      text: `ระบบจะเลื่อนครูที่ปรึกษาตามรุ่นนักเรียนทุกระดับชั้น (ปวช.1 ➡️ ปวช.2, ปวช.2 ➡️ ปวช.3, ปวส.1 ➡️ ปวส.2, ปวส.1(ม.6) ➡️ ปวส.2(ม.6)) มาใส่ในปี ${selectedYear} ใช่หรือไม่?`,
+      confirmText: "เลื่อนตามรุ่นทุกชั้นปี",
       icon: "question"
     });
 
@@ -294,10 +294,11 @@ export default function HeadAdvisorManagement({
             type="button"
             disabled={isSaving || isLoading}
             onClick={handlePromoteAdvisors}
+            title="เลื่อนครูตามรุ่นนักเรียนทุกระดับชั้น: ปวช.1 ➡️ ปวช.2, ปวช.2 ➡️ ปวช.3, ปวส.1 ➡️ ปวส.2, ปวส.1(ม.6) ➡️ ปวส.2(ม.6)"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold shadow-sm transition active:scale-95"
           >
             <ArrowRight className="w-3.5 h-3.5 text-amber-500" />
-            เลื่อนครูตามรุ่นนักเรียน (ปวช.1 ➡️ ปวช.2)
+            เลื่อนครูตามรุ่นนักเรียน (ทุกระดับชั้น)
           </button>
         </div>
       </div>
