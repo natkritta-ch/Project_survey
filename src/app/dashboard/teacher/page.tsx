@@ -307,8 +307,8 @@ export default async function TeacherDashboard() {
         const hasAssemblyRecords = effectiveTotalDays > 0;
         const assemblyPercent = hasAssemblyRecords ? Math.round((assemblyPresents / effectiveTotalDays) * 100) : 0;
         
-        // เสี่ยง ม.ผ. ตามเกณฑ์ สอศ. (เวลาเข้าร่วม < 80% หรือ ขาด >= 4 ครั้ง หรือ ขาด >= 20%)
-        const isAssemblyAtRisk = hasAssemblyRecords && (assemblyAbsents >= 4 || (effectiveTotalDays > 0 && (assemblyAbsents / effectiveTotalDays) >= 0.20) || assemblyPercent < 80);
+        // เสี่ยง ม.ผ. ตามเกณฑ์กิจกรรมหน้าเสาธง (เกณฑ์ผ่าน 60% อะลุ้มอล่วยตามมติสถานศึกษา)
+        const isAssemblyAtRisk = hasAssemblyRecords && assemblyPercent < 60;
 
         // 2. แยกวิชาเรียนรายวิชา (Class)
         const classAtts = atts.filter((a: any) => a.type === "class");

@@ -226,8 +226,8 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
 
       const presents = Array.from(dayStatusMap.values()).filter((status: string) => ["PRESENT", "LATE"].includes(status)).length;
       const percent = Math.round((presents / totalDays) * 100);
-      // เกณฑ์ สอศ. ม.ผ. คือเวลาเข้าร่วม < 80%
-      if (percent < 80) {
+      // เกณฑ์กิจกรรมหน้าเสาธง: ม.ผ. คือเวลาเข้าร่วม < 60% (อะลุ้มอล่วยตามมติสถานศึกษา)
+      if (percent < 60) {
         failedCount++;
         failingStudentsList.push({ ...s, percent, presents });
       }
@@ -538,7 +538,7 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
               <div className="p-2 bg-orange-100 text-orange-600 rounded-full dark:bg-orange-900/40">
                 <BadgeCheck className="w-5 h-5" />
               </div>
-              <h3 className="font-bold text-orange-900 dark:text-orange-200 text-lg">รายชื่อนักเรียนติด มผ. (เข้าแถว {"<"} 80%)</h3>
+              <h3 className="font-bold text-orange-900 dark:text-orange-200 text-lg">รายชื่อนักเรียนติด มผ. (เข้าแถว {"<"} 60%)</h3>
             </div>
             <div className="flex items-center gap-2">
               <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-bold shadow-sm whitespace-nowrap">
