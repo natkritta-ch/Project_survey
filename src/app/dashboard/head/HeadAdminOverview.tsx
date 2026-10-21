@@ -177,17 +177,17 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
     <div className="space-y-6">
       
       {/* Overview Control Panel */}
-      <div className="bg-card/90 backdrop-blur-md p-5 rounded-2xl shadow-sm border border-border flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+      <div className="bg-card/90 backdrop-blur-md p-5 rounded-2xl shadow-sm border border-border flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div>
           <h2 className="text-[var(--text-xl)] font-bold text-foreground">ภาพรวมสถิติโรงเรียน (Global Overview)</h2>
           <p className="text-[var(--text-sm)] text-muted-foreground">ข้อมูลอัปเดตแบบเรียลไทม์ ครอบคลุมการเข้าแถวและการเข้าเรียนรายวิชา</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/50 px-3 py-2 rounded-xl border border-slate-100 dark:border-slate-700">
-            <span className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1.5 whitespace-nowrap">
-              <Clock className="w-4 h-4 text-indigo-500" />
-              ภาคเรียนประเมิน:
-            </span>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* ตัวเลือกภาคเรียน */}
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <Clock className="w-4 h-4 text-indigo-500 shrink-0" />
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">ภาคเรียน:</span>
             <select 
               value={selectedTermConfigId} 
               onChange={e => {
@@ -204,31 +204,37 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
                   }
                 }
               }} 
-              className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-1.5 text-sm font-bold text-indigo-700 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-sm"
+              className="bg-transparent text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none cursor-pointer pr-1"
             >
               {termConfigs.map(tc => (
-                <option key={tc.id} value={tc.id}>
-                  {tc.isCurrent ? `★ ภาคเรียนที่ ${tc.term}/${tc.academicYear} (ปัจจุบัน)` : `ภาคเรียนที่ ${tc.term}/${tc.academicYear}`}
+                <option key={tc.id} value={tc.id} className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
+                  {tc.isCurrent ? `★ เทอม ${tc.term}/${tc.academicYear} (ปัจจุบัน)` : `เทอม ${tc.term}/${tc.academicYear}`}
                 </option>
               ))}
               {termConfigs.length === 0 && (
-                <option value="none">เทอม 1/{currentBEYear} (ค่าเริ่มต้น)</option>
+                <option value="none" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
+                  เทอม 1/{currentBEYear} (ค่าเริ่มต้น)
+                </option>
               )}
-              <option value="all">-- ข้อมูลทั้งหมด (ไม่จำกัดช่วงเวลา) --</option>
+              <option value="all" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">
+                -- ทุกช่วงเวลา (ทั้งหมด) --
+              </option>
             </select>
-
-            {assemblyStartDate && assemblyEndDate && (
-              <span className="text-[11px] text-slate-400 hidden lg:inline-block ml-1">
-                ({new Date(assemblyStartDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} - {new Date(assemblyEndDate).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' })})
-              </span>
-            )}
           </div>
-          <div className="hidden sm:block h-8 w-px bg-slate-200 dark:bg-slate-700"></div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-bold text-slate-600 dark:text-slate-300 whitespace-nowrap flex-shrink-0">ตัวกรองชั้นปี:</label>
-            <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-4 py-2 font-medium shadow-sm outline-none focus:ring-2 focus:ring-indigo-500">
-              <option value="ทั้งหมด">🌍 ทุกระดับชั้น (ค่าเริ่มต้น)</option>
-              {levelsOptions.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+
+          {/* ตัวเลือกชั้นปี */}
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+            <Users className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">ระดับชั้น:</span>
+            <select 
+              value={filterLevel} 
+              onChange={e => setFilterLevel(e.target.value)} 
+              className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer pr-1"
+            >
+              <option value="ทั้งหมด" className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">🌍 ทุกระดับชั้น (ค่าเริ่มต้น)</option>
+              {levelsOptions.map(lvl => (
+                <option key={lvl} value={lvl} className="text-slate-900 dark:text-white bg-white dark:bg-slate-800">{lvl}</option>
+              ))}
             </select>
           </div>
         </div>
