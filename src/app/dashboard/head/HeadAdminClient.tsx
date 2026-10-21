@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restoreSubject, hardDeleteSubject, restoreAllSubjects, hardDeleteAllSubjects, createSchedule, updateSchedule, deleteSchedule, deleteManySchedules, restoreSchedule, hardDeleteSchedule, restoreAllSchedules, hardDeleteAllSchedules, createUser, updateUser, deleteUser, deleteManyUsers, restoreUser, hardDeleteUser, restoreAllUsers, hardDeleteAllUsers, toggleEditPermission, promoteStudents, clearOldGraduates, getUserDetails } from "./actions";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import HeadAdminOverview from "./HeadAdminOverview";
@@ -46,13 +46,14 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const teachers = users.filter(u => u.role === "TEACHER" || u.role === "HEAD");
 
   // ---------- Schedules State ----------
-  const currentTermConfig = termConfigs.find((t: any) => t.isCurrent) || termConfigs[0];
-  const [schedFilterTermConfigId, setSchedFilterTermConfigId] = useState<string>(
-    currentTermConfig ? currentTermConfig.id : "all"
-  );
+  const currentTermConfig = termConfigs.find((t: any) => t.isCurrent);
+  const defaultTermValue = currentTermConfig
+    ? `${currentTermConfig.term}/${currentTermConfig.academicYear}`
+    : (termConfigs.length > 0 ? `${termConfigs[0].term}/${termConfigs[0].academicYear}` : `1/${currentBEYear}`);
+
+  const [schedFilterTerm, setSchedFilterTerm] = useState<string>(defaultTermValue);
   const [schedFilterLevel, setSchedFilterLevel] = useState("ปวช.1");
   const [schedFilterGroup, setSchedFilterGroup] = useState("ทั้งหมด");
-  const [isAddScheduleOpen, setIsAddScheduleOpen] = useState(false);
   const [schedId, setSchedId] = useState("");
   const [schedSubjId, setSchedSubjId] = useState("");
   const [schedDay, setSchedDay] = useState("1");
@@ -182,7 +183,6 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       } else {
         await createSchedule({ subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
         showToast("เพิ่มคาบเรียนลงในตารางสำเร็จ", "success");
-        setIsAddScheduleOpen(false);
       }
       resetScheduleForm();
     } catch (err: any) {
@@ -198,13 +198,17 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   };
 
   const handleEditSchedule = (sc: any) => {
-    setSchedId(sc.id); setSchedSubjId(sc.subjectId); setSchedDay(sc.dayOfWeek.toString()); setSchedStart(sc.startTime); setSchedEnd(sc.endTime);
-    setIsEditScheduleModalOpen(true);
+    setSchedId(sc.id); 
+    setSchedSubjId(sc.subjectId); 
+    setSchedDay(sc.dayOfWeek.toString()); 
+    setSchedStart(sc.startTime); 
+    setSchedEnd(sc.endTime);
+    const el = document.getElementById("schedule-form-section");
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const resetScheduleForm = () => {
     setSchedId(""); setSchedSubjId(""); setSchedDay("1"); setSchedStart("08:00"); setSchedEnd("10:00");
-    setIsEditScheduleModalOpen(false);
   };
 
   // ================= USER HANDLERS =================
@@ -419,9 +423,39 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     }
   };
 
-  const selectedSchedTermConfig = termConfigs.find((t: any) => t.id === schedFilterTermConfigId);
-  const targetSchedTerm = selectedSchedTermConfig ? selectedSchedTermConfig.term : (schedFilterTermConfigId === "all" ? null : null);
-  const targetSchedYear = selectedSchedTermConfig ? selectedSchedTermConfig.academicYear : (schedFilterTermConfigId === "all" ? null : null);
+  const isAllTerms = schedFilterTerm === "all";
+  const targetSchedTerm = !isAllTerms ? schedFilterTerm.split("/")[0] : null;
+  const targetSchedYear = !isAllTerms ? schedFilterTerm.split("/")[1] : null;
+
+  const termOptions = useMemo(() => {
+    const optionsMap = new Map<string, { term: string; academicYear: string; isCurrent: boolean }>();
+    
+    termConfigs.forEach((tc: any) => {
+      const key = `${tc.term}/${tc.academicYear}`;
+      optionsMap.set(key, { term: String(tc.term), academicYear: String(tc.academicYear), isCurrent: !!tc.isCurrent });
+    });
+
+    subjects.forEach((s: any) => {
+      if (s.term && s.academicYear) {
+        const key = `${s.term}/${s.academicYear}`;
+        if (!optionsMap.has(key)) {
+          optionsMap.set(key, { term: String(s.term), academicYear: String(s.academicYear), isCurrent: false });
+        }
+      }
+    });
+
+    const defaultKey = `1/${currentBEYear}`;
+    if (!optionsMap.has(defaultKey)) {
+      optionsMap.set(defaultKey, { term: "1", academicYear: String(currentBEYear), isCurrent: true });
+    }
+
+    return Array.from(optionsMap.values()).sort((a, b) => {
+      if (b.academicYear !== a.academicYear) {
+        return b.academicYear.localeCompare(a.academicYear);
+      }
+      return b.term.localeCompare(a.term);
+    });
+  }, [termConfigs, subjects, currentBEYear]);
 
   const displaySubjects = filterLevel === "ทั้งหมด" ? activeSubjects : activeSubjects.filter(s => s.level === filterLevel);
   const displaySchedules = activeSchedules.filter(sc => {
@@ -430,8 +464,8 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       const grp = sc.subject?.group || "";
       if (grp !== schedFilterGroup && !grp.includes(schedFilterGroup)) return false;
     }
-    if (targetSchedTerm && sc.subject?.term && sc.subject.term !== targetSchedTerm) return false;
-    if (targetSchedYear && sc.subject?.academicYear && sc.subject.academicYear !== targetSchedYear) return false;
+    if (targetSchedTerm && (sc.subject?.term || "1") !== targetSchedTerm) return false;
+    if (targetSchedYear && (sc.subject?.academicYear || String(currentBEYear)) !== targetSchedYear) return false;
     return true;
   });
   const displayUsers = activeUsers.filter(u => {
@@ -458,8 +492,137 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       setViewAttendanceUser({ ...u, ...details });
     } catch (e) {
       showError("เกิดข้อผิดพลาดในการดึงข้อมูลประวัติการเข้าเรียน");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
+  };
+
+  const renderScheduleGrid = (gridSchedules: any[], gridTitle: string, gridKey: string = "grid") => {
+    return (
+      <div key={gridKey} className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-700 pb-3">
+          <div className="flex items-center gap-3">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>
+              {gridTitle}
+            </h3>
+            {schedFilterLevel !== "ทั้งหมด" && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                ชั้นปี: {schedFilterLevel}
+              </span>
+            )}
+            {schedFilterGroup !== "ทั้งหมด" && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                กลุ่ม: {schedFilterGroup}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map(day => {
+            const daySchedules = gridSchedules.filter(sc => sc.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
+            
+            return (
+              <div key={day} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full hover:shadow-md transition">
+                <div className="bg-slate-100 dark:bg-slate-700 p-2.5 text-center border-b border-gray-200 dark:border-gray-600">
+                  <h4 className="font-bold text-gray-800 dark:text-gray-200 text-sm tracking-wide">{daysMap[day]}</h4>
+                </div>
+                <div className="p-3 flex-1 flex flex-col gap-3">
+                  {daySchedules.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center p-4">
+                      <span className="text-gray-400 text-xs font-semibold tracking-wider">ว่าง</span>
+                    </div>
+                  ) : (
+                    daySchedules.map(sc => (
+                      <div key={sc.id} className={`p-3 rounded-lg border flex flex-col relative group overflow-hidden ${schedId === sc.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 ring-1 ring-indigo-200' : 'border-gray-100 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50'}`}>
+                        <div className="font-bold text-[13px] text-gray-900 dark:text-white mb-1 leading-tight">
+                          {sc.subject?.name}
+                        </div>
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5 flex-wrap">
+                          <span>รหัส: {sc.subject?.code}</span>
+                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                            กลุ่ม {sc.subject?.group || "-"}
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900/40 w-fit px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800">
+                          <svg className="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          {sc.startTime} - {sc.endTime}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {schedFilterLevel === "ทั้งหมด" && (
+                            <div className="text-[9px] font-extrabold uppercase bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded-sm inline-block text-gray-600 dark:text-gray-300 w-fit">
+                              {sc.subject?.level || "-"}
+                            </div>
+                          )}
+                          <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm inline-block w-fit ${sc.subject?.room ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
+                            🏫 ห้อง: {sc.subject?.room || "-"}
+                          </div>
+                          {sc.subject?.teacher && (
+                            <div className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm inline-block w-fit bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                              👨‍🏫 อ.{sc.subject.teacher.name}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Hover actions */}
+                        <div className="absolute top-2 right-2 flex opacity-0 group-hover:opacity-100 transition-opacity gap-1 backdrop-blur-md bg-white/80 dark:bg-gray-800/80 p-0.5 rounded-md shadow-sm border border-gray-100 dark:border-gray-600">
+                          <button disabled={isLoading} onClick={() => handleEditSchedule(sc)} className="text-gray-500 hover:text-indigo-600 p-1 rounded transition disabled:opacity-50" title="แก้ไข">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          </button>
+                          <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบตารางเรียน?", text: `ต้องการนำวิชา "${sc.subject?.name}" ออกจากตารางเรียนใช่หรือไม่?`, isDanger: true }); if(ok) deleteSchedule(sc.id); }} className="text-gray-500 hover:text-red-600 p-1 rounded transition disabled:opacity-50" title="ลบ">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Saturday and Sunday */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          {[6, 7].map(day => {
+            const daySchedules = gridSchedules.filter(sc => sc.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
+            if (daySchedules.length === 0) return null;
+            
+            return (
+              <div key={day} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full bg-orange-50/30 dark:bg-orange-900/10">
+                <div className="bg-orange-100 dark:bg-orange-900/40 p-2 text-center border-b border-orange-200 dark:border-orange-800">
+                  <h4 className="font-bold text-orange-900 dark:text-orange-200 text-sm">{daysMap[day]}</h4>
+                </div>
+                <div className="p-3 flex-1 flex flex-col gap-2">
+                  {daySchedules.map(sc => (
+                    <div key={sc.id} className="p-2.5 flex justify-between items-center bg-white dark:bg-gray-800 rounded-lg border border-orange-100 dark:border-orange-800/50 shadow-sm">
+                      <div>
+                         <div className="font-bold text-sm text-orange-800 dark:text-orange-300 mb-1 flex items-center gap-1.5 flex-wrap">
+                           <span>{sc.subject?.name}</span>
+                           <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                             กลุ่ม {sc.subject?.group || "-"}
+                           </span>
+                         </div>
+                         <div className="flex items-center gap-2 flex-wrap">
+                           <div className="text-[11px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded w-fit">{sc.startTime} - {sc.endTime}</div>
+                           {sc.subject?.teacher && <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">👨‍🏫 อ.{sc.subject.teacher.name}</span>}
+                           {sc.subject?.room && <span className="text-xs text-blue-700 dark:text-blue-300">🏫 ห้อง {sc.subject.room}</span>}
+                         </div>
+                      </div>
+                      <div className="flex bg-gray-100 dark:bg-gray-700 rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
+                          <button disabled={isLoading} onClick={() => handleEditSchedule(sc)} className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-xs px-2 py-1 font-semibold transition border-r border-gray-200 dark:border-gray-600">แก้ไข</button>
+                          <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบตารางเรียน?", text: `ต้องการนำวิชา "${sc.subject?.name}" ออกจากตารางเรียนใช่หรือไม่?`, isDanger: true }); if(ok) deleteSchedule(sc.id); }} className="text-gray-600 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 text-xs px-2 py-1 font-semibold transition">ลบ</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -912,20 +1075,18 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">ภาคเรียน:</span>
                   <select 
-                    value={schedFilterTermConfigId} 
-                    onChange={e => setSchedFilterTermConfigId(e.target.value)} 
+                    value={schedFilterTerm} 
+                    onChange={e => setSchedFilterTerm(e.target.value)} 
                     className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2.5 py-1 border font-medium outline-none bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400"
                   >
-                    {termConfigs.map(tc => (
-                      <option key={tc.id} value={tc.id}>
-                        {tc.isCurrent ? `★ เทอม ${tc.term}/${tc.academicYear} (ปัจจุบัน)` : `เทอม ${tc.term}/${tc.academicYear}`}
-                      </option>
-                    ))}
-                    {termConfigs.length === 0 && (
-                      <option value={`1-${currentBEYear}`}>
-                        เทอม 1/{currentBEYear} (ปัจจุบัน)
-                      </option>
-                    )}
+                    {termOptions.map(t => {
+                      const key = `${t.term}/${t.academicYear}`;
+                      return (
+                        <option key={key} value={key}>
+                          {t.isCurrent ? `เทอม ${t.term}/${t.academicYear} (ปัจจุบัน)` : `เทอม ${t.term}/${t.academicYear}`}
+                        </option>
+                      );
+                    })}
                     <option value="all">ทุกภาคเรียน</option>
                   </select>
                 </div>
@@ -950,72 +1111,41 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               </div>
             </div>
 
-            {/* เพิ่มวิชาเรียนลงตาราง (Collapsible) */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden transition-all duration-200">
-              <div 
-                onClick={() => setIsAddScheduleOpen(!isAddScheduleOpen)}
-                className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors select-none"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-                    isAddScheduleOpen 
-                      ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/60 dark:text-indigo-300' 
-                      : 'bg-indigo-50 text-indigo-600 dark:bg-gray-700 dark:text-indigo-400'
-                  }`}>
-                    <svg className={`w-4 h-4 transition-transform duration-200 ${isAddScheduleOpen ? 'rotate-45' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                      เพิ่มวิชาเรียนลงตาราง
-                      {targetSchedTerm && targetSchedYear && (
-                        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
-                          เทอม {targetSchedTerm}/{targetSchedYear}
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {isAddScheduleOpen ? "คลิกเพื่อซ่อนแบบฟอร์ม" : "คลิกเพื่อเปิดแบบฟอร์มจัดคาบเรียนลงในตาราง"}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsAddScheduleOpen(!isAddScheduleOpen);
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    isAddScheduleOpen
-                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200'
-                      : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
-                  }`}
-                >
-                  <span>{isAddScheduleOpen ? "ซ่อนแบบฟอร์ม" : "+ เพิ่มวิชาเรียนลงตาราง"}</span>
-                  <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddScheduleOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+            {/* เพิ่มวิชาเรียนลงตาราง (ไม่ซ่อนหุบ / Always Visible) */}
+            <div id="schedule-form-section" className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+              <div className="mb-4">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  {schedId ? "แก้ไขวิชาในตารางเรียน" : "เพิ่มวิชาเรียนลงตาราง"}
+                  {targetSchedTerm && targetSchedYear && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-800">
+                      เทอม {targetSchedTerm}/{targetSchedYear}
+                    </span>
+                  )}
+                  {schedFilterLevel !== "ทั้งหมด" && (
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                      {schedFilterLevel}
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {schedId ? "แก้ไขข้อมูลคาบเรียนและกดบันทึก" : "เลือกวิชาและกำหนดวันเวลาเพื่อจัดคาบเรียนลงในตาราง"}
+                </p>
               </div>
 
-              {isAddScheduleOpen && (
-                <div className="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/40">
-                  <form onSubmit={handleSaveSchedule} className="flex gap-4 items-end flex-wrap">
-                    <div className="flex-1 min-w-[250px] relative">
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        วิชา {schedFilterLevel !== "ทั้งหมด" ? `(เฉพาะ ${schedFilterLevel}` : "("}
-                        {schedFilterGroup !== "ทั้งหมด" ? ` | กลุ่ม ${schedFilterGroup}` : ""}
-                        {targetSchedTerm && targetSchedYear ? ` | เทอม ${targetSchedTerm}/${targetSchedYear}` : ""}
-                        {")"}
-                      </label>
-                  
+              <form onSubmit={handleSaveSchedule} className="flex gap-4 items-end flex-wrap">
+                <div className="flex-1 min-w-[250px] relative">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    วิชา {schedFilterLevel !== "ทั้งหมด" ? `(เฉพาะ ${schedFilterLevel}` : "("}
+                    {schedFilterGroup !== "ทั้งหมด" ? ` | กลุ่ม ${schedFilterGroup}` : ""}
+                    {targetSchedTerm && targetSchedYear ? ` | เทอม ${targetSchedTerm}/${targetSchedYear}` : ""}
+                    {")"}
+                  </label>
+              
                   {isSchedDropdownOpen && (
                     <div className="fixed inset-0 z-40" onClick={() => setIsSchedDropdownOpen(false)}></div>
                   )}
 
-                  <div className="relative z-50">
+                  <div className="relative z-40">
                     <div 
                       onClick={() => setIsSchedDropdownOpen(!isSchedDropdownOpen)}
                       className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isSchedDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
@@ -1035,7 +1165,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     </div>
 
                     {isSchedDropdownOpen && (
-                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-64 overflow-y-auto z-50">
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-64 overflow-y-auto z-50">
                         <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
                           <input
                             type="text"
@@ -1053,66 +1183,86 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                           >
                             -- ยกเลิกการเลือกวิชา --
                           </div>
-                          {(schedFilterLevel === "ทั้งหมด" ? levelsOptions : [schedFilterLevel]).map(level => {
-                            const levelSubjects = subjects.filter(s => {
-                               if ((s.level || "ไม่ระบุ") !== level) return false;
-                               if (schedFilterGroup !== "ทั้งหมด") {
-                                 const grp = s.group || "";
-                                 if (grp !== schedFilterGroup && !grp.includes(schedFilterGroup)) return false;
-                               }
-                               if (targetSchedTerm && s.term && s.term !== targetSchedTerm) return false;
-                               if (targetSchedYear && s.academicYear && s.academicYear !== targetSchedYear) return false;
-                               if (!schedSearchQuery) return true;
-                               const q = schedSearchQuery.toLowerCase();
-                               return (
-                                 s.code.toLowerCase().includes(q) || 
-                                 s.name.toLowerCase().includes(q) ||
-                                 (s.group && s.group.toLowerCase().includes(q)) ||
-                                 (s.teacher?.name && s.teacher.name.toLowerCase().includes(q)) ||
-                                 (s.room && s.room.toLowerCase().includes(q))
+                          {(() => {
+                            const levelsToScan = schedFilterLevel === "ทั้งหมด" ? levelsOptions : [schedFilterLevel];
+                            let totalFound = 0;
+
+                            const renderedLevels = levelsToScan.map(level => {
+                              const levelSubjects = subjects.filter(s => {
+                                if (s.deletedAt) return false;
+                                if ((s.level || "ไม่ระบุ") !== level) return false;
+                                if (schedFilterGroup !== "ทั้งหมด") {
+                                  const grp = s.group || "";
+                                  if (grp !== schedFilterGroup && !grp.includes(schedFilterGroup)) return false;
+                                }
+                                if (targetSchedTerm && (s.term || "1") !== targetSchedTerm) return false;
+                                if (targetSchedYear && (s.academicYear || String(currentBEYear)) !== targetSchedYear) return false;
+                                if (!schedSearchQuery) return true;
+                                const q = schedSearchQuery.toLowerCase();
+                                return (
+                                  s.code.toLowerCase().includes(q) || 
+                                  s.name.toLowerCase().includes(q) ||
+                                  (s.group && s.group.toLowerCase().includes(q)) ||
+                                  (s.teacher?.name && s.teacher.name.toLowerCase().includes(q)) ||
+                                  (s.room && s.room.toLowerCase().includes(q))
                                 );
-                            });
-                            if (levelSubjects.length === 0) return null;
+                              });
+                              if (levelSubjects.length === 0) return null;
+                              totalFound += levelSubjects.length;
 
-                            const groupedByTermYr: Record<string, any[]> = {};
-                            levelSubjects.forEach(s => {
-                              const yr = s.academicYear || "-";
-                              const tm = s.term || "-";
-                              const key = `ชั้นปี: ${level} | ปีการศึกษา: ${yr} เทอม: ${tm}`;
-                              if (!groupedByTermYr[key]) groupedByTermYr[key] = [];
-                              groupedByTermYr[key].push(s);
-                            });
+                              const groupedByTermYr: Record<string, any[]> = {};
+                              levelSubjects.forEach(s => {
+                                const yr = s.academicYear || currentBEYear;
+                                const tm = s.term || "1";
+                                const key = `ชั้นปี: ${level} | ภาคเรียนที่ ${tm}/${yr}`;
+                                if (!groupedByTermYr[key]) groupedByTermYr[key] = [];
+                                groupedByTermYr[key].push(s);
+                              });
 
-                            const sortedTermKeys = Object.keys(groupedByTermYr).sort();
+                              const sortedTermKeys = Object.keys(groupedByTermYr).sort();
 
-                            return sortedTermKeys.map(termKey => (
-                              <div key={`${level}-${termKey}`}>
-                                <div className="px-3 py-1.5 text-[11px] uppercase tracking-wider font-bold bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400">
-                                  {termKey}
-                                </div>
-                                {groupedByTermYr[termKey].map(s => (
-                                  <div 
-                                    key={s.id} 
-                                    onClick={() => { setSchedSubjId(s.id); setIsSchedDropdownOpen(false); setSchedSearchQuery(""); }}
-                                    className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${schedSubjId === s.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
-                                  >
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="font-semibold text-gray-900 dark:text-gray-100">{s.code}</span>
-                                        <span className="text-gray-800 dark:text-gray-200 font-medium">{s.name}</span>
-                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
-                                          กลุ่ม {s.group || "-"}
+                              return sortedTermKeys.map(termKey => (
+                                <div key={`${level}-${termKey}`}>
+                                  <div className="px-3 py-1.5 text-[11px] uppercase tracking-wider font-bold bg-gray-50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400">
+                                    {termKey}
+                                  </div>
+                                  {groupedByTermYr[termKey].map(s => (
+                                    <div 
+                                      key={s.id} 
+                                      onClick={() => { setSchedSubjId(s.id); setIsSchedDropdownOpen(false); setSchedSearchQuery(""); }}
+                                      className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${schedSubjId === s.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="font-semibold text-gray-900 dark:text-gray-100">{s.code}</span>
+                                          <span className="text-gray-800 dark:text-gray-200 font-medium">{s.name}</span>
+                                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+                                            กลุ่ม {s.group || "-"}
+                                          </span>
+                                        </div>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                                          {s.teacher?.name ? `อ.${s.teacher.name}` : "ไม่ระบุผู้สอน"} {s.room ? `| ห้อง ${s.room}` : ""}
                                         </span>
                                       </div>
-                                      <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
-                                        {s.teacher?.name ? `อ.${s.teacher.name}` : "ไม่ระบุผู้สอน"} {s.room ? `| ห้อง ${s.room}` : ""}
-                                      </span>
                                     </div>
+                                  ))}
+                                </div>
+                              ));
+                            });
+
+                            if (totalFound === 0) {
+                              return (
+                                <div className="p-4 text-center text-xs text-gray-500 dark:text-gray-400">
+                                  ไม่มีรายวิชาที่ตรงกับตัวกรองด้านบน
+                                  <div className="text-[11px] text-gray-400 mt-1">
+                                    (ชั้นปี: {schedFilterLevel}{targetSchedTerm ? ` | เทอม ${targetSchedTerm}/${targetSchedYear}` : ""}{schedFilterGroup !== "ทั้งหมด" ? ` | กลุ่ม ${schedFilterGroup}` : ""})
                                   </div>
-                                ))}
-                              </div>
-                            ));
-                          })}
+                                </div>
+                              );
+                            }
+
+                            return renderedLevels;
+                          })()}
                         </div>
                       </div>
                     )}
@@ -1120,7 +1270,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">วันที่</label>
-                  <select value={schedDay} onChange={e => setSchedDay(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border outline-none">
+                  <select value={schedDay} onChange={e => setSchedDay(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border outline-none bg-white dark:bg-gray-700 dark:text-white">
                     {Object.entries(daysMap).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </div>
@@ -1130,7 +1280,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     <select
                       value={schedStart ? schedStart.split(':')[0] : '08'}
                       onChange={e => setSchedStart(`${e.target.value}:${schedStart ? schedStart.split(':')[1] || '00' : '00'}`)}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2 py-2 border outline-none bg-white dark:bg-gray-700"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2 py-2 border outline-none bg-white dark:bg-gray-700 dark:text-white"
                     >
                       {Array.from({length: 24}).map((_, i) => {
                         const v = i.toString().padStart(2, '0');
@@ -1141,7 +1291,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     <select
                       value={schedStart ? schedStart.split(':')[1] : '00'}
                       onChange={e => setSchedStart(`${schedStart ? schedStart.split(':')[0] || '08' : '08'}:${e.target.value}`)}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2 py-2 border outline-none bg-white dark:bg-gray-700"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2 py-2 border outline-none bg-white dark:bg-gray-700 dark:text-white"
                     >
                       {Array.from({length: 60}).map((_, i) => {
                         const v = i.toString().padStart(2, '0');
@@ -1156,7 +1306,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     <select
                       value={schedEnd ? schedEnd.split(':')[0] : '09'}
                       onChange={e => setSchedEnd(`${e.target.value}:${schedEnd ? schedEnd.split(':')[1] || '00' : '00'}`)}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2 py-2 border outline-none bg-white dark:bg-gray-700"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2 py-2 border outline-none bg-white dark:bg-gray-700 dark:text-white"
                     >
                       {Array.from({length: 24}).map((_, i) => {
                         const v = i.toString().padStart(2, '0');
@@ -1167,7 +1317,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     <select
                       value={schedEnd ? schedEnd.split(':')[1] : '00'}
                       onChange={e => setSchedEnd(`${schedEnd ? schedEnd.split(':')[0] || '09' : '09'}:${e.target.value}`)}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2 py-2 border outline-none bg-white dark:bg-gray-700"
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-2 py-2 border outline-none bg-white dark:bg-gray-700 dark:text-white"
                     >
                       {Array.from({length: 60}).map((_, i) => {
                         const v = i.toString().padStart(2, '0');
@@ -1178,154 +1328,48 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </div>
                 <div className="flex items-center gap-2">
                   <button disabled={isLoading} type="submit" className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium text-sm shadow-sm transition">
-                    {schedId ? "บันทึก" : "เพิ่ม"}
+                    {schedId ? "บันทึกการแก้ไข" : "+ เพิ่ม"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      resetScheduleForm();
-                      setIsAddScheduleOpen(false);
-                    }}
-                    className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium transition"
-                  >
-                    ยกเลิก / ซ่อน
-                  </button>
+                  {(schedId || schedSubjId) && (
+                    <button
+                      type="button"
+                      onClick={resetScheduleForm}
+                      className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium transition"
+                    >
+                      {schedId ? "ยกเลิกการแก้ไข" : "ล้างข้อมูล"}
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
-          )}
-        </div>
 
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-700 pb-3">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">แผนผังตารางเรียน</h3>
-                  {targetSchedTerm && targetSchedYear ? (
-                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-800 flex items-center gap-1.5 shadow-sm">
-                      <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                      ภาคเรียนที่ {targetSchedTerm}/{targetSchedYear}
-                    </span>
-                  ) : (
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
-                      แสดงทุกภาคเรียน
-                    </span>
-                  )}
-                  {schedFilterLevel !== "ทั้งหมด" && (
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                      ชั้นปี: {schedFilterLevel}
-                    </span>
-                  )}
-                  {schedFilterGroup !== "ทั้งหมด" && (
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                      กลุ่ม: {schedFilterGroup}
-                    </span>
-                  )}
-                </div>
+            {/* ================= Schedule Grids ================= */}
+            {!isAllTerms ? (
+              renderScheduleGrid(
+                displaySchedules,
+                `แผนผังตารางเรียนเทอม ${targetSchedTerm}`
+              )
+            ) : (
+              <div className="space-y-10">
+                {renderScheduleGrid(
+                  displaySchedules.filter(sc => (sc.subject?.term || "1") === "1"),
+                  "แผนผังตารางเรียนเทอม 1",
+                  "grid-term-1"
+                )}
+                {renderScheduleGrid(
+                  displaySchedules.filter(sc => sc.subject?.term === "2"),
+                  "แผนผังตารางเรียนเทอม 2",
+                  "grid-term-2"
+                )}
+                {Array.from(new Set(displaySchedules.map(sc => sc.subject?.term).filter(t => t && t !== "1" && t !== "2"))).map(otherTerm => (
+                  renderScheduleGrid(
+                    displaySchedules.filter(sc => sc.subject?.term === otherTerm),
+                    `แผนผังตารางเรียนเทอม ${otherTerm}`,
+                    `grid-term-${otherTerm}`
+                  )
+                ))}
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                {[1, 2, 3, 4, 5].map(day => {
-                  const daySchedules = displaySchedules.filter(sc => sc.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
-                  
-                  return (
-                    <div key={day} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full hover:shadow-md transition">
-                      <div className="bg-slate-100 dark:bg-slate-700 p-2.5 text-center border-b border-gray-200 dark:border-gray-600">
-                        <h4 className="font-bold text-gray-800 dark:text-gray-200 text-sm tracking-wide">{daysMap[day]}</h4>
-                      </div>
-                      <div className="p-3 flex-1 flex flex-col gap-3">
-                        {daySchedules.length === 0 ? (
-                          <div className="flex-1 flex items-center justify-center p-4">
-                            <span className="text-gray-400 text-xs font-semibold tracking-wider">ว่าง</span>
-                          </div>
-                        ) : (
-                          daySchedules.map(sc => (
-                            <div key={sc.id} className={`p-3 rounded-lg border flex flex-col relative group overflow-hidden ${schedId === sc.id ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 ring-1 ring-indigo-200' : 'border-gray-100 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-700/50'}`}>
-                              <div className="font-bold text-[13px] text-gray-900 dark:text-white mb-1 leading-tight">
-                                {sc.subject?.name}
-                              </div>
-                              <div className="text-[10px] text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5 flex-wrap">
-                                <span>รหัส: {sc.subject?.code}</span>
-                                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
-                                  กลุ่ม {sc.subject?.group || "-"}
-                                </span>
-                              </div>
-                              <div className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-900/40 w-fit px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800">
-                                <svg className="w-3 h-3 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                {sc.startTime} - {sc.endTime}
-                              </div>
-                              <div className="mt-2 flex flex-wrap gap-1">
-                                {schedFilterLevel === "ทั้งหมด" && (
-                                  <div className="text-[9px] font-extrabold uppercase bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded-sm inline-block text-gray-600 dark:text-gray-300 w-fit">
-                                    {sc.subject?.level || "-"}
-                                  </div>
-                                )}
-                                <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-sm inline-block w-fit ${sc.subject?.room ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}>
-                                  🏫 ห้อง: {sc.subject?.room || "-"}
-                                </div>
-                                {sc.subject?.teacher && (
-                                  <div className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm inline-block w-fit bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
-                                    👨‍🏫 อ.{sc.subject.teacher.name}
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {/* Hover actions */}
-                              <div className="absolute top-2 right-2 flex opacity-0 group-hover:opacity-100 transition-opacity gap-1 backdrop-blur-md bg-white/80 dark:bg-gray-800/80 p-0.5 rounded-md shadow-sm border border-gray-100 dark:border-gray-600">
-                                <button disabled={isLoading} onClick={() => handleEditSchedule(sc)} className="text-gray-500 hover:text-indigo-600 p-1 rounded transition disabled:opacity-50" title="แก้ไข">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                </button>
-                                <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบตารางเรียน?", text: `ต้องการนำวิชา "${sc.subject?.name}" ออกจากตารางเรียนใช่หรือไม่?`, isDanger: true }); if(ok) deleteSchedule(sc.id); }} className="text-gray-500 hover:text-red-600 p-1 rounded transition disabled:opacity-50" title="ลบ">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Saturday and Sunday */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                {[6, 7].map(day => {
-                  const daySchedules = displaySchedules.filter(sc => sc.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
-                  if (daySchedules.length === 0) return null; // Only show weekend if there are classes
-                  
-                  return (
-                    <div key={day} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-full bg-orange-50/30 dark:bg-orange-900/10">
-                      <div className="bg-orange-100 dark:bg-orange-900/40 p-2 text-center border-b border-orange-200 dark:border-orange-800">
-                        <h4 className="font-bold text-orange-900 dark:text-orange-200 text-sm">{daysMap[day]}</h4>
-                      </div>
-                      <div className="p-3 flex-1 flex flex-col gap-2">
-                        {daySchedules.map(sc => (
-                          <div key={sc.id} className="p-2.5 flex justify-between items-center bg-white dark:bg-gray-800 rounded-lg border border-orange-100 dark:border-orange-800/50 shadow-sm">
-                            <div>
-                               <div className="font-bold text-sm text-orange-800 dark:text-orange-300 mb-1 flex items-center gap-1.5 flex-wrap">
-                                 <span>{sc.subject?.name}</span>
-                                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
-                                   กลุ่ม {sc.subject?.group || "-"}
-                                 </span>
-                               </div>
-                               <div className="flex items-center gap-2 flex-wrap">
-                                 <div className="text-[11px] font-bold text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded w-fit">{sc.startTime} - {sc.endTime}</div>
-                                 {sc.subject?.teacher && <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">👨‍🏫 อ.{sc.subject.teacher.name}</span>}
-                                 {sc.subject?.room && <span className="text-xs text-blue-700 dark:text-blue-300">🏫 ห้อง {sc.subject.room}</span>}
-                               </div>
-                            </div>
-                            <div className="flex bg-gray-100 dark:bg-gray-700 rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
-                                <button disabled={isLoading} onClick={() => handleEditSchedule(sc)} className="text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-xs px-2 py-1 font-semibold transition border-r border-gray-200 dark:border-gray-600">แก้ไข</button>
-                                <button disabled={isLoading} onClick={async () => { const ok = await showConfirm({ title: "ยืนยันการลบตารางเรียน?", text: `ต้องการนำวิชา "${sc.subject?.name}" ออกจากตารางเรียนใช่หรือไม่?`, isDanger: true }); if(ok) deleteSchedule(sc.id); }} className="text-gray-600 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 text-xs px-2 py-1 font-semibold transition">ลบ</button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            )}
           </div>
         )}
 
