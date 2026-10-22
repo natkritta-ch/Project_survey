@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restoreSubject, hardDeleteSubject, restoreAllSubjects, hardDeleteAllSubjects, createSchedule, updateSchedule, deleteSchedule, deleteManySchedules, restoreSchedule, hardDeleteSchedule, restoreAllSchedules, hardDeleteAllSchedules, createUser, updateUser, deleteUser, deleteManyUsers, restoreUser, hardDeleteUser, restoreAllUsers, hardDeleteAllUsers, toggleEditPermission, promoteStudents, clearOldGraduates, getUserDetails, generateParentCodesForAllStudents } from "./actions";
+import { createSubject, updateSubject, deleteSubject, deleteManySubjects, restoreSubject, hardDeleteSubject, restoreAllSubjects, hardDeleteAllSubjects, createSchedule, updateSchedule, deleteSchedule, deleteManySchedules, restoreSchedule, hardDeleteSchedule, restoreAllSchedules, hardDeleteAllSchedules, createUser, updateUser, deleteUser, deleteManyUsers, restoreUser, hardDeleteUser, restoreAllUsers, hardDeleteAllUsers, toggleEditPermission, promoteStudents, clearOldGraduates, getUserDetails, generateParentCodesForAllStudents, copySubjectsAndSchedulesFromPreviousYear } from "./actions";
 import AttendanceHistory from "../../../components/AttendanceHistory";
 import HeadAdminOverview from "./HeadAdminOverview";
 import HeadProgressionManagement from "./HeadProgressionManagement";
 import HeadAdvisorManagement from "./HeadAdvisorManagement";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm } from "@/lib/alerts";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Copy } from "lucide-react";
 
 export default function HeadAdminClient({ subjects, schedules, users, termConfigs = [], makeupClasses = [] }: { subjects: any[], schedules: any[], users: any[], termConfigs?: any[], makeupClasses?: any[] }) {
   const [activeTab, setActiveTab] = useState("overview");
@@ -73,6 +73,31 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const [isSchedDropdownOpen, setIsSchedDropdownOpen] = useState(false);
   const [schedSearchQuery, setSchedSearchQuery] = useState("");
   const [isEditScheduleModalOpen, setIsEditScheduleModalOpen] = useState(false);
+  const [isCloneScheduleModalOpen, setIsCloneScheduleModalOpen] = useState(false);
+  const [cloneSourceYear, setCloneSourceYear] = useState(String(currentBEYear - 1));
+  const [cloneTargetYear, setCloneTargetYear] = useState(String(currentBEYear));
+  const [cloneTerm, setCloneTerm] = useState("all");
+
+  const handleExecuteClone = async () => {
+    if (!cloneSourceYear || !cloneTargetYear) {
+      showError("กรุณาระบุปีการศึกษาต้นทางและปลายทาง");
+      return;
+    }
+    if (cloneSourceYear === cloneTargetYear) {
+      showError("ปีการศึกษาต้นทางและปลายทางต้องไม่ซ้ำกัน");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await copySubjectsAndSchedulesFromPreviousYear(cloneSourceYear, cloneTargetYear, cloneTerm);
+      setIsCloneScheduleModalOpen(false);
+      showSuccess("Auto-clone สำเร็จ!", res.message);
+    } catch (err: any) {
+      showError("เกิดข้อผิดพลาดในการคัดลอก", err.message || "ไม่สามารถคัดลอกได้");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // ---------- Users State ----------
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
@@ -1415,6 +1440,26 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     {groupOptions.map(g => <option key={g} value={g}>กลุ่ม {g}</option>)}
                   </select>
                 </div>
+
+                <div className="h-4 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
+
+                {/* ปุ่ม Auto-clone ข้ามปี */}
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => {
+                    const curYear = targetSchedYear || String(currentBEYear);
+                    setCloneSourceYear(String(parseInt(curYear, 10) - 1));
+                    setCloneTargetYear(curYear);
+                    if (targetSchedTerm) setCloneTerm(targetSchedTerm);
+                    setIsCloneScheduleModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md text-xs font-bold transition shadow-sm active:scale-95 whitespace-nowrap ml-auto sm:ml-0"
+                  title="คัดลอกรายวิชาและตารางสอนจากปีการศึกษาเดิมมายังปีนี้อัตโนมัติ"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Auto-clone ข้ามปี</span>
+                </button>
               </div>
             </div>
 
@@ -2746,6 +2791,111 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= Auto-clone Schedule Modal ================= */}
+      {isCloneScheduleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-700">
+              <div className="flex items-center gap-2">
+                <span className="p-2 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                  <Copy className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="font-extrabold text-gray-900 dark:text-white text-base">
+                    Auto-clone รายวิชาและตารางสอนข้ามปี
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    คัดลอกข้อมูลรายวิชาและคาบเรียนทั้งหมดมายังปีการศึกษาใหม่
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCloneScheduleModalOpen(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    ปีการศึกษาต้นทาง:
+                  </label>
+                  <input
+                    type="text"
+                    value={cloneSourceYear}
+                    onChange={e => setCloneSourceYear(e.target.value)}
+                    placeholder="เช่น 2569"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    ปีการศึกษาปลายทาง:
+                  </label>
+                  <input
+                    type="text"
+                    value={cloneTargetYear}
+                    onChange={e => setCloneTargetYear(e.target.value)}
+                    placeholder="เช่น 2570"
+                    className="w-full text-xs p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  ภาคเรียนที่ต้องการคัดลอก:
+                </label>
+                <select
+                  value={cloneTerm}
+                  onChange={e => setCloneTerm(e.target.value)}
+                  className="w-full text-xs p-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
+                >
+                  <option value="all">ทุกภาคเรียน (เทอม 1 และ เทอม 2)</option>
+                  <option value="1">เฉพาะภาคเรียนที่ 1</option>
+                  <option value="2">เฉพาะภาคเรียนที่ 2</option>
+                </select>
+              </div>
+
+              <div className="bg-indigo-50/60 dark:bg-indigo-950/30 p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-800/40 text-xs text-indigo-900 dark:text-indigo-300 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <span>💡 ข้อมูลการคัดลอก:</span>
+                </div>
+                <ul className="list-disc list-inside space-y-0.5 text-[11px] text-indigo-800 dark:text-indigo-400">
+                  <li>ระบบจะสร้างรายวิชาและคาบเรียนในปีปลายทางให้อัตโนมัติ</li>
+                  <li>รายวิชาที่มีอยู่แล้วจะไม่ถูกเขียนทับ</li>
+                  <li>หลังคัดลอก สามารถแก้ไข/ลบ/เพิ่มรายวิชาได้ตามปกติ</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-gray-100 dark:border-gray-700">
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={() => setIsCloneScheduleModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={isLoading}
+                onClick={handleExecuteClone}
+                className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-md transition active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {isLoading ? "กำลังคัดลอก..." : "คัดลอกทันที"}
+              </button>
+            </div>
           </div>
         </div>
       )}

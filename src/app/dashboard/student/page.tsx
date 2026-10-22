@@ -96,6 +96,19 @@ export default async function StudentDashboard() {
     orderBy: { timestamp: "desc" },
   });
 
+  // ตัดรอบการเข้าเรียนตามภาคเรียนปัจจุบัน สำหรับกล่องสรุปสถานะ (มผ. / ขร.)
+  const termStartDate = currentTerm?.startDate ? new Date(currentTerm.startDate) : null;
+  const termEndDate = currentTerm?.endDate ? new Date(currentTerm.endDate) : null;
+  if (termEndDate) termEndDate.setHours(23, 59, 59, 999);
+
+  const currentTermAttendances = attendances.filter(a => {
+    if (!termStartDate || !termEndDate) return true;
+    const ts = new Date(a.timestamp);
+    return ts >= termStartDate && ts <= termEndDate;
+  });
+
+  const currentTermLabel = currentTerm ? `${currentTerm.term}/${currentAcademicYear}` : undefined;
+
   // ดึงคำขอผูกบัญชีผู้ปกครอง (Parent Links)
   const parentLinks = await prisma.parentStudentLink.findMany({
     where: { studentId: userId },
@@ -224,6 +237,8 @@ export default async function StudentDashboard() {
       initialParentLinks={parentLinks}
       advisorInfo={advisorInfo}
       makeupClasses={makeupClasses}
+      currentTermAttendances={currentTermAttendances}
+      currentTermLabel={currentTermLabel}
     />
   );
 }

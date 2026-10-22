@@ -20,7 +20,9 @@ export default function StudentDashboardClient({
   daysMap,
   initialParentLinks,
   advisorInfo = null,
-  makeupClasses = []
+  makeupClasses = [],
+  currentTermAttendances,
+  currentTermLabel
 }: any) {
   const [activeTab, setActiveTab] = useState("overview"); // overview, schedule, attendance, profile
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -199,7 +201,11 @@ export default function StudentDashboardClient({
               />
 
               {/* 🌟 ผลสรุปสถานะการเข้าเรียน สิทธิ์สอบ ข.ร. และกิจกรรมหน้าเสาธง ม.ผ. */}
-              <StudentStatusOverview attendances={attendances} subjects={mySubjects} />
+              <StudentStatusOverview 
+                attendances={currentTermAttendances || attendances} 
+                subjects={mySubjects} 
+                termLabel={currentTermLabel} 
+              />
             </div>
           )}
 

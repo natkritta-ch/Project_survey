@@ -466,10 +466,11 @@ export async function advanceAcademicTerm(data: {
   endDate: string;
   promoteLevels: boolean;
   promoteAdvisors?: boolean;
+  cloneSubjectsAndSchedules?: boolean;
 }) {
   await requireHeadAuth();
 
-  // หาปีการศึกษาเดิมก่อนหน้าเพื่อใช้ในการเลื่อนอาจารย์ที่ปรึกษาตามรุ่น
+  // หาปีการศึกษาเดิมก่อนหน้าเพื่อใช้ในการเลื่อนอาจารย์ที่ปรึกษาตามรุ่นและ Auto-clone รายวิชา/ตารางสอน
   const currentActiveTerm = await prisma.termConfig.findFirst({
     where: { isCurrent: true }
   });
@@ -553,6 +554,19 @@ export async function advanceAcademicTerm(data: {
     }
   }
 
+  // 4. Auto-clone รายวิชาและตารางสอนข้ามปี (ถ้าติ๊กเลือก และเลื่อนข้ามปีการศึกษา)
+  let clonedSubjectsCount = 0;
+  let clonedSchedulesCount = 0;
+  if (data.cloneSubjectsAndSchedules !== false && previousYear && previousYear !== data.nextYear) {
+    try {
+      const cloneRes = await copySubjectsAndSchedulesFromPreviousYear(previousYear, data.nextYear);
+      clonedSubjectsCount = cloneRes.clonedSubjects;
+      clonedSchedulesCount = cloneRes.clonedSchedules;
+    } catch (err) {
+      console.error("Failed to auto-clone subjects and schedules:", err);
+    }
+  }
+
   revalidatePath("/dashboard/head");
   revalidatePath("/dashboard/teacher");
   revalidatePath("/dashboard/student");
@@ -564,7 +578,134 @@ export async function advanceAcademicTerm(data: {
     nextYear: data.nextYear,
     promoteLevels: data.promoteLevels,
     promotedCounts,
-    totalPromoted
+    totalPromoted,
+    clonedSubjectsCount,
+    clonedSchedulesCount
+  };
+}
+
+export async function copySubjectsAndSchedulesFromPreviousYear(
+  fromYear: string,
+  toYear: string,
+  targetTerm?: string
+) {
+  await requireHeadAuth();
+
+  if (!fromYear || !toYear) {
+    throw new Error("กรุณาระบุปีการศึกษาต้นทางและปลายทาง");
+  }
+  if (fromYear === toYear) {
+    throw new Error("ปีการศึกษาต้นทางและปลายทางต้องไม่เป็นปีเดียวกัน");
+  }
+
+  // 1. ค้นหารายวิชาต้นทางทั้งหมดที่ยังไม่ถูกลบ
+  const sourceSubjects = await prisma.subject.findMany({
+    where: {
+      academicYear: fromYear,
+      deletedAt: null,
+      ...(targetTerm && targetTerm !== "all" ? { term: targetTerm } : {})
+    },
+    include: {
+      schedule: {
+        where: { deletedAt: null }
+      }
+    }
+  });
+
+  if (sourceSubjects.length === 0) {
+    return {
+      success: true,
+      clonedSubjects: 0,
+      clonedSchedules: 0,
+      message: `ไม่พบรายวิชาในปีการศึกษา ${fromYear}${targetTerm && targetTerm !== "all" ? ` (เทอม ${targetTerm})` : ""}`
+    };
+  }
+
+  let clonedSubjectsCount = 0;
+  let clonedSchedulesCount = 0;
+
+  for (const srcSubj of sourceSubjects) {
+    // ตรวจสอบครูผู้สอนว่ายังมีอยู่ในระบบหรือไม่
+    let teacherIdToUse = srcSubj.teacherId;
+    if (teacherIdToUse) {
+      const teacherExists = await prisma.user.findFirst({
+        where: { id: teacherIdToUse, deletedAt: null }
+      });
+      if (!teacherExists) {
+        teacherIdToUse = null;
+      }
+    }
+
+    // ตรวจสอบว่ามีวิชานี้ในปีปลายทางหรือยัง (code, academicYear, term, group, level)
+    let targetSubj = await prisma.subject.findFirst({
+      where: {
+        code: srcSubj.code,
+        academicYear: toYear,
+        term: srcSubj.term,
+        group: srcSubj.group,
+        level: srcSubj.level
+      }
+    });
+
+    if (!targetSubj) {
+      targetSubj = await prisma.subject.create({
+        data: {
+          name: srcSubj.name,
+          code: srcSubj.code,
+          level: srcSubj.level,
+          group: srcSubj.group,
+          room: srcSubj.room,
+          academicYear: toYear,
+          term: srcSubj.term,
+          credit: srcSubj.credit,
+          teacherId: teacherIdToUse,
+          lateThresholdMin: srcSubj.lateThresholdMin,
+        }
+      });
+      clonedSubjectsCount++;
+    } else if (targetSubj.deletedAt) {
+      // หากเคยถูกลบไว้ ให้กู้คืน
+      await prisma.subject.update({
+        where: { id: targetSubj.id },
+        data: { deletedAt: null }
+      });
+    }
+
+    // คัดลอกตารางสอนของวิชานี้
+    if (srcSubj.schedule && srcSubj.schedule.length > 0) {
+      for (const sc of srcSubj.schedule) {
+        const existingSchedule = await prisma.schedule.findFirst({
+          where: {
+            subjectId: targetSubj.id,
+            dayOfWeek: sc.dayOfWeek,
+            startTime: sc.startTime,
+            endTime: sc.endTime,
+            deletedAt: null
+          }
+        });
+
+        if (!existingSchedule) {
+          await prisma.schedule.create({
+            data: {
+              subjectId: targetSubj.id,
+              dayOfWeek: sc.dayOfWeek,
+              startTime: sc.startTime,
+              endTime: sc.endTime
+            }
+          });
+          clonedSchedulesCount++;
+        }
+      }
+    }
+  }
+
+  revalidatePath("/dashboard/head");
+  revalidatePath("/dashboard/teacher");
+  return {
+    success: true,
+    clonedSubjects: clonedSubjectsCount,
+    clonedSchedules: clonedSchedulesCount,
+    message: `คัดลอกรายวิชาสำเร็จ ${clonedSubjectsCount} วิชา และตารางสอน ${clonedSchedulesCount} คาบ จากปี ${fromYear} สู่ปี ${toYear}`
   };
 }
 

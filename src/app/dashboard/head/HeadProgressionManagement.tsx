@@ -92,6 +92,7 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
   const [inputStartDate, setInputStartDate] = useState(defaultDates.start);
   const [inputEndDate, setInputEndDate] = useState(defaultDates.end);
   const [promoteAdvisors, setPromoteAdvisors] = useState(true);
+  const [cloneSubjectsAndSchedules, setCloneSubjectsAndSchedules] = useState(true);
 
   useEffect(() => {
     setInputStartDate(defaultDates.start);
@@ -152,16 +153,21 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
         startDate: inputStartDate,
         endDate: inputEndDate,
         promoteLevels: willPromoteLevels,
-        promoteAdvisors: willPromoteLevels ? promoteAdvisors : false
+        promoteAdvisors: willPromoteLevels ? promoteAdvisors : false,
+        cloneSubjectsAndSchedules: willPromoteLevels ? cloneSubjectsAndSchedules : false
       });
 
       setShowConfirmModal(false);
       setLastActionResult(res);
+      let successMsg = willPromoteLevels
+        ? `ระบบปรับเข้าสู่ภาคเรียนที่ ${nextTerm}/${nextYear} และเลื่อนระดับชั้นนักเรียนเรียบร้อยแล้ว`
+        : `ระบบปรับเข้าสู่ภาคเรียนที่ ${nextTerm}/${nextYear} เรียบร้อยแล้ว (นักเรียนคงชั้นปีเดิม)`;
+      if (res.clonedSubjectsCount > 0 || res.clonedSchedulesCount > 0) {
+        successMsg += ` พร้อมคัดลอกรายวิชาอัตโนมัติ ${res.clonedSubjectsCount} วิชา และตารางสอน ${res.clonedSchedulesCount} คาบ`;
+      }
       showSuccess(
         "ปรับเปลี่ยนภาคเรียนสำเร็จ!",
-        willPromoteLevels
-          ? `ระบบปรับเข้าสู่ภาคเรียนที่ ${nextTerm}/${nextYear} และเลื่อนระดับชั้นนักเรียนเรียบร้อยแล้ว`
-          : `ระบบปรับเข้าสู่ภาคเรียนที่ ${nextTerm}/${nextYear} เรียบร้อยแล้ว (นักเรียนคงชั้นปีเดิม)`
+        successMsg
       );
     } catch (err: any) {
       showError("เกิดข้อผิดพลาด", err.message || "ไม่สามารถดำเนินการได้");
@@ -500,24 +506,46 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
                 )}
 
                 {willPromoteLevels && (
-                  <div className="mt-3 pt-2.5 border-t border-gray-200 dark:border-gray-700">
-                    <label className="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
-                      <input
-                        type="checkbox"
-                        checked={promoteAdvisors}
-                        onChange={e => setPromoteAdvisors(e.target.checked)}
-                        className="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                      />
-                      <div>
-                        <span className="font-semibold text-gray-800 dark:text-gray-200">
-                          เลื่อนอาจารย์ที่ปรึกษาตามรุ่นชั้นปีด้วย
-                        </span>
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          ครูที่ปรึกษา ปวช.1 ➡️ ปวช.2, ปวช.2 ➡️ ปวช.3, ปวส.1 ➡️ ปวส.2 อัตโนมัติในปีการศึกษาใหม่
-                        </p>
-                      </div>
-                    </label>
-                  </div>
+                  <>
+                    <div className="mt-3 pt-2.5 border-t border-gray-200 dark:border-gray-700">
+                      <label className="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={promoteAdvisors}
+                          onChange={e => setPromoteAdvisors(e.target.checked)}
+                          className="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <div>
+                          <span className="font-semibold text-gray-800 dark:text-gray-200">
+                            เลื่อนอาจารย์ที่ปรึกษาตามรุ่นชั้นปีด้วย
+                          </span>
+                          <p className="text-[11px] text-gray-500 mt-0.5">
+                            ครูที่ปรึกษา ปวช.1 ➡️ ปวช.2, ปวช.2 ➡️ ปวช.3, ปวส.1 ➡️ ปวส.2 อัตโนมัติในปีการศึกษาใหม่
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="mt-2.5 pt-2.5 border-t border-gray-200 dark:border-gray-700">
+                      <label className="flex items-start gap-2.5 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={cloneSubjectsAndSchedules}
+                          onChange={e => setCloneSubjectsAndSchedules(e.target.checked)}
+                          className="w-4 h-4 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <div>
+                          <span className="font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                            <span>คัดลอกรายวิชาและตารางสอนข้ามปีอัตโนมัติ (Auto-clone)</span>
+                            <span className="text-[10px] px-1.5 py-0.2 bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 rounded font-bold">แนะนำ</span>
+                          </span>
+                          <p className="text-[11px] text-gray-500 mt-0.5">
+                            คัดลอกรายวิชาและคาบเรียนในตารางสอนจากปี {currentYear} มายังปี {nextYear} ให้อัตโนมัติ (สามารถแก้ไข ปรับปรุง หรือเพิ่มวิชาใหม่ได้ตลอดเวลา)
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+                  </>
                 )}
               </div>
             </div>

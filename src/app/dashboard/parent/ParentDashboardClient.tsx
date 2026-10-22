@@ -12,6 +12,8 @@ export default function ParentDashboardClient({
   parentData,
   childrenData,
   allAttendances,
+  allCurrentTermAttendances = {},
+  currentTermLabel,
   allSubjects,
   allSchedules,
   childAdvisors = {}
@@ -337,7 +339,11 @@ export default function ParentDashboardClient({
                   </div>
 
                   <div className="mt-8">
-                    <StudentStatusOverview attendances={attendances} subjects={childSubjects} />
+                    <StudentStatusOverview 
+                      attendances={allCurrentTermAttendances?.[activeChild?.id] || attendances} 
+                      subjects={childSubjects} 
+                      termLabel={currentTermLabel} 
+                    />
                   </div>
                 </div>
               )}

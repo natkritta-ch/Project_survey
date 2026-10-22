@@ -77,6 +77,9 @@ export interface StudentAdvisee {
 interface TeacherAdvisoryProps {
   advisoryData: {
     academicYear: string;
+    term?: string;
+    termStartDate?: string | Date;
+    termEndDate?: string | Date;
     assignments: Array<{
       level: string;
       isPrimary: boolean;
@@ -87,7 +90,7 @@ interface TeacherAdvisoryProps {
 }
 
 export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryProps) {
-  const { academicYear, assignments, students: initialStudents } = advisoryData;
+  const { academicYear, term, assignments, students: initialStudents } = advisoryData;
   const [students, setStudents] = useState<StudentAdvisee[]>(initialStudents || []);
   const [selectedLevel, setSelectedLevel] = useState<string>(assignments[0]?.level || "ทั้งหมด");
   const [selectedStudentFilterId, setSelectedStudentFilterId] = useState<string | null>(null);
@@ -318,7 +321,7 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-indigo-200 text-xs font-semibold mb-2 backdrop-blur-md">
-              <GraduationCap className="w-4 h-4" /> ห้องในที่ปรึกษา ปีการศึกษา {academicYear}
+              <GraduationCap className="w-4 h-4" /> ห้องในที่ปรึกษา {term ? `ภาคเรียนที่ ${term}/${academicYear}` : `ปีการศึกษา ${academicYear}`}
             </div>
             <h2 className="text-2xl font-black tracking-tight">
               ห้องเรียนในความดูแลของฉัน
@@ -481,7 +484,7 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
 
         <div className="bg-rose-50/60 dark:bg-rose-950/20 p-4 rounded-2xl border border-rose-100 dark:border-rose-900/40 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-rose-700 dark:text-rose-300 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">เสี่ยง ม.ผ. (เข้าแถว)</span>
+            <span className="text-xs font-bold uppercase tracking-wider">เสี่ยง ม.ผ. (เข้าแถว{term ? ` เทอม ${term}` : ""})</span>
             <ShieldAlert className="w-4 h-4 text-rose-600" />
           </div>
           <div className="flex items-baseline gap-1">
@@ -536,7 +539,7 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
             }`}
           >
             <ShieldAlert className="w-3.5 h-3.5" />
-            เสี่ยง ม.ผ. เข้าแถว ({stats.atRiskAssembly})
+            เสี่ยง ม.ผ. เข้าแถว{term ? ` เทอม ${term}` : ""} ({stats.atRiskAssembly})
           </button>
           <button
             type="button"
@@ -829,7 +832,7 @@ export default function TeacherAdvisoryView({ advisoryData }: TeacherAdvisoryPro
             <div className="grid grid-cols-2 gap-3 my-4">
               <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                 <div>
-                  <span className="text-[11px] text-gray-500 block">การเข้าแถวหน้าเสาธง</span>
+                  <span className="text-[11px] text-gray-500 block">การเข้าแถวหน้าเสาธง{term ? ` (ตัดรอบเทอม ${term})` : ""}</span>
                   {selectedStudentForDetail.assemblySummary && selectedStudentForDetail.assemblySummary.total > 0 ? (
                     <div className="flex items-baseline gap-1 mt-0.5">
                       <span className="text-lg font-black text-gray-900 dark:text-white">

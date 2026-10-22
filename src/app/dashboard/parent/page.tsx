@@ -47,12 +47,24 @@ export default async function ParentDashboard() {
       orderBy: [{ dayOfWeek: "asc" }, { startTime: "asc" }],
     });
 
+    let allCurrentTermAttendances: Record<string, any[]> = {};
+    const termStartDate = currentTerm?.startDate ? new Date(currentTerm.startDate) : null;
+    const termEndDate = currentTerm?.endDate ? new Date(currentTerm.endDate) : null;
+    if (termEndDate) termEndDate.setHours(23, 59, 59, 999);
+
     for (const child of approvedChildren) {
       const childId = child.id;
       allAttendances[childId] = await prisma.attendance.findMany({
         where: { studentId: childId },
         include: { subject: true },
         orderBy: { timestamp: "desc" },
+      });
+
+      // กรองตัดรอบการเข้าเรียนตามเทอมปัจจุบันสำหรับสรุปสถานะ มผ. / ขร.
+      allCurrentTermAttendances[childId] = allAttendances[childId].filter((a: any) => {
+        if (!termStartDate || !termEndDate) return true;
+        const ts = new Date(a.timestamp);
+        return ts >= termStartDate && ts <= termEndDate;
       });
 
       const childSchedules = schedules.filter((sc: any) => {
@@ -79,8 +91,10 @@ export default async function ParentDashboard() {
     }
 
     let childAdvisors: Record<string, any> = {};
+    const currentAcademicYear = currentTerm?.academicYear || String(new Date().getFullYear() + 543);
+    const currentTermLabel = currentTerm ? `${currentTerm.term}/${currentAcademicYear}` : undefined;
+
     try {
-      const currentAcademicYear = currentTerm?.academicYear || String(new Date().getFullYear() + 543);
       const childLevels = Array.from(new Set(approvedChildren.map((c: any) => c.level).filter(Boolean)));
       const advisors = await (prisma as any).classroomAdvisor.findMany({
         where: {
@@ -105,6 +119,8 @@ export default async function ParentDashboard() {
         parentData={parentData}
         childrenData={childrenData}
         allAttendances={allAttendances}
+        allCurrentTermAttendances={allCurrentTermAttendances}
+        currentTermLabel={currentTermLabel}
         allSubjects={allSubjects}
         allSchedules={allSchedules}
         childAdvisors={childAdvisors}
@@ -118,6 +134,7 @@ export default async function ParentDashboard() {
       parentData={parentData}
       childrenData={childrenData}
       allAttendances={allAttendances}
+      allCurrentTermAttendances={{}}
       allSubjects={allSubjects}
       allSchedules={allSchedules}
       childAdvisors={{}}

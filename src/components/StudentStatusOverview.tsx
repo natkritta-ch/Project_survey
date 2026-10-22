@@ -3,7 +3,15 @@
 import React, { useMemo } from "react";
 import { AlertTriangle, XCircle, CheckCircle2, ShieldAlert } from "lucide-react";
 
-export default function StudentStatusOverview({ attendances, subjects }: { attendances: any[], subjects: any[] }) {
+export default function StudentStatusOverview({ 
+  attendances, 
+  subjects,
+  termLabel
+}: { 
+  attendances: any[], 
+  subjects: any[],
+  termLabel?: string 
+}) {
   const { assemblyStats, subjectStats } = useMemo(() => {
     // Assembly Stats
     const assemblyLogs = attendances.filter(a => a.type === "assembly" || !a.subjectId);
@@ -52,9 +60,16 @@ export default function StudentStatusOverview({ attendances, subjects }: { atten
 
   return (
     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 transition-shadow hover:shadow-md mb-8">
-      <h3 className="font-bold text-lg mb-5 text-slate-800 dark:text-white flex items-center gap-2">
-        <ShieldAlert className="w-5 h-5 text-indigo-500" /> สรุปสถานะการเข้าเรียน (คัดกรอง ขร. / มผ.)
-      </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-5">
+        <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+          <ShieldAlert className="w-5 h-5 text-indigo-500" /> สรุปสถานะการเข้าเรียน (คัดกรอง ขร. / มผ.)
+        </h3>
+        {termLabel && (
+          <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+            ตัดรอบประจำภาคเรียนที่ {termLabel}
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         

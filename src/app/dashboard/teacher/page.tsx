@@ -241,11 +241,22 @@ export default async function TeacherDashboard() {
         orderBy: [{ level: 'asc' }, { username: 'asc' }]
       });
 
-      // ดึงรายวิชาทั้งหมดของระดับชั้นที่ครูเป็นที่ปรึกษา เพื่อแมปตารางวิชาให้ครบถ้วน
+      // กำหนดช่วงวันตัดรอบของภาคเรียนปัจจุบัน เพื่อตัดรอบสถิติการเข้าแถวและรายวิชาไม่ให้ปะปนข้ามเทอม (เช่น เทอม 2 ตัดรอบแยกจากเทอม 1)
+      const termStartDate = currentTerm?.startDate ? new Date(currentTerm.startDate) : null;
+      const termEndDate = currentTerm?.endDate ? new Date(currentTerm.endDate) : null;
+      if (termEndDate) termEndDate.setHours(23, 59, 59, 999);
+
+      const assemblyDateWhere = termStartDate && termEndDate ? {
+        gte: termStartDate,
+        lte: termEndDate
+      } : undefined;
+
+      // ดึงรายวิชาทั้งหมดของระดับชั้นที่ครูเป็นที่ปรึกษา เฉพาะภาคเรียนและปีการศึกษาปัจจุบัน เพื่อแมปตารางวิชาให้ถูกต้องตรงเทอม
       const levelSubjects = await prisma.subject.findMany({
         where: {
           level: { in: advisedLevels },
-          deletedAt: null
+          deletedAt: null,
+          ...(currentTerm ? { academicYear: currentTerm.academicYear, term: currentTerm.term } : {})
         },
         select: {
           id: true,
@@ -256,11 +267,12 @@ export default async function TeacherDashboard() {
         }
       });
 
-      // หาจำนวนวันเข้าแถวหน้าเสาธงทั้งหมดที่มีการบันทึกในระบบของระดับชั้นที่ครูดูแล
+      // หาจำนวนวันเข้าแถวหน้าเสาธงทั้งหมดที่มีการบันทึกในระบบของระดับชั้นที่ครูดูแล (ตัดรอบตามภาคเรียนปัจจุบัน)
       const allClassAssemblyLogs = await prisma.attendance.findMany({
         where: {
           type: "assembly",
-          student: { level: { in: advisedLevels }, deletedAt: null }
+          student: { level: { in: advisedLevels }, deletedAt: null },
+          ...(assemblyDateWhere ? { timestamp: assemblyDateWhere } : {})
         },
         select: { timestamp: true }
       });
@@ -272,8 +284,13 @@ export default async function TeacherDashboard() {
       const processedAdvisedStudents = rawAdvisedStudents.map((st: any) => {
         const atts = st.attendances || [];
 
-        // 1. แยกการเข้าแถวหน้าเสาธง (Assembly)
-        const assemblyAtts = atts.filter((a: any) => a.type === "assembly");
+        // 1. แยกการเข้าแถวหน้าเสาธง (Assembly) เฉพาะในภาคเรียนปัจจุบัน (ตัดรอบตามวันเปิด-ปิดเทอม)
+        const assemblyAtts = atts.filter((a: any) => {
+          if (a.type !== "assembly") return false;
+          if (termStartDate && new Date(a.timestamp) < termStartDate) return false;
+          if (termEndDate && new Date(a.timestamp) > termEndDate) return false;
+          return true;
+        });
         
         // จัดกลุ่มวันเข้าแถวของนักเรียนคนนี้ เพื่อป้องกันการนับซ้ำในวันเดียวกัน
         // ลำดับความสำคัญ: PRESENT (1) > LATE (2) > LEAVE (3) > ABSENT (4)
@@ -433,6 +450,9 @@ export default async function TeacherDashboard() {
 
       advisoryData = {
         academicYear: currentAcademicYear,
+        term: currentTerm?.term || "1",
+        termStartDate: currentTerm?.startDate,
+        termEndDate: currentTerm?.endDate,
         assignments: advisorAssignments.map((a: any) => ({
           level: a.level,
           isPrimary: a.primaryAdvisorId === userId,

@@ -7,6 +7,7 @@ import StatusEditor from "./StatusEditor";
 import { getAttendanceRemarks } from "../../../../lib/attendanceRemarks";
 import ClientSearchBox from "./ClientSearchBox";
 import { CheckCircle2, AlertTriangle, XCircle, Users, BarChart3, ListChecks } from "lucide-react";
+import { getCurrentTermConfig } from "../../../../lib/term";
 
 import ExportXlsxBtn from "../../../../components/ExportXlsxBtn";
 import ClientSelectAutoSubmit from "./ClientSelectAutoSubmit";
@@ -32,6 +33,15 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
   const showOnlyFailed = params.failed === "true";
   const activeSearch = params.search || "";
 
+  // หาเทอมปัจจุบันอัตโนมัติ เพื่อใช้ตัดรอบวันเข้าแถวและรายวิชา
+  const currentTerm = await getCurrentTermConfig();
+  const defaultAssemblyStart = params.assemblyStart !== undefined
+    ? params.assemblyStart
+    : (currentTerm?.startDate ? new Date(currentTerm.startDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) : "");
+  const defaultAssemblyEnd = params.assemblyEnd !== undefined
+    ? params.assemblyEnd
+    : (currentTerm?.endDate ? new Date(currentTerm.endDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) : "");
+
   // ดึงวิชาที่อาจารย์คนนี้สอน (จะว่างเปล่าก็ไม่เป็นไร เป็นส่วนหนึ่งของสิทธิ์การมองเห็น)
   const mySubjects = await prisma.subject.findMany({ where: { teacherId, deletedAt: null }, orderBy: { name: 'asc' } });
   const subjects = mySubjects;
@@ -50,11 +60,11 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
   if (isSummaryView(viewMode)) {
     if (activeSubjectId === "assembly") {
       let assemblyDateFilter: any = {};
-      if (params.assemblyStart) {
-        assemblyDateFilter.gte = new Date(params.assemblyStart);
+      if (defaultAssemblyStart) {
+        assemblyDateFilter.gte = new Date(defaultAssemblyStart);
       }
-      if (params.assemblyEnd) {
-        const endDate = new Date(params.assemblyEnd);
+      if (defaultAssemblyEnd) {
+        const endDate = new Date(defaultAssemblyEnd);
         endDate.setHours(23, 59, 59, 999);
         assemblyDateFilter.lte = endDate;
       }
@@ -410,11 +420,20 @@ export default async function TeacherReportPage({ searchParams }: { searchParams
 
           {activeSubjectId === "assembly" && isSummaryView(viewMode) && (
             <div className="flex flex-col">
-              <label className="text-xs font-bold text-slate-500 tracking-wider uppercase mb-1 block">ช่วงวันที่ตัดรอบ (Assembly)</label>
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <label className="text-xs font-bold text-slate-500 tracking-wider uppercase block">
+                  ช่วงวันที่ตัดรอบ (Assembly)
+                </label>
+                {currentTerm && (
+                  <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/40 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-800">
+                    เทอม {currentTerm.term}/{currentTerm.academicYear}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                <ClientInputAutoSubmit type="date" name="assemblyStart" defaultValue={params.assemblyStart || ""} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-[13px] outline-none w-[130px] min-w-0" />
+                <ClientInputAutoSubmit type="date" name="assemblyStart" defaultValue={defaultAssemblyStart} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-[13px] outline-none w-[130px] min-w-0" />
                 <span className="text-xs text-slate-400 font-bold">ถึง</span>
-                <ClientInputAutoSubmit type="date" name="assemblyEnd" defaultValue={params.assemblyEnd || ""} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-[13px] outline-none w-[130px] min-w-0" />
+                <ClientInputAutoSubmit type="date" name="assemblyEnd" defaultValue={defaultAssemblyEnd} className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-[13px] outline-none w-[130px] min-w-0" />
               </div>
             </div>
           )}
