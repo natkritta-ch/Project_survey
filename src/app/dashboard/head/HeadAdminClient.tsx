@@ -1785,36 +1785,74 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     ผูกกับนักเรียน (บุตรหลาน)
                   </label>
                   {isStudentDropdownOpen && (
-                    <div className="fixed inset-0 z-40" onClick={() => setIsStudentDropdownOpen(false)}></div>
+                    <div className="fixed inset-0 z-40" onClick={() => { setIsStudentDropdownOpen(false); setStudentSearchQuery(""); }}></div>
                   )}
                   <div className="relative z-40">
-                    <div
-                      onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
-                      className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isStudentDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
-                    >
-                      <span className={`${userStudentId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'} truncate`}>
-                        {userStudentId
-                          ? (() => {
+                    <div className="relative flex items-center mt-1">
+                      <input
+                        type="text"
+                        value={
+                          isStudentDropdownOpen
+                            ? studentSearchQuery
+                            : (() => {
+                                const st = users.find(u => u.id === userStudentId);
+                                return st ? `${st.name} (${st.username})` : "";
+                              })()
+                        }
+                        onChange={e => {
+                          setStudentSearchQuery(e.target.value);
+                          setIsStudentDropdownOpen(true);
+                          if (!e.target.value) setUserStudentId("");
+                        }}
+                        onFocus={e => {
+                          setIsStudentDropdownOpen(true);
+                          const st = users.find(u => u.id === userStudentId);
+                          setStudentSearchQuery(st ? st.name : "");
+                          e.target.select();
+                        }}
+                        placeholder="-- พิมพ์ค้นหาชื่อ หรือ รหัสนักเรียน --"
+                        className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-14 bg-white dark:bg-gray-800 dark:text-white"
+                      />
+                      <div className="absolute right-2 flex items-center gap-1 text-gray-400">
+                        {(userStudentId || studentSearchQuery) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUserStudentId("");
+                              setStudentSearchQuery("");
+                              setIsStudentDropdownOpen(false);
+                            }}
+                            className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                            title="ล้างการเลือก"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isStudentDropdownOpen) {
+                              setIsStudentDropdownOpen(false);
+                              setStudentSearchQuery("");
+                            } else {
+                              setIsStudentDropdownOpen(true);
                               const st = users.find(u => u.id === userStudentId);
-                              return st ? `${st.name} (${st.username})` : "-- ไม่ระบุ --";
-                            })()
-                          : "-- ค้นหาและเลือกนักเรียน --"}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                              setStudentSearchQuery(st ? st.name : "");
+                            }
+                          }}
+                          className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                        >
+                          <svg className={`w-4 h-4 transition-transform duration-150 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
 
                     {isStudentDropdownOpen && (
                       <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
-                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                          <input
-                            type="text"
-                            value={studentSearchQuery}
-                            onChange={e => setStudentSearchQuery(e.target.value)}
-                            placeholder="พิมพ์ชื่อ หรือ รหัสนักเรียน..."
-                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                            autoFocus
-                          />
-                        </div>
                         <div className="py-1">
                           <div
                             onClick={() => {
@@ -1822,7 +1860,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                               setIsStudentDropdownOpen(false);
                               setStudentSearchQuery("");
                             }}
-                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic border-b border-gray-100 dark:border-gray-700"
                           >
                             -- ไม่ระบุ --
                           </div>
@@ -3012,36 +3050,74 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                     ผูกกับนักเรียน (บุตรหลาน)
                   </label>
                   {isStudentDropdownOpen && (
-                    <div className="fixed inset-0 z-40" onClick={() => setIsStudentDropdownOpen(false)}></div>
+                    <div className="fixed inset-0 z-40" onClick={() => { setIsStudentDropdownOpen(false); setStudentSearchQuery(""); }}></div>
                   )}
                   <div className="relative z-40">
-                    <div
-                      onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
-                      className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isStudentDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
-                    >
-                      <span className={`${userStudentId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'} truncate`}>
-                        {userStudentId
-                          ? (() => {
+                    <div className="relative flex items-center mt-1">
+                      <input
+                        type="text"
+                        value={
+                          isStudentDropdownOpen
+                            ? studentSearchQuery
+                            : (() => {
+                                const st = users.find(u => u.id === userStudentId);
+                                return st ? `${st.name} (${st.username})` : "";
+                              })()
+                        }
+                        onChange={e => {
+                          setStudentSearchQuery(e.target.value);
+                          setIsStudentDropdownOpen(true);
+                          if (!e.target.value) setUserStudentId("");
+                        }}
+                        onFocus={e => {
+                          setIsStudentDropdownOpen(true);
+                          const st = users.find(u => u.id === userStudentId);
+                          setStudentSearchQuery(st ? st.name : "");
+                          e.target.select();
+                        }}
+                        placeholder="-- พิมพ์ค้นหาชื่อ หรือ รหัสนักเรียน --"
+                        className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-14 bg-white dark:bg-gray-800 dark:text-white"
+                      />
+                      <div className="absolute right-2 flex items-center gap-1 text-gray-400">
+                        {(userStudentId || studentSearchQuery) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUserStudentId("");
+                              setStudentSearchQuery("");
+                              setIsStudentDropdownOpen(false);
+                            }}
+                            className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                            title="ล้างการเลือก"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isStudentDropdownOpen) {
+                              setIsStudentDropdownOpen(false);
+                              setStudentSearchQuery("");
+                            } else {
+                              setIsStudentDropdownOpen(true);
                               const st = users.find(u => u.id === userStudentId);
-                              return st ? `${st.name} (${st.username})` : "-- ไม่ระบุ --";
-                            })()
-                          : "-- ค้นหาและเลือกนักเรียน --"}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                              setStudentSearchQuery(st ? st.name : "");
+                            }
+                          }}
+                          className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                        >
+                          <svg className={`w-4 h-4 transition-transform duration-150 ${isStudentDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
 
                     {isStudentDropdownOpen && (
                       <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-52 overflow-y-auto z-50">
-                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                          <input
-                            type="text"
-                            value={studentSearchQuery}
-                            onChange={e => setStudentSearchQuery(e.target.value)}
-                            placeholder="พิมพ์ชื่อ หรือ รหัสนักเรียน..."
-                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                            autoFocus
-                          />
-                        </div>
                         <div className="py-1">
                           <div
                             onClick={() => {
@@ -3049,7 +3125,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                               setIsStudentDropdownOpen(false);
                               setStudentSearchQuery("");
                             }}
-                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic border-b border-gray-100 dark:border-gray-700"
                           >
                             -- ไม่ระบุ --
                           </div>

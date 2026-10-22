@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, BookOpen, ChevronDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Search, BookOpen, ChevronDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, XCircle, Clock, AlertTriangle, ShieldCheck, X } from "lucide-react";
 
 export default function AttendanceHistory({ attendances, subjects, schedules }: { attendances: any[], subjects: any[], schedules?: any[] }) {
   // ค่าเริ่มต้นเป็นรายสัปดาห์ (Weekly View) ตามที่ผู้ใช้กำหนด
@@ -163,48 +163,84 @@ export default function AttendanceHistory({ attendances, subjects, schedules }: 
         <div className="relative">
           <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">วิชา / กิจกรรม</label>
           {isSubjectDropdownOpen && (
-            <div className="fixed inset-0 z-20" onClick={() => setIsSubjectDropdownOpen(false)}></div>
+            <div className="fixed inset-0 z-20" onClick={() => { setIsSubjectDropdownOpen(false); setSubjectSearch(""); }}></div>
           )}
 
           <div className="relative z-20">
-            <div
-              onClick={() => setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
-              className={`flex items-center justify-between w-full rounded-lg border shadow-sm sm:text-sm px-3 py-2.5 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
-                isSubjectDropdownOpen 
-                  ? 'border-indigo-500 ring-2 ring-indigo-500/20' 
-                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
-              }`}
-            >
-              <div className="flex items-center gap-2 min-w-0 flex-1 truncate text-gray-900 dark:text-white font-medium">
-                <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
-                <span className="truncate">
-                  {filterSubject === "all" && `ดูทั้งหมด (${attendances.length} รายการ)`}
-                  {filterSubject === "assembly" && `★ เข้าแถว / กิจกรรมรวม (${attendances.filter(r => !r.subject).length})`}
-                  {filterSubject !== "all" && filterSubject !== "assembly" && (() => {
-                    const s = subjects.find(x => x.id === filterSubject);
-                    const count = attendances.filter(r => r.subject?.id === filterSubject).length;
-                    return s ? `[${s.code}] ${s.name} (${count})` : "วิชาที่เลือก";
-                  })()}
-                </span>
+            <div className="relative flex items-center">
+              <div className="absolute left-3 pointer-events-none text-indigo-500">
+                <BookOpen className="w-4 h-4" />
               </div>
-              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ml-2 ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+              <input
+                type="text"
+                value={
+                  isSubjectDropdownOpen
+                    ? subjectSearch
+                    : (() => {
+                        if (filterSubject === "all") return "";
+                        if (filterSubject === "assembly") return "★ เข้าแถว / กิจกรรมรวม";
+                        const s = subjects.find(x => x.id === filterSubject);
+                        return s ? `[${s.code}] ${s.name}` : "";
+                      })()
+                }
+                onChange={e => {
+                  setSubjectSearch(e.target.value);
+                  setIsSubjectDropdownOpen(true);
+                  if (!e.target.value) setFilterSubject("all");
+                }}
+                onFocus={e => {
+                  setIsSubjectDropdownOpen(true);
+                  if (filterSubject !== "all" && filterSubject !== "assembly") {
+                    const s = subjects.find(x => x.id === filterSubject);
+                    setSubjectSearch(s ? s.name : "");
+                  } else {
+                    setSubjectSearch("");
+                  }
+                  e.target.select();
+                }}
+                placeholder="-- ทุกวิชา / ค้นหาวิชา --"
+                className="w-full rounded-lg border shadow-sm sm:text-sm pl-9 pr-14 py-2.5 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <div className="absolute right-2 flex items-center gap-0.5 text-gray-400">
+                {(filterSubject !== "all" || subjectSearch) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilterSubject("all");
+                      setSubjectSearch("");
+                      setIsSubjectDropdownOpen(false);
+                    }}
+                    className="p-1 hover:text-rose-500 transition"
+                    title="ล้างตัวกรอง (ดูทั้งหมด)"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSubjectDropdownOpen) {
+                      setIsSubjectDropdownOpen(false);
+                      setSubjectSearch("");
+                    } else {
+                      setIsSubjectDropdownOpen(true);
+                      if (filterSubject !== "all" && filterSubject !== "assembly") {
+                        const s = subjects.find(x => x.id === filterSubject);
+                        setSubjectSearch(s ? s.name : "");
+                      } else {
+                        setSubjectSearch("");
+                      }
+                    }
+                  }}
+                  className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                >
+                  <ChevronDown className={`w-4 h-4 transition-transform duration-150 ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
             </div>
 
             {isSubjectDropdownOpen && (
               <div className="absolute left-0 top-full mt-1.5 w-full sm:w-80 max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-64 overflow-y-auto z-30 animate-in fade-in zoom-in-95">
-                <div className="p-2.5 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={subjectSearch}
-                      onChange={e => setSubjectSearch(e.target.value)}
-                      placeholder="ค้นหารหัส หรือชื่อวิชา..."
-                      className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                      autoFocus
-                    />
-                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
-                  </div>
-                </div>
 
                 <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
                   {/* ตัวเลือกทั่วไป */}

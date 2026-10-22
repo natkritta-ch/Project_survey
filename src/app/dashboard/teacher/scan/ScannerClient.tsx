@@ -703,49 +703,80 @@ export default function TeacherScannerClient({
               ) : (
                 <div className="relative">
                   {isSubjectDropdownOpen && (
-                    <div className="fixed inset-0 z-40" onClick={() => setIsSubjectDropdownOpen(false)}></div>
+                    <div className="fixed inset-0 z-40" onClick={() => { setIsSubjectDropdownOpen(false); setSubjectSearch(""); }}></div>
                   )}
 
                   <div className="relative z-40">
-                    <div
-                      onClick={() => !isScanning && setIsSubjectDropdownOpen(!isSubjectDropdownOpen)}
-                      className={`flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
-                        isScanning ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''
-                      } ${
-                        isSubjectDropdownOpen 
-                          ? 'border-indigo-500 ring-1 ring-indigo-500' 
-                          : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
-                        <span className={selectedSubject ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'}>
-                          {selectedSubject
-                            ? (() => {
-                                const s = subjectsList.find(x => x.id === selectedSubject);
-                                return s ? `[${s.code}] ${s.name} (ชั้นปี: ${s.level || "ไม่ระบุ"})` : "-- กรุณาเลือกวิชา --";
-                              })()
-                            : "-- กรุณาเลือกวิชา --"}
-                        </span>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-3 pointer-events-none text-indigo-500">
+                        <BookOpen className="w-4 h-4" />
                       </div>
-                      <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                      <input
+                        type="text"
+                        disabled={isScanning}
+                        value={
+                          isSubjectDropdownOpen
+                            ? subjectSearch
+                            : (() => {
+                                const s = subjectsList.find(x => x.id === selectedSubject);
+                                return s ? `[${s.code}] ${s.name} (ชั้นปี: ${s.level || "ไม่ระบุ"})` : "";
+                              })()
+                        }
+                        onChange={e => {
+                          setSubjectSearch(e.target.value);
+                          setIsSubjectDropdownOpen(true);
+                          if (!e.target.value) setSelectedSubject("");
+                        }}
+                        onFocus={e => {
+                          if (isScanning) return;
+                          setIsSubjectDropdownOpen(true);
+                          const s = subjectsList.find(x => x.id === selectedSubject);
+                          setSubjectSearch(s ? s.name : "");
+                          e.target.select();
+                        }}
+                        placeholder="-- กรุณาเลือกวิชา (พิมพ์ค้นหารหัส หรือชื่อวิชา) --"
+                        className={`w-full rounded-md border shadow-sm sm:text-sm pl-9 pr-14 py-2 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 ${
+                          isScanning ? 'opacity-60 cursor-not-allowed bg-gray-100 dark:bg-gray-800' : ''
+                        }`}
+                      />
+                      <div className="absolute right-2 flex items-center gap-0.5 text-gray-400">
+                        {(selectedSubject || subjectSearch) && !isScanning && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedSubject("");
+                              setSubjectSearch("");
+                              setIsSubjectDropdownOpen(false);
+                            }}
+                            className="p-1 hover:text-rose-500 transition"
+                            title="ล้างการเลือกวิชา"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={isScanning}
+                          onClick={() => {
+                            if (isScanning) return;
+                            if (isSubjectDropdownOpen) {
+                              setIsSubjectDropdownOpen(false);
+                              setSubjectSearch("");
+                            } else {
+                              setIsSubjectDropdownOpen(true);
+                              const s = subjectsList.find(x => x.id === selectedSubject);
+                              setSubjectSearch(s ? s.name : "");
+                            }
+                          }}
+                          className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                        >
+                          <ChevronDown className={`w-4 h-4 transition-transform duration-150 ${isSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                      </div>
                     </div>
 
                     {isSubjectDropdownOpen && !isScanning && (
                       <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
-                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                          <div className="relative">
-                            <input
-                              type="text"
-                              value={subjectSearch}
-                              onChange={e => setSubjectSearch(e.target.value)}
-                              placeholder="พิมพ์ค้นหารหัส หรือชื่อวิชา..."
-                              className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                              autoFocus
-                            />
-                            <Search className="w-4 h-4 text-gray-400 absolute left-2.5 top-2" />
-                          </div>
-                        </div>
 
                         <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
                           {subjectsList
@@ -1078,37 +1109,71 @@ export default function TeacherScannerClient({
             {/* Searchable Select Combobox สำหรับนักเรียน */}
             <div className="relative flex-1">
               {isManualStudentDropdownOpen && (
-                <div className="fixed inset-0 z-40" onClick={() => setIsManualStudentDropdownOpen(false)}></div>
+                <div className="fixed inset-0 z-40" onClick={() => { setIsManualStudentDropdownOpen(false); setManualStudentSearch(""); }}></div>
               )}
 
               <div className="relative z-40">
-                <div
-                  onClick={() => setIsManualStudentDropdownOpen(!isManualStudentDropdownOpen)}
-                  className={`flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${isManualStudentDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
-                >
-                  <span className={`${manualStudentId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'}`}>
-                    {manualStudentId
-                      ? (() => {
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={
+                      isManualStudentDropdownOpen
+                        ? manualStudentSearch
+                        : (() => {
+                            const s = students.find(x => x.id === manualStudentId);
+                            return s ? `${s.name} (${s.username}) - ${s.level || "ไม่ระบุ"}` : "";
+                          })()
+                    }
+                    onChange={e => {
+                      setManualStudentSearch(e.target.value);
+                      setIsManualStudentDropdownOpen(true);
+                      if (!e.target.value) setManualStudentId("");
+                    }}
+                    onFocus={e => {
+                      setIsManualStudentDropdownOpen(true);
+                      const s = students.find(x => x.id === manualStudentId);
+                      setManualStudentSearch(s ? s.name : "");
+                      e.target.select();
+                    }}
+                    placeholder="-- พิมพ์ค้นหารหัส หรือชื่อนักเรียนเพื่อเช็คชื่อ --"
+                    className="w-full rounded-md border shadow-sm sm:text-sm pl-3 pr-14 py-2 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <div className="absolute right-2 flex items-center gap-0.5 text-gray-400">
+                    {(manualStudentId || manualStudentSearch) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualStudentId("");
+                          setManualStudentSearch("");
+                          setIsManualStudentDropdownOpen(false);
+                        }}
+                        className="p-1 hover:text-rose-500 transition"
+                        title="ล้างการเลือก"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isManualStudentDropdownOpen) {
+                          setIsManualStudentDropdownOpen(false);
+                          setManualStudentSearch("");
+                        } else {
+                          setIsManualStudentDropdownOpen(true);
                           const s = students.find(x => x.id === manualStudentId);
-                          return s ? `${s.name} (${s.username}) - ${s.level || "ไม่ระบุ"}` : "-- เลือกนักเรียนที่ยังไม่ได้เช็คชื่อ --";
-                        })()
-                      : "-- เลือกนักเรียนที่ยังไม่ได้เช็คชื่อ --"}
-                  </span>
-                  <svg className={`w-4 h-4 text-gray-400 transition-transform ${isManualStudentDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          setManualStudentSearch(s ? s.name : "");
+                        }
+                      }}
+                      className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                    >
+                      <ChevronDown className={`w-4 h-4 transition-transform duration-150 ${isManualStudentDropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  </div>
                 </div>
 
                 {isManualStudentDropdownOpen && (
                   <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
-                    <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                      <input
-                        type="text"
-                        value={manualStudentSearch}
-                        onChange={e => setManualStudentSearch(e.target.value)}
-                        placeholder="พิมพ์ค้นหารหัส หรือชื่อนักเรียน..."
-                        className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                        autoFocus
-                      />
-                    </div>
                     <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
                       <div
                         onClick={() => {
@@ -1242,47 +1307,74 @@ export default function TeacherScannerClient({
               <div className="relative">
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">วิชาที่ต้องการสอนชดเชย</label>
                 {isMakeupSubjectDropdownOpen && (
-                  <div className="fixed inset-0 z-40" onClick={() => setIsMakeupSubjectDropdownOpen(false)}></div>
+                  <div className="fixed inset-0 z-40" onClick={() => { setIsMakeupSubjectDropdownOpen(false); setMakeupSubjectSearch(""); }}></div>
                 )}
 
                 <div className="relative z-40">
-                  <div
-                    onClick={() => setIsMakeupSubjectDropdownOpen(!isMakeupSubjectDropdownOpen)}
-                    className={`flex items-center justify-between w-full rounded-xl border text-sm py-2.5 px-3 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
-                      isMakeupSubjectDropdownOpen 
-                        ? 'border-amber-500 ring-2 ring-amber-500/20' 
-                        : 'border-gray-300 dark:border-gray-700 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
-                      <span className={makeupSubjectId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-400'}>
-                        {makeupSubjectId
-                          ? (() => {
-                              const s = subjectsList.find(x => x.id === makeupSubjectId);
-                              return s ? `[${s.code}] ${s.name} (${s.level || "ไม่ระบุ"})` : "-- เลือกวิชา --";
-                            })()
-                          : "-- เลือกวิชา --"}
-                      </span>
+                  <div className="relative flex items-center">
+                    <div className="absolute left-3 pointer-events-none text-amber-500">
+                      <BookOpen className="w-4 h-4" />
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isMakeupSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                    <input
+                      type="text"
+                      value={
+                        isMakeupSubjectDropdownOpen
+                          ? makeupSubjectSearch
+                          : (() => {
+                              const s = subjectsList.find(x => x.id === makeupSubjectId);
+                              return s ? `[${s.code}] ${s.name} (${s.level || "ไม่ระบุ"})` : "";
+                            })()
+                      }
+                      onChange={e => {
+                        setMakeupSubjectSearch(e.target.value);
+                        setIsMakeupSubjectDropdownOpen(true);
+                        if (!e.target.value) setMakeupSubjectId("");
+                      }}
+                      onFocus={e => {
+                        setIsMakeupSubjectDropdownOpen(true);
+                        const s = subjectsList.find(x => x.id === makeupSubjectId);
+                        setMakeupSubjectSearch(s ? s.name : "");
+                        e.target.select();
+                      }}
+                      placeholder="-- เลือกวิชา (พิมพ์ค้นหารหัส หรือชื่อวิชา) --"
+                      className="w-full rounded-xl border text-sm py-2.5 pl-9 pr-14 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    />
+                    <div className="absolute right-2 flex items-center gap-0.5 text-gray-400">
+                      {(makeupSubjectId || makeupSubjectSearch) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMakeupSubjectId("");
+                            setMakeupSubjectSearch("");
+                            setIsMakeupSubjectDropdownOpen(false);
+                          }}
+                          className="p-1 hover:text-rose-500 transition"
+                          title="ล้างการเลือกวิชา"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isMakeupSubjectDropdownOpen) {
+                            setIsMakeupSubjectDropdownOpen(false);
+                            setMakeupSubjectSearch("");
+                          } else {
+                            setIsMakeupSubjectDropdownOpen(true);
+                            const s = subjectsList.find(x => x.id === makeupSubjectId);
+                            setMakeupSubjectSearch(s ? s.name : "");
+                          }
+                        }}
+                        className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                      >
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-150 ${isMakeupSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
                   </div>
 
                   {isMakeupSubjectDropdownOpen && (
                     <div className="absolute w-full mt-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
-                      <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={makeupSubjectSearch}
-                            onChange={e => setMakeupSubjectSearch(e.target.value)}
-                            placeholder="พิมพ์ค้นหารหัส หรือชื่อวิชา..."
-                            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 dark:bg-gray-700 dark:text-white"
-                            autoFocus
-                          />
-                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
-                        </div>
-                      </div>
 
                       <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
                         {subjectsList

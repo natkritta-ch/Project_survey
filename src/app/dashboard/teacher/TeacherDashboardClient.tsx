@@ -1288,47 +1288,74 @@ export default function TeacherDashboardClient({
               <div className="relative">
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">วิชาที่ต้องการสอนชดเชย</label>
                 {isMakeupSubjectDropdownOpen && (
-                  <div className="fixed inset-0 z-40" onClick={() => setIsMakeupSubjectDropdownOpen(false)}></div>
+                  <div className="fixed inset-0 z-40" onClick={() => { setIsMakeupSubjectDropdownOpen(false); setMakeupSubjectSearch(""); }}></div>
                 )}
 
                 <div className="relative z-40">
-                  <div
-                    onClick={() => setIsMakeupSubjectDropdownOpen(!isMakeupSubjectDropdownOpen)}
-                    className={`flex items-center justify-between w-full rounded-xl border text-sm py-2.5 px-3 cursor-pointer bg-white dark:bg-gray-900 transition-colors ${
-                      isMakeupSubjectDropdownOpen 
-                        ? 'border-amber-500 ring-2 ring-amber-500/20' 
-                        : 'border-gray-300 dark:border-gray-700 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <BookOpen className="w-4 h-4 text-amber-500 shrink-0" />
-                      <span className={makeupSubjectId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-400'}>
-                        {makeupSubjectId
-                          ? (() => {
-                              const s = subjects.find((x: any) => x.id === makeupSubjectId);
-                              return s ? `[${s.code}] ${s.name} (${s.level || "ไม่ระบุ"})` : "-- เลือกวิชา --";
-                            })()
-                          : "-- เลือกวิชา --"}
-                      </span>
+                  <div className="relative flex items-center">
+                    <div className="absolute left-3 pointer-events-none text-amber-500">
+                      <BookOpen className="w-4 h-4" />
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isMakeupSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                    <input
+                      type="text"
+                      value={
+                        isMakeupSubjectDropdownOpen
+                          ? makeupSubjectSearch
+                          : (() => {
+                              const s = subjects.find((x: any) => x.id === makeupSubjectId);
+                              return s ? `[${s.code}] ${s.name} (${s.level || "ไม่ระบุ"})` : "";
+                            })()
+                      }
+                      onChange={e => {
+                        setMakeupSubjectSearch(e.target.value);
+                        setIsMakeupSubjectDropdownOpen(true);
+                        if (!e.target.value) setMakeupSubjectId("");
+                      }}
+                      onFocus={e => {
+                        setIsMakeupSubjectDropdownOpen(true);
+                        const s = subjects.find((x: any) => x.id === makeupSubjectId);
+                        setMakeupSubjectSearch(s ? s.name : "");
+                        e.target.select();
+                      }}
+                      placeholder="-- เลือกวิชา (พิมพ์ค้นหารหัส หรือชื่อวิชา) --"
+                      className="w-full rounded-xl border text-sm py-2.5 pl-9 pr-14 bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                    />
+                    <div className="absolute right-2 flex items-center gap-0.5 text-gray-400">
+                      {(makeupSubjectId || makeupSubjectSearch) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMakeupSubjectId("");
+                            setMakeupSubjectSearch("");
+                            setIsMakeupSubjectDropdownOpen(false);
+                          }}
+                          className="p-1 hover:text-rose-500 transition"
+                          title="ล้างการเลือกวิชา"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isMakeupSubjectDropdownOpen) {
+                            setIsMakeupSubjectDropdownOpen(false);
+                            setMakeupSubjectSearch("");
+                          } else {
+                            setIsMakeupSubjectDropdownOpen(true);
+                            const s = subjects.find((x: any) => x.id === makeupSubjectId);
+                            setMakeupSubjectSearch(s ? s.name : "");
+                          }
+                        }}
+                        className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                      >
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-150 ${isMakeupSubjectDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
                   </div>
 
                   {isMakeupSubjectDropdownOpen && (
                     <div className="absolute w-full mt-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-56 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
-                      <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={makeupSubjectSearch}
-                            onChange={e => setMakeupSubjectSearch(e.target.value)}
-                            placeholder="พิมพ์ค้นหารหัส หรือชื่อวิชา..."
-                            className="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg text-xs focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 dark:bg-gray-700 dark:text-white"
-                            autoFocus
-                          />
-                          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2" />
-                        </div>
-                      </div>
 
                       <div className="py-1 divide-y divide-gray-50 dark:divide-gray-700/50">
                         {subjects
