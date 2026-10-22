@@ -53,6 +53,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     : (termConfigs.length > 0 ? `${termConfigs[0].term}/${termConfigs[0].academicYear}` : `1/${currentBEYear}`);
 
   const [schedFilterTerm, setSchedFilterTerm] = useState<string>(defaultTermValue);
+  const [filterSubjTerm, setFilterSubjTerm] = useState<string>(defaultTermValue);
   const [schedFilterLevel, setSchedFilterLevel] = useState("ปวช.1");
   const [schedFilterGroup, setSchedFilterGroup] = useState("ทั้งหมด");
   const [schedId, setSchedId] = useState("");
@@ -587,6 +588,10 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
   const targetSchedTerm = !isAllTerms ? schedFilterTerm.split("/")[0] : null;
   const targetSchedYear = !isAllTerms ? schedFilterTerm.split("/")[1] : null;
 
+  const isAllSubjTerms = filterSubjTerm === "all" || filterSubjTerm === "ทั้งหมด";
+  const targetSubjTerm = !isAllSubjTerms ? filterSubjTerm.split("/")[0] : null;
+  const targetSubjYear = !isAllSubjTerms ? filterSubjTerm.split("/")[1] : null;
+
   const termOptions = useMemo(() => {
     const optionsMap = new Map<string, { term: string; academicYear: string; isCurrent: boolean }>();
     
@@ -617,7 +622,14 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     });
   }, [termConfigs, subjects, currentBEYear]);
 
-  const displaySubjects = filterLevel === "ทั้งหมด" ? activeSubjects : activeSubjects.filter(s => s.level === filterLevel);
+  const displaySubjects = activeSubjects.filter(s => {
+    if (filterLevel !== "ทั้งหมด" && s.level !== filterLevel) return false;
+    const subjYr = s.academicYear || levelToYear(s.level || "");
+    const subjTm = s.term || "1";
+    if (targetSubjTerm && subjTm !== targetSubjTerm) return false;
+    if (targetSubjYear && subjYr !== targetSubjYear) return false;
+    return true;
+  });
   const displaySchedules = activeSchedules.filter(sc => {
     if (schedFilterLevel !== "ทั้งหมด" && (sc.subject?.level || "ไม่ระบุ") !== schedFilterLevel) return false;
     if (schedFilterGroup !== "ทั้งหมด") {
@@ -1161,14 +1173,34 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
               </div>
             )}
 
-            <div className="flex justify-between items-center mt-2">
-              <h3 className="text-lg font-bold dark:text-white">รายวิชาทั้งหมด</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-sm dark:text-gray-300 whitespace-nowrap flex-shrink-0">ตัวกรองชั้นปี:</span>
-                <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border">
-                  <option value="ทั้งหมด">ทั้งหมด</option>
-                  {levelsOptions.map(l => <option key={l} value={l}>{l}{l === "ปวช.1" ? " (ค่าเริ่มต้น)" : ""}</option>)}
-                </select>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-2 gap-3">
+              <h3 className="text-lg font-bold dark:text-white">รายวิชาทั้งหมด ({displaySubjects.length})</h3>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm dark:text-gray-300 whitespace-nowrap flex-shrink-0">ภาคเรียน:</span>
+                  <select 
+                    value={filterSubjTerm} 
+                    onChange={e => setFilterSubjTerm(e.target.value)} 
+                    className="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium"
+                  >
+                    {termOptions.map(t => {
+                      const key = `${t.term}/${t.academicYear}`;
+                      return (
+                        <option key={key} value={key}>
+                          {t.isCurrent ? `เทอม ${t.term}/${t.academicYear} (ปัจจุบัน)` : `เทอม ${t.term}/${t.academicYear}`}
+                        </option>
+                      );
+                    })}
+                    <option value="all">ทุกภาคเรียน</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm dark:text-gray-300 whitespace-nowrap flex-shrink-0">ตัวกรองชั้นปี:</span>
+                  <select value={filterLevel} onChange={e => setFilterLevel(e.target.value)} className="rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-1 border font-medium">
+                    <option value="ทั้งหมด">ทั้งหมด</option>
+                    {levelsOptions.map(l => <option key={l} value={l}>{l}{l === "ปวช.1" ? " (ค่าเริ่มต้น)" : ""}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
             
