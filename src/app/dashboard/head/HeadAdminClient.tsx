@@ -45,6 +45,14 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
   // Filter teachers for the dropdown
   const teachers = users.filter(u => u.role === "TEACHER" || u.role === "HEAD");
+  const allRoomsList = useMemo(() => Object.values(roomOptions).flat(), []);
+  const selectedTeacher = teachers.find(t => t.id === subjTeacherId);
+  const isShowingSelectedTeacher = !!selectedTeacher && teacherSearchQuery === selectedTeacher.name;
+  const filteredTeachers = teachers.filter(t => {
+    if (!teacherSearchQuery || isShowingSelectedTeacher) return true;
+    return t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase());
+  });
+  const isExactRoom = allRoomsList.includes(subjRoom);
 
   // ---------- Schedules State ----------
   const currentTermConfig = termConfigs.find((t: any) => t.isCurrent);
@@ -162,17 +170,22 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
 
   const handleEditSubject = (s: any) => {
     setSubjId(s.id); setSubjCode(s.code); setSubjName(s.name); setSubjLevel(s.level || "ไม่ระบุ"); setSubjTeacherId(s.teacherId || "");
+    const foundTeacher = teachers.find(t => t.id === s.teacherId);
+    setTeacherSearchQuery(s.teacher?.name || foundTeacher?.name || "");
     setSubjAcademicYear(s.academicYear || levelToYear(s.level || "")); setSubjTerm(s.term || "1"); setSubjCredit(s.credit !== undefined ? Number(s.credit) : 3.0);
     setSubjGroup(s.group || "ก.1,2");
     setSubjRoom(s.room || "");
+    setRoomSearchQuery(s.room || "");
     setIsEditSubjectModalOpen(true);
   };
 
   const resetSubjectForm = () => {
     setSubjId(""); setSubjCode(""); setSubjName(""); setSubjLevel("ปวช.1"); setSubjTeacherId("");
+    setTeacherSearchQuery("");
     setSubjAcademicYear(String(currentBEYear)); setSubjTerm("1"); setSubjCredit(3.0); setSubjGroup("ก.1,2"); setSubjRoom("");
-    setIsRoomDropdownOpen(false); setRoomSearchQuery("");
-    setIsTeacherDropdownOpen(false); setTeacherSearchQuery("");
+    setRoomSearchQuery("");
+    setIsRoomDropdownOpen(false);
+    setIsTeacherDropdownOpen(false);
     setIsSubjectSuggestOpen(false);
     setIsEditSubjectModalOpen(false);
   };
@@ -849,10 +862,10 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
         {activeTab === "subjects" && (
           <div className="space-y-6">
             {!isEditSubjectModalOpen && (
-              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden transition-all duration-200">
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm transition-all duration-200">
                 <div 
                   onClick={() => setIsAddSubjectOpen(!isAddSubjectOpen)}
-                  className="flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors select-none"
+                  className={`flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-gray-50/80 dark:hover:bg-gray-700/50 transition-colors select-none ${isAddSubjectOpen ? 'rounded-t-xl' : 'rounded-xl'}`}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
@@ -894,7 +907,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 </div>
 
                 {isAddSubjectOpen && (
-                  <div className="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/40">
+                  <div className="p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/40 rounded-b-xl">
                     <form onSubmit={handleSaveSubject} className="flex gap-4 items-end flex-wrap">
               {/* ช่องรหัสวิชา พร้อม Live Suggestion */}
               <div className="relative">
@@ -1032,57 +1045,96 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   {groupOptions.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
-              <div className="relative min-w-[200px]">
+              <div className="relative min-w-[220px]">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">อาจารย์ประจำวิชา (เลือกหรือไม่ก็ได้)</label>
                 {isTeacherDropdownOpen && (
-                  <div className="fixed inset-0 z-40" onClick={() => setIsTeacherDropdownOpen(false)}></div>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => {
+                      setIsTeacherDropdownOpen(false);
+                      const cur = teachers.find(t => t.id === subjTeacherId);
+                      setTeacherSearchQuery(cur ? cur.name : "");
+                    }}
+                  ></div>
                 )}
-                <div className="relative z-40">
-                  <div
-                    onClick={() => setIsTeacherDropdownOpen(!isTeacherDropdownOpen)}
-                    className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isTeacherDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
-                  >
-                    <span className={`${subjTeacherId ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}`}>
-                      {subjTeacherId
-                        ? (teachers.find(t => t.id === subjTeacherId)?.name || "-- ไม่ระบุ --")
-                        : "-- ไม่ระบุ --"}
-                    </span>
-                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isTeacherDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                <div className="relative z-40 mt-1">
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={teacherSearchQuery}
+                      onChange={e => {
+                        setTeacherSearchQuery(e.target.value);
+                        setIsTeacherDropdownOpen(true);
+                        if (!e.target.value) setSubjTeacherId("");
+                      }}
+                      onFocus={(e) => {
+                        setIsTeacherDropdownOpen(true);
+                        e.target.select();
+                      }}
+                      placeholder="พิมพ์ค้นหาชื่ออาจารย์..."
+                      className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-14 bg-white dark:bg-gray-800 dark:text-white"
+                    />
+                    <div className="absolute right-2 flex items-center gap-1 text-gray-400">
+                      {(subjTeacherId || teacherSearchQuery) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubjTeacherId("");
+                            setTeacherSearchQuery("");
+                            setIsTeacherDropdownOpen(false);
+                          }}
+                          className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                          title="ล้างค่า"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsTeacherDropdownOpen(!isTeacherDropdownOpen)}
+                        className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                      >
+                        <svg className={`w-4 h-4 transition-transform duration-150 ${isTeacherDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
                   {isTeacherDropdownOpen && (
-                    <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
-                      <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                        <input
-                          type="text"
-                          value={teacherSearchQuery}
-                          onChange={e => setTeacherSearchQuery(e.target.value)}
-                          placeholder="ค้นหาชื่ออาจารย์..."
-                          className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                          autoFocus
-                        />
-                      </div>
+                    <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
                       <div className="py-1">
                         <div
-                          onClick={() => { setSubjTeacherId(""); setIsTeacherDropdownOpen(false); setTeacherSearchQuery(""); }}
-                          className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                          onClick={() => { 
+                            setSubjTeacherId(""); 
+                            setTeacherSearchQuery(""); 
+                            setIsTeacherDropdownOpen(false); 
+                          }}
+                          className={`px-3 py-2 text-sm cursor-pointer italic ${!subjTeacherId ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 font-medium' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                         >
                           -- ไม่ระบุ --
                         </div>
-                        {teachers
-                          .filter(t => !teacherSearchQuery || t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase()))
-                          .map(t => (
-                            <div
-                              key={t.id}
-                              onClick={() => { setSubjTeacherId(t.id); setIsTeacherDropdownOpen(false); setTeacherSearchQuery(""); }}
-                              className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${subjTeacherId === t.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
-                            >
-                              <span className="font-semibold">{t.name}</span>
-                              <span className="ml-2 text-xs text-gray-400">{t.role === "HEAD" ? "หัวหน้าแผนก" : "อาจารย์"}</span>
-                            </div>
-                          ))
-                        }
-                        {teachers.filter(t => !teacherSearchQuery || t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase())).length === 0 && (
+                        {filteredTeachers.map(t => (
+                          <div
+                            key={t.id}
+                            onClick={() => { 
+                              setSubjTeacherId(t.id); 
+                              setTeacherSearchQuery(t.name); 
+                              setIsTeacherDropdownOpen(false); 
+                            }}
+                            className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
+                              subjTeacherId === t.id 
+                                ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' 
+                                : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'
+                            }`}
+                          >
+                            <span className="font-semibold">{t.name}</span>
+                            <span className="ml-2 text-xs text-gray-400">{t.role === "HEAD" ? "หัวหน้าแผนก" : "อาจารย์"}</span>
+                          </div>
+                        ))}
+                        {filteredTeachers.length === 0 && (
                           <div className="px-4 py-3 text-sm text-gray-400 italic">ไม่พบอาจารย์ที่ค้นหา</div>
                         )}
                       </div>
@@ -1090,43 +1142,68 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   )}
                 </div>
               </div>
+
               <div className="relative min-w-[200px]">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ห้องเรียน</label>
                 {isRoomDropdownOpen && (
                   <div className="fixed inset-0 z-40" onClick={() => setIsRoomDropdownOpen(false)}></div>
                 )}
-                <div className="relative z-40">
-                  <div 
-                    onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
-                    className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isRoomDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
-                  >
-                    <span className={`${subjRoom ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}`}>
-                      {subjRoom || "-- ไม่ระบุ --"}
-                    </span>
-                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${isRoomDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                <div className="relative z-40 mt-1">
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={subjRoom}
+                      onChange={e => {
+                        setSubjRoom(e.target.value);
+                        setIsRoomDropdownOpen(true);
+                      }}
+                      onFocus={(e) => {
+                        setIsRoomDropdownOpen(true);
+                        e.target.select();
+                      }}
+                      placeholder="พิมพ์หรือเลือกห้องเรียน..."
+                      className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-14 bg-white dark:bg-gray-800 dark:text-white"
+                    />
+                    <div className="absolute right-2 flex items-center gap-1 text-gray-400">
+                      {subjRoom && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubjRoom("");
+                            setIsRoomDropdownOpen(false);
+                          }}
+                          className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                          title="ล้างค่า"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
+                        className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                      >
+                        <svg className={`w-4 h-4 transition-transform duration-150 ${isRoomDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
                   {isRoomDropdownOpen && (
-                    <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
-                      <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                        <input
-                          type="text"
-                          value={roomSearchQuery}
-                          onChange={e => setRoomSearchQuery(e.target.value)}
-                          placeholder="ค้นหาห้องเรียน..."
-                          className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                          autoFocus
-                        />
-                      </div>
+                    <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
                       <div className="py-1">
                         <div 
                           onClick={() => { setSubjRoom(""); setIsRoomDropdownOpen(false); }}
-                          className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                          className={`px-3 py-2 text-sm cursor-pointer italic ${!subjRoom ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 font-medium' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                         >
                           -- ไม่ระบุ --
                         </div>
                         {Object.entries(roomOptions).map(([dept, rooms]) => {
-                          const filteredRooms = rooms.filter(r => !roomSearchQuery || r.toLowerCase().includes(roomSearchQuery.toLowerCase()));
+                          const query = (subjRoom || "").trim().toLowerCase();
+                          const filteredRooms = rooms.filter(r => (!query || isExactRoom) ? true : r.toLowerCase().includes(query));
                           if (filteredRooms.length === 0) return null;
 
                           return (
@@ -1137,7 +1214,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                               {filteredRooms.map(r => (
                                 <div 
                                   key={r} 
-                                  onClick={() => { setSubjRoom(r); setIsRoomDropdownOpen(false); setRoomSearchQuery(""); }}
+                                  onClick={() => { setSubjRoom(r); setIsRoomDropdownOpen(false); }}
                                   className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${subjRoom === r ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
                                 >
                                   {r}
@@ -2388,95 +2465,161 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                 <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">อาจารย์ประจำวิชา</label>
                   {isTeacherDropdownOpen && (
-                    <div className="fixed inset-0 z-40" onClick={() => setIsTeacherDropdownOpen(false)}></div>
+                    <div 
+                      className="fixed inset-0 z-40" 
+                      onClick={() => {
+                        setIsTeacherDropdownOpen(false);
+                        const cur = teachers.find(t => t.id === subjTeacherId);
+                        setTeacherSearchQuery(cur ? cur.name : "");
+                      }}
+                    ></div>
                   )}
-                  <div className="relative z-40">
-                    <div
-                      onClick={() => setIsTeacherDropdownOpen(!isTeacherDropdownOpen)}
-                      className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isTeacherDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
-                    >
-                      <span className={`${subjTeacherId ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'} truncate`}>
-                        {subjTeacherId
-                          ? (teachers.find(t => t.id === subjTeacherId)?.name || "-- ไม่ระบุ --")
-                          : "-- ไม่ระบุ --"}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isTeacherDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  <div className="relative z-40 mt-1">
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        value={teacherSearchQuery}
+                        onChange={e => {
+                          setTeacherSearchQuery(e.target.value);
+                          setIsTeacherDropdownOpen(true);
+                          if (!e.target.value) setSubjTeacherId("");
+                        }}
+                        onFocus={(e) => {
+                          setIsTeacherDropdownOpen(true);
+                          e.target.select();
+                        }}
+                        placeholder="พิมพ์ค้นหาชื่ออาจารย์..."
+                        className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-14 bg-white dark:bg-gray-800 dark:text-white"
+                      />
+                      <div className="absolute right-2 flex items-center gap-1 text-gray-400">
+                        {(subjTeacherId || teacherSearchQuery) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubjTeacherId("");
+                              setTeacherSearchQuery("");
+                              setIsTeacherDropdownOpen(false);
+                            }}
+                            className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                            title="ล้างค่า"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIsTeacherDropdownOpen(!isTeacherDropdownOpen)}
+                          className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                        >
+                          <svg className={`w-4 h-4 transition-transform duration-150 ${isTeacherDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
 
                     {isTeacherDropdownOpen && (
-                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-48 overflow-y-auto z-50">
-                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10">
-                          <input
-                            type="text"
-                            value={teacherSearchQuery}
-                            onChange={e => setTeacherSearchQuery(e.target.value)}
-                            placeholder="ค้นหาชื่ออาจารย์..."
-                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                            autoFocus
-                          />
-                        </div>
+                      <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-48 overflow-y-auto z-50">
                         <div className="py-1">
                           <div
-                            onClick={() => { setSubjTeacherId(""); setIsTeacherDropdownOpen(false); setTeacherSearchQuery(""); }}
-                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                            onClick={() => { 
+                              setSubjTeacherId(""); 
+                              setTeacherSearchQuery(""); 
+                              setIsTeacherDropdownOpen(false); 
+                            }}
+                            className={`px-3 py-2 text-sm cursor-pointer italic ${!subjTeacherId ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 font-medium' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                           >
                             -- ไม่ระบุ --
                           </div>
-                          {teachers
-                            .filter(t => !teacherSearchQuery || t.name.toLowerCase().includes(teacherSearchQuery.toLowerCase()))
-                            .map(t => (
-                              <div
-                                key={t.id}
-                                onClick={() => { setSubjTeacherId(t.id); setIsTeacherDropdownOpen(false); setTeacherSearchQuery(""); }}
-                                className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${subjTeacherId === t.id ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
-                              >
-                                <span className="font-semibold">{t.name}</span>
-                                <span className="ml-2 text-xs text-gray-400">{t.role === "HEAD" ? "หัวหน้าแผนก" : "อาจารย์"}</span>
-                              </div>
-                            ))
-                          }
+                          {filteredTeachers.map(t => (
+                            <div
+                              key={t.id}
+                              onClick={() => { 
+                                setSubjTeacherId(t.id); 
+                                setTeacherSearchQuery(t.name); 
+                                setIsTeacherDropdownOpen(false); 
+                              }}
+                              className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
+                                subjTeacherId === t.id 
+                                  ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' 
+                                  : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'
+                              }`}
+                            >
+                              <span className="font-semibold">{t.name}</span>
+                              <span className="ml-2 text-xs text-gray-400">{t.role === "HEAD" ? "หัวหน้าแผนก" : "อาจารย์"}</span>
+                            </div>
+                          ))}
+                          {filteredTeachers.length === 0 && (
+                            <div className="px-4 py-3 text-sm text-gray-400 italic">ไม่พบอาจารย์ที่ค้นหา</div>
+                          )}
                         </div>
                       </div>
                     )}
                   </div>
                 </div>
-                <div className="relative min-w-[200px]">
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">ห้องเรียน</label>
                   {isRoomDropdownOpen && (
                     <div className="fixed inset-0 z-40" onClick={() => setIsRoomDropdownOpen(false)}></div>
                   )}
-                  <div className="relative z-40">
-                    <div 
-                      onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
-                      className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isRoomDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
-                    >
-                      <span className={`${subjRoom ? 'text-gray-900 dark:text-gray-100' : 'text-gray-500'}`}>
-                        {subjRoom || "-- ไม่ระบุ --"}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${isRoomDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  <div className="relative z-40 mt-1">
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        value={subjRoom}
+                        onChange={e => {
+                          setSubjRoom(e.target.value);
+                          setIsRoomDropdownOpen(true);
+                        }}
+                        onFocus={(e) => {
+                          setIsRoomDropdownOpen(true);
+                          e.target.select();
+                        }}
+                        placeholder="พิมพ์หรือเลือกห้องเรียน..."
+                        className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-14 bg-white dark:bg-gray-800 dark:text-white"
+                      />
+                      <div className="absolute right-2 flex items-center gap-1 text-gray-400">
+                        {subjRoom && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubjRoom("");
+                              setIsRoomDropdownOpen(false);
+                            }}
+                            className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                            title="ล้างค่า"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setIsRoomDropdownOpen(!isRoomDropdownOpen)}
+                          className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                        >
+                          <svg className={`w-4 h-4 transition-transform duration-150 ${isRoomDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
 
                     {isRoomDropdownOpen && (
-                      <div className="absolute w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-60 overflow-y-auto z-50">
-                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                          <input
-                            type="text"
-                            value={roomSearchQuery}
-                            onChange={e => setRoomSearchQuery(e.target.value)}
-                            placeholder="ค้นหาห้องเรียน..."
-                            className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                            autoFocus
-                          />
-                        </div>
+                      <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-48 overflow-y-auto z-50">
                         <div className="py-1">
                           <div 
                             onClick={() => { setSubjRoom(""); setIsRoomDropdownOpen(false); }}
-                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                            className={`px-3 py-2 text-sm cursor-pointer italic ${!subjRoom ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 font-medium' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                           >
                             -- ไม่ระบุ --
                           </div>
                           {Object.entries(roomOptions).map(([dept, rooms]) => {
-                            const filteredRooms = rooms.filter(r => !roomSearchQuery || r.toLowerCase().includes(roomSearchQuery.toLowerCase()));
+                            const query = (subjRoom || "").trim().toLowerCase();
+                            const filteredRooms = rooms.filter(r => (!query || isExactRoom) ? true : r.toLowerCase().includes(query));
                             if (filteredRooms.length === 0) return null;
 
                             return (
@@ -2487,7 +2630,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                                 {filteredRooms.map(r => (
                                   <div 
                                     key={r} 
-                                    onClick={() => { setSubjRoom(r); setIsRoomDropdownOpen(false); setRoomSearchQuery(""); }}
+                                    onClick={() => { setSubjRoom(r); setIsRoomDropdownOpen(false); }}
                                     className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${subjRoom === r ? 'bg-indigo-50 text-indigo-900 border-l-2 border-indigo-500 dark:bg-indigo-900/60 dark:text-indigo-200' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50 border-l-2 border-transparent'}`}
                                   >
                                     {r}
