@@ -5,7 +5,6 @@ import {
   GraduationCap, 
   ArrowRight, 
   Calendar, 
-  Users, 
   BookOpen, 
   Clock, 
   CheckCircle2, 
@@ -400,7 +399,7 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
           สิ่งที่ควรทำต่อเมื่อเปิดภาคเรียนใหม่ (Next Steps Checklist)
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <button
             onClick={() => setActiveTab("subjects")}
             className="p-4 rounded-xl border border-gray-100 dark:border-gray-700/60 bg-gray-50/50 dark:bg-gray-700/20 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 hover:border-indigo-200 transition-all text-left group"
@@ -430,22 +429,6 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
             </h4>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               กำหนดห้องเรียน เวลาเรียน และมอบหมายอาจารย์ผู้สอน
-            </p>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("users")}
-            className="p-4 rounded-xl border border-gray-100 dark:border-gray-700/60 bg-gray-50/50 dark:bg-gray-700/20 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 hover:border-indigo-200 transition-all text-left group"
-          >
-            <div className="p-2.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-xl w-fit mb-3">
-              <Users className="w-5 h-5" />
-            </div>
-            <h4 className="font-bold text-sm text-gray-900 dark:text-white flex items-center justify-between">
-              3. รับสมัคร/นำเข้านักเรียนใหม่
-              <ChevronRight className="w-4 h-4 text-gray-400 group-hover:translate-x-1 transition-transform" />
-            </h4>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              เพิ่มบัญชีนักเรียนใหม่สำหรับชั้น ปวช.1 และ ปวส.1
             </p>
           </button>
         </div>
