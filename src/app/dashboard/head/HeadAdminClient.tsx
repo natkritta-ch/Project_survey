@@ -1449,44 +1449,82 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
                   </label>
               
                   {isSchedDropdownOpen && (
-                    <div className="fixed inset-0 z-40" onClick={() => setIsSchedDropdownOpen(false)}></div>
+                    <div className="fixed inset-0 z-40" onClick={() => { setIsSchedDropdownOpen(false); setSchedSearchQuery(""); }}></div>
                   )}
 
                   <div className="relative z-40">
-                    <div 
-                      onClick={() => setIsSchedDropdownOpen(!isSchedDropdownOpen)}
-                      className={`mt-1 flex items-center justify-between w-full rounded-md border shadow-sm sm:text-sm px-3 py-2 cursor-pointer bg-white dark:bg-gray-800 transition-colors ${isSchedDropdownOpen ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400'}`}
-                    >
-                      <span className={`${schedSubjId ? 'text-gray-900 dark:text-gray-100 font-medium' : 'text-gray-500'}`}>
-                        {schedSubjId 
-                          ? (() => {
+                    <div className="relative flex items-center mt-1">
+                      <input
+                        type="text"
+                        value={
+                          isSchedDropdownOpen
+                            ? schedSearchQuery
+                            : (() => {
+                                const s = subjects.find(x => x.id === schedSubjId);
+                                if (!s) return "";
+                                const groupBadge = s.group ? ` [กลุ่ม ${s.group}]` : "";
+                                const teacherPart = s.teacher?.name ? ` (อ.${s.teacher.name}${s.room ? ` | ห้อง ${s.room}` : ""})` : (s.room ? ` (ห้อง ${s.room})` : "");
+                                return `${s.code} ${s.name}${groupBadge}${teacherPart}`;
+                              })()
+                        }
+                        onChange={e => {
+                          setSchedSearchQuery(e.target.value);
+                          setIsSchedDropdownOpen(true);
+                          if (!e.target.value) setSchedSubjId("");
+                        }}
+                        onFocus={(e) => {
+                          setIsSchedDropdownOpen(true);
+                          const s = subjects.find(x => x.id === schedSubjId);
+                          setSchedSearchQuery(s ? s.name : "");
+                          e.target.select();
+                        }}
+                        placeholder="พิมพ์ค้นหารหัส, ชื่อวิชา, กลุ่ม, อาจารย์ หรือห้อง..."
+                        className="block w-full rounded-md border border-gray-300 dark:border-gray-600 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 sm:text-sm px-3 py-2 pr-14 bg-white dark:bg-gray-800 dark:text-white"
+                      />
+                      <div className="absolute right-2 flex items-center gap-1 text-gray-400">
+                        {(schedSubjId || schedSearchQuery) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSchedSubjId("");
+                              setSchedSearchQuery("");
+                              setIsSchedDropdownOpen(false);
+                            }}
+                            className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                            title="ล้างการเลือกวิชา"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSchedDropdownOpen) {
+                              setIsSchedDropdownOpen(false);
+                              setSchedSearchQuery("");
+                            } else {
+                              setIsSchedDropdownOpen(true);
                               const s = subjects.find(x => x.id === schedSubjId);
-                              if (!s) return "-- เลือกวิชา --";
-                              const groupBadge = s.group ? ` [กลุ่ม ${s.group}]` : "";
-                              const teacherPart = s.teacher?.name ? ` (อ.${s.teacher.name}${s.room ? ` | ห้อง ${s.room}` : ""})` : (s.room ? ` (ห้อง ${s.room})` : "");
-                              return `${s.code} ${s.name}${groupBadge}${teacherPart}`;
-                            })()
-                          : "-- เลือกวิชา --"}
-                      </span>
-                      <svg className={`w-4 h-4 text-gray-400 transition-transform ${isSchedDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                              setSchedSearchQuery(s ? s.name : "");
+                            }
+                          }}
+                          className="p-1 hover:text-gray-600 dark:hover:text-gray-200 transition"
+                        >
+                          <svg className={`w-4 h-4 transition-transform duration-150 ${isSchedDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
 
                     {isSchedDropdownOpen && (
                       <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-xl max-h-64 overflow-y-auto z-50">
-                        <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 z-10 shadow-sm">
-                          <input
-                            type="text"
-                            value={schedSearchQuery}
-                            onChange={e => setSchedSearchQuery(e.target.value)}
-                            placeholder="ค้นหารหัส, ชื่อวิชา, กลุ่ม, อาจารย์ หรือห้อง..."
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-                            autoFocus
-                          />
-                        </div>
                         <div className="py-1">
                           <div 
-                            onClick={() => { setSchedSubjId(""); setIsSchedDropdownOpen(false); }}
-                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic"
+                            onClick={() => { setSchedSubjId(""); setIsSchedDropdownOpen(false); setSchedSearchQuery(""); }}
+                            className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer italic border-b border-gray-100 dark:border-gray-700"
                           >
                             -- ยกเลิกการเลือกวิชา --
                           </div>

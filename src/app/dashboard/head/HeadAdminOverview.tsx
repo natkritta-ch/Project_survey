@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Search, ChevronDown, Clock } from "lucide-react";
+import { Users, AlertTriangle, BookOpen, UserCheck, ShieldAlert, BadgeCheck, Search, ChevronDown, Clock, X } from "lucide-react";
 import * as XLSX from "xlsx";
 
 export default function HeadAdminOverview({ subjects, users, levelsOptions, termConfigs = [] }: { subjects: any[], users: any[], levelsOptions: string[], termConfigs?: any[] }) {
@@ -431,37 +431,60 @@ export default function HeadAdminOverview({ subjects, users, levelsOptions, term
               <span className="font-semibold text-slate-500 whitespace-nowrap hidden sm:inline-block">วิชา:</span>
               <div className="relative">
                 {isSubjectKrDropdownOpen && (
-                  <div className="fixed inset-0 z-40" onClick={() => setIsSubjectKrDropdownOpen(false)}></div>
+                  <div className="fixed inset-0 z-40" onClick={() => { setIsSubjectKrDropdownOpen(false); setSubjectKrSearch(""); }}></div>
                 )}
                 <div className="relative z-40">
-                  <div
-                    onClick={() => setIsSubjectKrDropdownOpen(!isSubjectKrDropdownOpen)}
-                    className={`flex items-center justify-between gap-1.5 px-3 py-1.5 border border-rose-200 dark:border-slate-600 rounded-lg text-sm cursor-pointer bg-white dark:bg-slate-900 transition-colors max-w-[200px] ${
-                      isSubjectKrDropdownOpen ? 'border-rose-400 ring-2 ring-rose-400/20' : 'hover:border-rose-300'
-                    }`}
-                  >
-                    <span className="truncate text-slate-700 dark:text-slate-200 font-medium">
-                      {filterSubjectKr === "ทั้งหมด" ? "-- ทุกวิชา --" : filterSubjectKr}
-                    </span>
-                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${isSubjectKrDropdownOpen ? 'rotate-180' : ''}`} />
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={isSubjectKrDropdownOpen ? subjectKrSearch : (filterSubjectKr === "ทั้งหมด" ? "" : filterSubjectKr)}
+                      onChange={e => {
+                        setSubjectKrSearch(e.target.value);
+                        setIsSubjectKrDropdownOpen(true);
+                      }}
+                      onFocus={e => {
+                        setIsSubjectKrDropdownOpen(true);
+                        setSubjectKrSearch(filterSubjectKr === "ทั้งหมด" ? "" : filterSubjectKr);
+                        e.target.select();
+                      }}
+                      placeholder="-- ทุกวิชา (พิมพ์ค้นหา) --"
+                      className="w-48 sm:w-56 pl-3 pr-14 py-1.5 border border-rose-200 dark:border-slate-600 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-400"
+                    />
+                    <div className="absolute right-1.5 flex items-center gap-0.5 text-slate-400">
+                      {filterSubjectKr !== "ทั้งหมด" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilterSubjectKr("ทั้งหมด");
+                            setSubjectKrSearch("");
+                            setIsSubjectKrDropdownOpen(false);
+                          }}
+                          className="p-1 hover:text-rose-500 transition"
+                          title="ล้างตัวกรองวิชา"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isSubjectKrDropdownOpen) {
+                            setIsSubjectKrDropdownOpen(false);
+                            setSubjectKrSearch("");
+                          } else {
+                            setIsSubjectKrDropdownOpen(true);
+                            setSubjectKrSearch(filterSubjectKr === "ทั้งหมด" ? "" : filterSubjectKr);
+                          }
+                        }}
+                        className="p-1 hover:text-slate-600 dark:hover:text-slate-200 transition"
+                      >
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isSubjectKrDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    </div>
                   </div>
 
                   {isSubjectKrDropdownOpen && (
                     <div className="absolute right-0 sm:left-0 top-full mt-1 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-50 animate-in fade-in zoom-in-95">
-                      <div className="p-2 sticky top-0 bg-white dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 z-10 shadow-sm">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={subjectKrSearch}
-                            onChange={e => setSubjectKrSearch(e.target.value)}
-                            placeholder="ค้นหาชื่อวิชา..."
-                            className="w-full pl-7 pr-2.5 py-1 text-xs border border-slate-200 dark:border-slate-600 rounded-md bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:border-rose-400"
-                            autoFocus
-                          />
-                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2 top-1.5" />
-                        </div>
-                      </div>
-
                       <div className="py-1 divide-y divide-slate-50 dark:divide-slate-700/50">
                         {(!subjectKrSearch || "ทั้งหมด".includes(subjectKrSearch.toLowerCase())) && (
                           <div

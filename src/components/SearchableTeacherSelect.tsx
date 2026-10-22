@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Search, ChevronDown, Check, X, User } from "lucide-react";
+import { ChevronDown, Check, X, User } from "lucide-react";
 
 export interface TeacherOption {
   id: string;
@@ -36,31 +36,37 @@ export default function SearchableTeacherSelect({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // หาอาจารย์ที่ถูกเลือกปัจจุบัน
   const selectedTeacher = teachers.find(t => t.id === value);
+
+  // อัปเดต searchTerm เมื่อไม่ได้เปิด dropdown เพื่อให้แสดงชื่อครูที่เลือกอยู่
+  useEffect(() => {
+    if (!isOpen) {
+      if (selectedTeacher) {
+        setSearchTerm(selectedTeacher.name + (selectedTeacher.nickname ? ` (${selectedTeacher.nickname})` : ""));
+      } else {
+        setSearchTerm("");
+      }
+    }
+  }, [value, selectedTeacher, isOpen]);
 
   // ปิดเมนูเมื่อคลิกด้านนอก
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        setSearchTerm("");
+        if (selectedTeacher) {
+          setSearchTerm(selectedTeacher.name + (selectedTeacher.nickname ? ` (${selectedTeacher.nickname})` : ""));
+        } else {
+          setSearchTerm("");
+        }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // โฟกัสช่องค้นหาอัตโนมัติเมื่อเปิด
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => {
-        searchInputRef.current?.focus();
-      }, 50);
-    }
-  }, [isOpen]);
+  }, [selectedTeacher]);
 
   // กรองรายชื่ออาจารย์ตามคำค้นหา
   const filteredTeachers = teachers.filter(t => {
@@ -75,87 +81,87 @@ export default function SearchableTeacherSelect({
   const handleSelect = (teacherId: string | null) => {
     onChange(teacherId);
     setIsOpen(false);
-    setSearchTerm("");
+    if (!teacherId) {
+      setSearchTerm("");
+    } else {
+      const chosen = teachers.find(t => t.id === teacherId);
+      if (chosen) {
+        setSearchTerm(chosen.name + (chosen.nickname ? ` (${chosen.nickname})` : ""));
+      }
+    }
   };
 
   return (
     <div ref={containerRef} className={`relative w-full ${className}`}>
-      {/* ปุ่มกดเปิด Dropdown */}
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between text-left text-xs px-3 py-2 rounded-xl border transition-all ${
-          disabled 
-            ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700" 
-            : isOpen 
-              ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-white dark:bg-gray-800 text-gray-900 dark:text-white" 
-              : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 text-gray-800 dark:text-gray-200"
-        }`}
-      >
-        <div className="flex items-center gap-2 truncate pr-2">
-          <User className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-          {selectedTeacher ? (
-            <span className="font-medium text-gray-900 dark:text-white truncate">
-              {selectedTeacher.name}
-              {selectedTeacher.nickname && (
-                <span className="text-gray-400 dark:text-gray-400 text-[11px] ml-1">
-                  ({selectedTeacher.nickname})
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="text-gray-400 dark:text-gray-500 truncate">{placeholder}</span>
-          )}
+      {/* ช่องพิมพ์ค้นหาโดยตรง (Direct Searchable Input) */}
+      <div className="relative flex items-center">
+        <div className="absolute left-3 pointer-events-none text-gray-400">
+          <User className="w-3.5 h-3.5" />
         </div>
+        <input
+          ref={inputRef}
+          type="text"
+          disabled={disabled}
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setIsOpen(true);
+            if (!e.target.value && allowClear) {
+              onChange(null);
+            }
+          }}
+          onFocus={(e) => {
+            setIsOpen(true);
+            e.target.select();
+          }}
+          placeholder={placeholder}
+          className={`w-full text-xs pl-8 pr-14 py-2 rounded-xl border transition-all ${
+            disabled 
+              ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700" 
+              : isOpen 
+                ? "border-indigo-500 ring-2 ring-indigo-500/20 bg-white dark:bg-gray-800 text-gray-900 dark:text-white" 
+                : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600 text-gray-800 dark:text-gray-200"
+          }`}
+        />
 
-        <div className="flex items-center gap-1 shrink-0">
-          {allowClear && selectedTeacher && !disabled && (
-            <span
-              role="button"
-              tabIndex={0}
+        <div className="absolute right-2 flex items-center gap-0.5">
+          {allowClear && (value || searchTerm) && !disabled && (
+            <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 handleSelect(null);
+                inputRef.current?.focus();
               }}
               className="p-1 text-gray-400 hover:text-rose-500 rounded-md transition"
               title="ล้างตัวเลือก"
             >
               <X className="w-3.5 h-3.5" />
-            </span>
+            </button>
           )}
-          <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isOpen ? "rotate-180 text-indigo-500" : ""}`} />
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              if (isOpen) {
+                setIsOpen(false);
+              } else {
+                setIsOpen(true);
+                inputRef.current?.focus();
+                inputRef.current?.select();
+              }
+            }}
+            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition"
+            title={isOpen ? "ปิดตัวเลือก" : "เปิดตัวเลือก"}
+          >
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-150 ${isOpen ? "rotate-180 text-indigo-500" : ""}`} />
+          </button>
         </div>
-      </button>
+      </div>
 
-      {/* Popover Dropdown พร้อมช่องค้นหา */}
-      {isOpen && (
+      {/* รายการตัวเลือกแสดงใต้ช่องทันที (ไม่มีช่องค้นหาซ้อน) */}
+      {isOpen && !disabled && (
         <div className="absolute z-50 left-0 right-0 mt-1.5 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          {/* ช่องพิมพ์ค้นหา (Search Input) */}
-          <div className="p-2 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/40">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="พิมพ์ค้นหาชื่ออาจารย์, รหัส, ชื่อเล่น..."
-                className="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-              />
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={() => setSearchTerm("")}
-                  className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* รายการตัวเลือก (Options List) */}
           <div className="max-h-56 overflow-y-auto py-1 divide-y divide-gray-50 dark:divide-gray-700/30">
             {allowClear && (
               <div
