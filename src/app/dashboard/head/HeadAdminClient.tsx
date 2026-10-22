@@ -196,10 +196,26 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
     setIsLoading(true);
     try {
       if (schedId) {
-        await updateSchedule(schedId, { subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
+        const res = await updateSchedule(schedId, { subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
+        if (res && res.success === false) {
+          if (res.error?.includes("TIME_COLLISION")) {
+            showWarning("เวลาเรียนชนกัน!", res.error.replace("TIME_COLLISION: ", ""));
+          } else {
+            showError("เกิดข้อผิดพลาด", res.error || "ไม่สามารถบันทึกตารางเรียนได้");
+          }
+          return;
+        }
         showToast("แก้ไขตารางเรียนสำเร็จ", "success");
       } else {
-        await createSchedule({ subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
+        const res = await createSchedule({ subjectId: schedSubjId, dayOfWeek: parseInt(schedDay), startTime: schedStart, endTime: schedEnd });
+        if (res && res.success === false) {
+          if (res.error?.includes("TIME_COLLISION")) {
+            showWarning("เวลาเรียนชนกัน!", res.error.replace("TIME_COLLISION: ", ""));
+          } else {
+            showError("เกิดข้อผิดพลาด", res.error || "ไม่สามารถบันทึกตารางเรียนได้");
+          }
+          return;
+        }
         showToast("เพิ่มคาบเรียนลงในตารางสำเร็จ", "success");
       }
       resetScheduleForm();
@@ -208,7 +224,7 @@ export default function HeadAdminClient({ subjects, schedules, users, termConfig
       if (msg.includes("TIME_COLLISION")) {
         showWarning("เวลาเรียนชนกัน!", msg.replace("TIME_COLLISION: ", ""));
       } else {
-        showError("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกตารางเรียนได้");
+        showError("เกิดข้อผิดพลาด", msg || "ไม่สามารถบันทึกตารางเรียนได้");
       }
     } finally {
       setIsLoading(false);
