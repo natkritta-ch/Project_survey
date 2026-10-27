@@ -292,7 +292,7 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
               <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
                 สถิตินักเรียนที่กำลังศึกษา ({activeStudents.length} คน)
               </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div className="bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
                   <span className="text-xs text-gray-500 block">ปวช.1</span>
                   <span className="text-base font-bold text-gray-800 dark:text-white">{studentCounts["ปวช.1"] || 0} คน</span>
@@ -312,6 +312,14 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
                 <div className="bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
                   <span className="text-xs text-gray-500 block">ปวส.2</span>
                   <span className="text-base font-bold text-gray-800 dark:text-white">{studentCounts["ปวส.2"] || 0} คน</span>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <span className="text-xs text-gray-500 block">ปวส.1(ม.6)</span>
+                  <span className="text-base font-bold text-gray-800 dark:text-white">{studentCounts["ปวส.1(ม.6)"] || 0} คน</span>
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <span className="text-xs text-gray-500 block">ปวส.2(ม.6)</span>
+                  <span className="text-base font-bold text-gray-800 dark:text-white">{studentCounts["ปวส.2(ม.6)"] || 0} คน</span>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-900/50 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
                   <span className="text-xs text-gray-500 block">จบการศึกษา</span>
@@ -498,6 +506,8 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
                     <li>ปวช.3 ({studentCounts["ปวช.3"] || 0} คน) ➡️ ปรับเป็น <strong>จบการศึกษา</strong></li>
                     <li>ปวส.1 ({studentCounts["ปวส.1"] || 0} คน) ➡️ เลื่อนขึ้น <strong>ปวส.2</strong></li>
                     <li>ปวส.2 ({studentCounts["ปวส.2"] || 0} คน) ➡️ ปรับเป็น <strong>จบการศึกษา</strong></li>
+                    <li>ปวส.1(ม.6) ({studentCounts["ปวส.1(ม.6)"] || 0} คน) ➡️ เลื่อนขึ้น <strong>ปวส.2(ม.6)</strong></li>
+                    <li>ปวส.2(ม.6) ({studentCounts["ปวส.2(ม.6)"] || 0} คน) ➡️ ปรับเป็น <strong>จบการศึกษา</strong></li>
                   </ul>
                 ) : (
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
@@ -520,7 +530,7 @@ export default function HeadProgressionManagement({ users, termConfigs, setActiv
                             เลื่อนอาจารย์ที่ปรึกษาตามรุ่นชั้นปีด้วย
                           </span>
                           <p className="text-[11px] text-gray-500 mt-0.5">
-                            ครูที่ปรึกษา ปวช.1 ➡️ ปวช.2, ปวช.2 ➡️ ปวช.3, ปวส.1 ➡️ ปวส.2 อัตโนมัติในปีการศึกษาใหม่
+                            ครูที่ปรึกษา ปวช.1 ➡️ ปวช.2, ปวช.2 ➡️ ปวช.3, ปวส.1 ➡️ ปวส.2, ปวส.1(ม.6) ➡️ ปวส.2(ม.6) อัตโนมัติในปีการศึกษาใหม่
                           </p>
                         </div>
                       </label>
