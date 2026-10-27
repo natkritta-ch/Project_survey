@@ -6,6 +6,7 @@ import { Search, Filter, Camera, Clock, Calendar, Users, MapPin, Home, LogOut, P
 import { signOut } from "next-auth/react";
 import { showSuccess, showError, showWarning, showInfo, showToast, showConfirm, showPromptNumber } from "@/lib/alerts";
 import TeacherAdvisoryView from "./TeacherAdvisoryView";
+import TimePicker24h from "@/components/TimePicker24h";
 
 export default function TeacherDashboardClient({ 
   schedules, 
@@ -1439,26 +1440,20 @@ export default function TeacherDashboardClient({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">เวลาเริ่ม (HH:mm)</label>
-                  <input
-                    type="time"
-                    value={makeupStartTime}
-                    onChange={e => setMakeupStartTime(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-sm py-2.5 px-3 focus:ring-2 focus:ring-amber-500 outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">เวลาสิ้นสุด (HH:mm)</label>
-                  <input
-                    type="time"
-                    value={makeupEndTime}
-                    onChange={e => setMakeupEndTime(e.target.value)}
-                    className="w-full rounded-xl border border-gray-300 dark:border-gray-700 dark:bg-gray-900 text-sm py-2.5 px-3 focus:ring-2 focus:ring-amber-500 outline-none"
-                    required
-                  />
-                </div>
+                <TimePicker24h
+                  label="เวลาเริ่ม (HH:mm)"
+                  value={makeupStartTime}
+                  onChange={setMakeupStartTime}
+                  required
+                  colorTheme="amber"
+                />
+                <TimePicker24h
+                  label="เวลาสิ้นสุด (HH:mm)"
+                  value={makeupEndTime}
+                  onChange={setMakeupEndTime}
+                  required
+                  colorTheme="amber"
+                />
               </div>
 
               <div>
